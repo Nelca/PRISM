@@ -566,7 +566,7 @@ docs/
 ### モジュール(要件定義はM1〜M8すべて完了。実装順序はM3→M4→M6→M1→M2→M5→M7→M8、D-76)
 - [x] M3 要件定義済 / **実装済**(`packages/core/src/monetization/`。地理較正・適合度ティア・モンテカルロ不確実性合成・3プラグイン(代替費用法/LIME3/IFVI)・整合性検証・統合パイプライン。テスト35件通過) / 完了判定は未実施(実データ通し・M4接続後)
 - [x] M4 要件定義済 / **実装済**(`packages/core/src/divergence/`。価値概念分割・F-0〜F-3/F-8事前条件チェック・F-4/F-5要因別再計算可能性判定・対数空間Shapleyエンジン・F-9表示規則+読み下し文生成。M3の水パイロット実データで§7.3.1「乖離の100%が残差」ケースを再現。テスト44件通過、design-rationale-log D-83〜D-85) / 完了判定は未実施(M6接続後)
-- [x] M6 要件定義済 / **実装済**(`packages/core/src/decision/`。自然調整後NPV算出・深掘り推奨・拘束方式出力整形+変更履歴・判定カウント判定・トップレベル組み立て関数。M3実データでpending/crosses/does_not_crossを検証。M3実装にトルネード図が存在しなかったため`ValuationRecord.parameterUncertainty`を追加して代替(design-rationale-log D-86〜D-88)。テスト29件通過) / 完了判定は未実施(実際の投資判断接続後、build-plan §7.2)
+- [x] M6 要件定義済 / **実装済**(`packages/core/src/decision/`。自然調整後NPV算出・深掘り推奨・拘束方式出力整形+変更履歴・判定カウント判定・トップレベル組み立て関数。M3実データでpending/crosses/does_not_crossを検証。M3実装にトルネード図が存在しなかったため`ValuationRecord.parameterUncertainty`を追加し、トルネード図自体は`packages/core/src/monetization/tornado.ts`としてM3側に実装、M6はそれを消費するのみ(design-rationale-log D-86〜D-88)。テスト32件通過) / 完了判定は未実施(実際の投資判断接続後、build-plan §7.2)
 - [ ] M1 要件定義済 / 実装 / 完了判定
 - [ ] M2 要件定義済 / 実装 / 完了判定
 - [ ] M5 要件定義済 / 実装 / 完了判定

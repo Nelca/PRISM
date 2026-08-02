@@ -2,14 +2,15 @@
  * M6 D-3:深掘り推奨(dominantAssumption)の特定。
  * 参照元: docs/requirements/m6-decision-record.md §3
  *
- * M3のトルネード図を流用する設計だったが、M3実装時にはトルネード図を作らなかった
- * (plan file参照)。代わりに、layer i(parameterUncertainty.sigma)とlayer ii
- * (transferFitness.tierから導かれるsigma、uncertainty.ts/fitness.tsの既存関数を再利用)
- * を同じ尺度で比較し、どちらがレンジを支配しているかを機械的に判定する。
+ * M3のトルネード図を流用する設計だったが、当初M3の実装にはトルネード図がなかった。
+ * レビューにより「本来M3が持つべき機能をM6側で穴埋めしない」方針とし、1レコード分の
+ * 要因ランキング(層i vs 層ii)自体は`monetization/tornado.ts`にM3の機能として実装した。
+ * このモジュールが担うのは、M6固有の関心事——複数のCountermeasureが参照する複数の
+ * ValuationRecordのうち、どれが自然調整後NPVのレンジを最も支配しているかの選定——のみ。
+ * 選ばれたレコードの要因ランキングはM3のcomputeTornadoChart()にそのまま委譲する。
  */
 
-import { cvToLognormalSigma } from "../monetization/uncertainty";
-import { errorBandCvForTier } from "../monetization/fitness";
+import { computeTornadoChart } from "../monetization/tornado";
 import type { Countermeasure } from "../types/decision";
 import type { ExchangeValuationRecord } from "../types/valuation";
 
@@ -24,16 +25,10 @@ function relativeRangeWidth(record: ExchangeValuationRecord): number {
   return (record.quantileRange.p95 - record.quantileRange.p5) / record.quantileRange.p50;
 }
 
-function layerIISigma(record: ExchangeValuationRecord): number {
-  return record.transferFitness.tier === "not_applicable"
-    ? 0
-    : cvToLognormalSigma(errorBandCvForTier(record.transferFitness.tier));
-}
-
 /**
  * 関与する全ValuationRecordのうち、相対レンジ幅((p95-p5)/p50)が最大のものを
- * 「支配的レコード」とし、そのレコード内でlayer i / layer iiのどちらのsigmaが
- * 大きいかを比較して文言を組み立てる。
+ * 「支配的レコード」とする(M6固有の選定)。そのレコード内でどの層が支配的かは、
+ * M3のトルネード図(computeTornadoChart)にそのまま委譲する。
  */
 export function identifyDominantAssumption(
   countermeasures: Countermeasure[],
@@ -64,13 +59,10 @@ export function identifyDominantAssumption(
     );
   }
 
-  const sigmaI = dominantRecord.parameterUncertainty.sigma;
-  const sigmaII = layerIISigma(dominantRecord);
+  const [topFactor] = computeTornadoChart(dominantRecord);
 
-  const dominantAssumption =
-    sigmaI >= sigmaII
-      ? `${dominantRecord.methodId}のパラメータ不確実性(層i、sigma≈${sigmaI.toFixed(3)})が、レンジを支配する主要な前提です。`
-      : `${dominantRecord.methodId}の適合度ティア${dominantRecord.transferFitness.tier}由来の移転誤差(層ii、sigma≈${sigmaII.toFixed(3)})が、レンジを支配する主要な前提です。`;
-
-  return { dominantAssumption, sourceValuationRecordId: dominantRecord.id };
+  return {
+    dominantAssumption: `${dominantRecord.methodId}の${topFactor.label}が、レンジを支配する主要な前提です。`,
+    sourceValuationRecordId: dominantRecord.id,
+  };
 }

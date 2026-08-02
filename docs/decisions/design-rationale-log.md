@@ -937,13 +937,17 @@ build-plan §4.3「後から変えられないものが固まったか」の確�
 
 要件定義(D-1〜D-10)をロジックとして実装する過程で判明した具体的な実装判断を記録する。M6要件定義の型ファイル(`types/decision.ts`)には`evaluateVerdict()`・`buildDecisionRecordValuationRefs()`が既に実装済みだったため、これらはそのまま再利用し、残りの計算のみを新規実装した。
 
-### D-86 M6 D-3が前提とする「M3のトルネード図」はM3実装に存在しなかった。ValuationRecordに`parameterUncertainty`を追加して代替した
+### D-86 M6 D-3が前提とする「M3のトルネード図」はM3実装に存在しなかった。M3に`monetization/tornado.ts`として実装し、M6はそれを消費するだけにした
 
 **発見:** M6要件定義書D-3は「深掘り推奨(dominantAssumption)はM3のトルネード図をそのまま流用する」としているが、M3実装時(design-rationale-log 2.15節)にトルネード図(要因別不確実性寄与の可視化)は作らなかった。`ValuationRecord`には層i×層iiを合成した後の`quantileRange`しか残っておらず、どちらの層がレンジを支配しているかを判別する情報がなかった。
 
-**対応:** `ValuationRecordCommon`に`parameterUncertainty: Distribution`(層i、`MethodOutput`が既に持つ値をそのまま引き継ぐ)を追加した。D-77・D-73と同じ「後方互換的なフィールド追加」パターン。既存の79件のテストが追加後も全て通ることを確認済み。
+**データモデルの対応:** `ValuationRecordCommon`に`parameterUncertainty: Distribution`(層i、`MethodOutput`が既に持つ値をそのまま引き継ぐ)を追加した。D-77・D-73と同じ「後方互換的なフィールド追加」パターン。
 
-**実装:** 層i(`parameterUncertainty.sigma`)と層ii(`transferFitness.tier`→`errorBandCvForTier()`→`cvToLognormalSigma()`、いずれもM3の既存関数を再利用)を同じ尺度(対数正規sigma)で比較し、大きい方を`dominantAssumption`の文言に反映する(`decision/dominant-assumption.ts`)。正式なトルネード図(グラフ表示)ではなく、その最小限の機械的代替。
+**当初の実装ミスとその修正(2026-08-02、ユーザー指摘):** 最初の実装では、層i(`parameterUncertainty.sigma`)と層ii(`errorBandCvForTier()`→`cvToLognormalSigma()`)の比較ロジックを`decision/dominant-assumption.ts`(M6側)に直接書いてしまった。ユーザーから「本来M3にあるべき機能ならM3に追加すべきで、M6側で修正を加えるのは望ましくない」との指摘を受け、精査した結果その通りだと判断した。**1件のValuationRecordの不確実性がどの層に支配されているかは、Countermeasureや意思決定とは無関係な、ValuationRecordそのものの性質であり、M3の関心事である。** M6が本来持つべき関心事は「複数のCountermeasureが参照する複数のValuationRecordのうち、どれがレンジを最も支配しているか」という選定のみ。
+
+**修正後の設計:** `monetization/tornado.ts`に`computeTornadoChart(record): TornadoChartEntry[]`をM3の機能として実装し(層i・層iiのsigmaを降順ランキング)、`decision/dominant-assumption.ts`はCountermeasure群から支配的レコードを選ぶ(M6固有の関心事)だけの薄い実装にし、要因ランキング自体はこの関数にそのまま委譲する形に直した。正式なトルネード図(グラフ表示)ではなく、その最小限の機械的代替である点は変わらない。
+
+**教訓:** 「要件定義書が前提とする機能が実装に存在しない」ことに気づいた際、不足を埋める場所は「その機能が本来属するべきモジュール」であるべきで、たまたま今作業しているモジュール側でその場しのぎに実装しない。モジュール境界を跨ぐ機能不足を発見したら、まず「これは誰の関心事か」を問い直す。
 
 ---
 
