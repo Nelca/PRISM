@@ -25,30 +25,32 @@ docs/
   concept-v2.md                  構想書v2。設計の最上位文書
 
   requirements/                  モジュール単位の要件定義
+    m1-target-definition.md          済(対象定義とLocate)
+    m2-assessment-execution.md       済(評価実行)
+    m3-monetization-engine.md        済(貨幣化エンジン)
     m4-divergence-decomposition.md   済(乖離分解)
-    m1-target-definition.md          未
-    m2-assessment-execution.md       未
-    m3-monetization-engine.md        未
-    m5-financial-bridge.md           未
-    m6-decision-record.md            未
-    m7-disclosure-verification.md    未
-    m8-ledger-versioning.md          未
+    m5-financial-bridge.md           済(財務接続)
+    m6-decision-record.md            済(対策評価と意思決定注入)
+    m7-disclosure-verification.md    済(開示生成と整合検証)
+    m8-ledger-versioning.md          済(記録・版管理基盤)
 
   decisions/                     設計判断の記録
     design-rationale-log.md          判断の経緯(実装前に必読)
-    0001-....md                      個別ADR(今後追加)
+    0001-mvp-pilot-category-scope.md            MVP実データ検証の対象カテゴリ
+    0002-phase0-continuation-gate.md            フェーズ0末の継続判定(条件2〜4は未完了)
 
   roadmap/
     build-plan.md                  フェーズ0からMVP完成までの作業指示
 
   data/                          外部データの調査結果(フェーズ0の成果物)
-    aop-mapping-v1.md                未 — AoP正規化対応表
-    method-recalculability.md        未 — 手法別の再計算可能性
+    aop-mapping-v1.md                初版済 — AoP正規化対応表(IFVI/LIME3確認済、CE Delft未着手)
+    method-recalculability.md        初版済 — 手法別の再計算可能性
     cices-v51-notes.md               未 — CICES階層構造
-    licensing.md                     未 — ライセンス条件
+    licensing.md                     初版済 — ライセンス条件(WDPA/ENCORE/ESVD/CE Delft/IFVIの料金・条項を確認済み、契約締結は未)
 
   business/                      事業側の資料
-    (経営会議提案資料をここに置く)
+    board-proposal.md                経営会議提案資料
+    outreach-action-plan.md          LOI獲得・ライセンス確認の実行計画(問い合わせメール下書き等)
 
   background/                    参考資料。設計の直接の根拠ではない
     concept-v1.md                    構想書v1。v2で覆った判断の経緯確認用
@@ -84,8 +86,9 @@ docs/
 
 ## 現在地
 
-- フェーズ0(検証)未着手
-- 実装未着手
-- 要件定義は M4 のみ完了
+- フェーズ0(検証)進行中。AoP正規化対応表・手法別再計算可能性・ライセンス条件(WDPA/ENCORE/ESVD/CE Delft/IFVIの料金・条項確認)は初版完了
+- **[GATE] フェーズ0末の継続判定(ADR-0002)を実施。乖離分解の技術検証(文書レベル)は通過。支払意思検証(C-1)はユーザー判断により充足扱い。LOI獲得(0件)・主要係数の商用契約締結は未完了だが、実行計画(ターゲット企業リスト・問い合わせメール下書き等)は`docs/business/outreach-action-plan.md`に準備済みで、残るは人間による送信・交渉のみ(design-rationale-log D-72)。**
+- 実装未着手。ただし条件3・4の未達はモジュール実装の着手を妨げない(D-72)
+- **M1〜M8、全モジュールの要件定義が完了。** 次は[P1]データモデル確定(型定義の実装着手)、または残るアクションアイテム(LOI獲得・ライセンス契約・ESVD等の確認)への対応
 
 次にやることは `roadmap/build-plan.md` §12 のチェックリストを参照。

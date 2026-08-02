@@ -2,8 +2,8 @@
 
 **対象モジュール:** M4(乖離分解)
 **参照元:** `docs/concept-v2.md` 8.2 / 8.5 / 8.6 / 8.7 / 9.2 / 9.3 / 9.4
-**status:** ドラフト(アルゴリズムの骨格は確定、外部データ依存部分は未検証)
-**最終更新:** 2026-07-31
+**status:** 確定(アルゴリズムの骨格・実装方針が固まっている。§10の未決定事項はいずれも「暫定値、フェーズ0/パイロットの実データで見直す」性質のもので、他の確定モジュールと同じ扱い。2026-08-01、M3要件定義(D-1〜D-8)との整合を反映し§0.2・§2.1・§3.2・§7.3.1・§10・付録型定義を改訂)
+**最終更新:** 2026-08-02
 
 ---
 
@@ -27,18 +27,20 @@
 
 依存側の生態系サービス分類には CICES という共通体系が存在するが、**影響側の損害到達先(AoP)には共通体系がなく、手法ごとに独自の分類を使っている。**
 
+**2026-08-01更新:** 以下の表はフェーズ0開始時点(2026-07-31)の未検証状態を記録したものである。**LIME3の「一次生産」・IFVIの対応付けは、その後`docs/data/aop-mapping-v1.md`で一次資料に基づき解消済み。** 表は歴史的経緯として残すが、最新の対応状況は同ファイルを参照すること。
+
 | 手法 | その手法が使うAoP呼称 | 正規化コードへの対応 | 確度 |
 |---|---|---|---|
-| LIME3 | 人間健康 / 社会資産 / 一次生産 / 生物多様性 | `human_health` / `social_assets` / **対応先不明** / `ecosystem_quality` | 中〜高 |
+| LIME3 | 人間健康 / 社会資産 / 一次生産 / 生物多様性 | `human_health` / `social_assets` / ~~対応先不明~~ **`resource_availability`(解消済み、aop-mapping-v1.md §2参照)** / `ecosystem_quality` | 中〜高 |
 | ReCiPe 2016 | Human health / Ecosystems / Resource scarcity | `human_health` / `ecosystem_quality` / `resource_availability` | 中〜高 |
 | IMPACT World+ | Human health / Ecosystem quality | `human_health` / `ecosystem_quality` | 中〜高 |
-| CE Delft 環境価格 | 人間健康 / 生態系サービス / 建造物・材料 / 資源 / 厚生 | **4分類に収まらない** | 中 |
-| IFVI | (方法論文書での確認が必要) | 未確認 | — |
+| CE Delft 環境価格 | 人間健康 / 生態系サービス / 建造物・材料 / 資源 / 厚生 | **4分類に収まらない(未着手、M2「汚染」カテゴリ着手時に対応)** | 中 |
+| IFVI(Water Consumption) | VFnutrition/VFdisease/VFes/VFaccess | `human_health` / `human_health` / `resource_availability` / **`not_applicable`(解消済み、aop-mapping-v1.md §1.3参照)** | 高 |
 
-**具体的な難所:**
+**具体的な難所(解消済み・履歴として記録):**
 
-- LIME3 の「一次生産」は、資源可用性とも生態系品質とも解釈でき、機械的な変換規則が存在しない
-- CE Delft の「建造物・材料」は標準的な4分類のいずれにも素直に収まらない
+- LIME3 の「一次生産」は、資源可用性とも生態系品質とも解釈でき、機械的な変換規則が存在しなかったが、一次資料の確認により`resource_availability`と確定した(自然の光合成による生産力という定義から)
+- CE Delft の「建造物・材料」は標準的な4分類のいずれにも素直に収まらない。**これは未解消のまま(MVP水パイロットのスコープ外)**
 
 この対応付けは**判断を伴う**。したがって:
 
@@ -72,6 +74,8 @@ M4は購入理由の中心であり、実装可否がフェーズ0の最優先�
       各レコードは手法ID(版番号付き)と手法メタデータを持つ
 ```
 
+**2026-08-01追記(M3要件定義との整合):** 1つの外部手法が複数のValuationRecordを生成しうる(M3 D-1、IFVI Water Consumptionは4本の内訳値 VFnutrition/VFdisease/VFes/VFaccess に分解して取り込まれる)。したがって「N=手法の数」ではなく「**N=ValuationRecordの数**」であることに注意する。methodIdは分解元が追跡できるよう `{親手法ID}.{内訳ID}`(例:`ifvi-water-consumption.VFnutrition`)の形式を用いる。
+
 ### 2.1 比較手法数の上限
 
 **上限 N = 5(ユーザーが選択)。**
@@ -81,6 +85,10 @@ M4は購入理由の中心であり、実装可否がフェーズ0の最優先�
 - 計算量: N=5 で全ペア C(5,2)=10 ペア × 3要因の部分集合 2³=8 通り。中心値のみで60回程度の再計算であり、負荷にならない(N=10でも45ペア=270回)
 - 可読性: 10ペアの分解結果を並べても、稟議でも監査でも読めない
 - 実態: N=5でも §3 の価値概念分割により、各グループは2〜3手法に落ちるのが通常で、実質のペア数は3前後になる
+
+**2026-08-01追記(上限の適用単位を明確化):** N≤5は**価値概念で分割した後(§3段階1)の各グループ内**に適用する。分割前の総数には適用しない。
+
+理由:MVPの水パイロットでは、IFVIの分解(4本)+LIME3(1本)+代替費用法(1本)で合計6本のValuationRecordが生成され、分割前の総数はN=5を超える。しかし段階1の価値概念分割により、交換価値グループ(VFaccess・代替費用法の2本)と厚生価値グループ(VFnutrition・VFdisease・VFes・LIME3の4本)に自然に分かれ、各グループはN≤5に収まる。D-12の可読性という制限の趣旨は、そもそも同一グループ内でのペア比較の読みやすさを指しており、価値概念をまたぐグループ間は最初から比較しない(段階1で「比較不能」とラベル)ため、グループ単位で数えるのが元の趣旨に合致する。
 
 **表示設計:** フットボールチャートを主表示とし、ペア分解はドリルダウンに置く。
 
@@ -118,6 +126,8 @@ Shapley分解は定義上「手法Aの価値概念 × 手法Bのエンドポイ�
 1. 価値概念が完全一致(必須)
 2. エンドポイント被覆が一致(§6.3 の一致階層設定に従う)
 
+**2026-08-01追記:`aopCode: "not_applicable"`同士の扱い。** 代替費用モデル等、エンドポイント被覆モデルを用いない手法(M3 D-1のVFaccess、代替費用法)は`aopCode`が`not_applicable`になる(M4要件定義書§6.2の正規化コードには存在しない、AoP体系の対象外を示す値。`docs/data/aop-mapping-v1.md` §3参照)。**この場合、`not_applicable`同士は条件2(エンドポイント被覆が一致)を満たすものとして扱い、グループ化・比較の対象とする。** 理由:いずれも「エンドポイントモデルを用いない直接コスト」という共通の性質を持ち、比較すること自体に意味があるため(例:IFVIのVFaccessとPRISM自身の代替費用法は、どちらも「将来/現在の代替調達コスト」という同種の問いに答えている)。
+
 ---
 
 ## 4. 分解アルゴリズム — 対数空間 Shapley
@@ -144,6 +154,25 @@ c_i = Σ_{S ⊆ F\{i}}  [ |S|! (k−|S|−1)! / k! ] × ( ln v(S ∪ {i}) − ln
 ```
 
 k=3 なら評価が必要な部分集合は 2³ = 8 通り(うち2つは既存の V_A・V_B なので新規計算は6回)。全6順列分の平均が上式で厳密に得られる。
+
+### 4.2.1 具体例(2026-08-02追記、§7.2の数値と対応)
+
+§7.2で示すIFVI Water(V_A = 8億円)とLIME3(V_B = 3億円)の比較例を、実際に8通りの v(S) を算出して確認する。**説明を単純にするため、3要因間の相互作用がない(各要因の効果が独立に掛け合わさる)ケースを想定する。**
+
+各要因を単独で差し替えたときの倍率が、エンドポイント被覆=×2.10、割引率=×1.15、地理較正=×1.10だったとすると、8通りの v(S) は次のようになる。
+
+| 部分集合 S | v(S) | 計算式 |
+|---|---|---|
+| ∅ | 3.00億円 | = V_B |
+| {エンドポイント被覆} | 6.30億円 | 3.00 × 2.10 |
+| {割引率} | 3.45億円 | 3.00 × 1.15 |
+| {地理較正} | 3.30億円 | 3.00 × 1.10 |
+| {エンドポイント被覆, 割引率} | 7.25億円 | 3.00 × 2.10 × 1.15 |
+| {エンドポイント被覆, 地理較正} | 6.93億円 | 3.00 × 2.10 × 1.10 |
+| {割引率, 地理較正} | 3.80億円 | 3.00 × 1.15 × 1.10 |
+| {エンドポイント被覆, 割引率, 地理較正} | 7.97億円 ≈ 8.00億円 | = V_A |
+
+要因間の相互作用がないため、全6順列のどの順で差し替えても各要因の限界寄与は変わらず、Shapley値は単純にその要因単独の倍率と一致する(c_endpoint = ln 2.10、c_discount = ln 1.15、c_geo = ln 1.10)。**要因間に相互作用がある場合は、順列ごとに限界寄与が変わるため、6順列の平均を取る必要がある**(対称性公理の意味はここにある)。
 
 ### 4.3 満たす公理(監査時の検証対象)
 
@@ -437,6 +466,30 @@ B / C = 2.67倍
   未説明乖離(残差)      ×1.16   ← 分解できなかった差
 ```
 
+### 7.3.1 3要因すべてが一致し、乖離の100%が残差になる場合(2026-08-01追記)
+
+M3のMVP水パイロットで実際に起こりうる具体例。IFVIのVFnutrition・VFdiseaseとLIME3の水消費値(いずれも`human_health`・厚生価値・割引なし)を比較する場合、3要因すべてに差がない可能性がある。
+
+```
+IFVIのVFnutrition vs LIME3(水・人間健康)
+
+  エンドポイント被覆    ── 差なし(両方 human_health)──
+  割引率                ── 差なし(両方 no_time_dimension)──
+  地理較正              ── 差なし(両方、対象国自身の共変量を直接使用しており、
+                                較正ブリッジが実質的に恒等変換)──
+  ─────────────────────────────────────
+  説明済み              ×1.00(寄与する要因なし)
+  未説明乖離(残差)      ×N.NN   ← 乖離の100%が残差
+```
+
+読み下し文(自動生成)の例:
+
+> IFVIとLIME3の値は、被覆するエンドポイント・割引率の扱い・地理較正のいずれも一致しています。**それでも生じているこの乖離は、本システムが分解対象とする3要因のいずれにも起因しません。** 手法固有の推定モデルやデータソースの違い(例:被害統計の推定方法、価値評価の技法そのものの違い)による可能性があります。
+
+**これはバグではない。** M4の設計原則(§3.1・§7.3、残差を正式な分解項目として扱う)が意図通り機能した結果であり、「3要因では説明できない乖離が存在する」という事実そのものが監査・意思決定上の情報になる(§8.2参照)。
+
+**将来の検討事項として記録するに留める:** 上記の例は、現行の3要因(エンドポイント被覆・割引率・地理較正)のいずれにも属さない**「価値評価の技法」**(例:VSLのような顕示選好ベースの推定 vs 意向調査のような表明選好ベースの推定)という第4の要因が、乖離の実体である可能性を示唆する。**ただしこれは今回追加する変更ではない。** D-12が手法数上限を可読性の制約としているのと同様、要因を増やすことは分解結果の可読性・監査説明のトレードオフを伴うため、独立した設計判断として別途扱う(§10 U-7として記録)。
+
 ### 7.4 代表値の選択
 
 **システムが提供するのは判断材料であり、推奨ではない**(構想書9.3)。
@@ -506,6 +559,7 @@ M8 の前提台帳に自動生成する。以下はいずれも**再計算ハッ
 | U-4 | CICES 一致階層を Group 以外にすべきケース | 実データを見て判断 |
 | U-5 | N ≧ 3 でグループ内の全ペア分解結果をどう集約表示するか | フットボールチャート主表示までは決定。集約ロジックは未定 |
 | U-6 | AoP 対応表の初版 | §0.3 の検証成果物 |
+| U-7(新規・2026-08-01) | エンドポイント被覆・割引率・地理較正の3要因すべてが一致し、乖離が100%残差になる実例(§7.3.1)を踏まえ、「価値評価の技法」(顕示選好 vs 表明選好等)を第4の分解要因として追加すべきか | 独立した設計判断として別途検討。要因追加は可読性・監査説明とのトレードオフを伴うため、追加ありきで進めない |
 
 ---
 
@@ -519,7 +573,9 @@ type AoPCode =
   | "ecosystem_quality"
   | "resource_availability"
   | "social_assets"
-  | "unmapped";
+  | "unmapped"        // 対応付けを試みたが判断できなかった(推定で埋めない)
+  | "not_applicable"; // 2026-08-01追記:エンドポイントモデルを用いない手法(代替費用法等、M3 D-1のVFaccess)。
+                      // "unmapped"(対応付け不能)とは区別する。§3.2の再グループ化ではnot_applicable同士を一致として扱う
 
 type DecompositionFactor =
   | "endpointCoverage"
@@ -603,7 +659,7 @@ interface DivergenceDecomposition {
   id: string;
   targetPhysicalQuantityId: string;
   siteId: string;
-  valuationRecordIds: string[];   // 2 ≦ N ≦ 5
+  valuationRecordIds: string[];   // 分割前の総数に上限なし。各ValueConceptGroup内で2 ≦ N ≦ 5(§2.1参照)
   groups: ValueConceptGroup[];
   crossGroupComparison: {
     incommensurable: true;        // 常に true。分解しない
@@ -620,3 +676,55 @@ interface DivergenceDecomposition {
   recalculationHash: string;
 }
 ```
+
+### 具体例:上記の型が実際にどう埋まるか(2026-08-02追記)
+
+§7.1・§4.2.1の水パイロット例(代替費用法=交換価値2,500万円、IFVI Water=厚生価値8億円、LIME3=厚生価値3億円)を`DivergenceDecomposition`に当てはめると、次のようになる(読みやすさのため一部簡略化)。
+
+```json
+{
+  "id": "dd-2027-site042-water",
+  "targetPhysicalQuantityId": "pq-site042-water-withdrawal-2026",
+  "siteId": "site-042",
+  "valuationRecordIds": ["vr-substitution-cost", "vr-ifvi-vfaccess", "vr-lime3-water"],
+  "groups": [
+    {
+      "valueConcept": "exchange",
+      "methodIds": ["substitution-cost", "ifvi-water-consumption.VFaccess"],
+      "usage": "SSBJ財務影響 / 投資判断",
+      "pairwiseDecompositions": []
+    },
+    {
+      "valueConcept": "welfare",
+      "methodIds": ["ifvi-water-consumption.VFnutrition_or_VFdisease", "lime3.water"],
+      "usage": "社会的費用ビュー / 開示",
+      "pairwiseDecompositions": [
+        {
+          "methodIdA": "ifvi-water-consumption.VFnutrition_or_VFdisease",
+          "methodIdB": "lime3.water",
+          "valueA": 800000000,
+          "valueB": 300000000,
+          "ratio": 2.67,
+          "mode": "multiplicative",
+          "fallbackApplied": [],
+          "contributions": [
+            { "factor": "endpointCoverage", "logContribution": 0.742, "multiplier": 2.10, "shareRatio": 0.75, "status": "decomposed" },
+            { "factor": "discountRate", "logContribution": 0.140, "multiplier": 1.15, "shareRatio": 0.14, "status": "decomposed" },
+            { "factor": "geographicCalibration", "logContribution": 0.095, "multiplier": 1.10, "shareRatio": 0.11, "status": "decomposed" }
+          ],
+          "residual": { "logResidual": 0.0, "multiplier": 1.0 },
+          "narrative": "IFVIとLIME3の2.67倍の差のうち、2.10倍分は数えている損害の範囲の違いです…(§7.2参照)"
+        }
+      ]
+    }
+  ],
+  "crossGroupComparison": {
+    "incommensurable": true,
+    "metadataDifferences": ["価値概念: 異なる ← この差が支配的", "エンドポイント被覆: 異なる"]
+  },
+  "assumptionEntryIds": ["ae-1001", "ae-1002"],
+  "recalculationHash": "sha256:..."
+}
+```
+
+**読み方:** 交換価値グループ(代替費用法・VFaccess)と厚生価値グループ(VFnutrition/VFdisease・LIME3)は`crossGroupComparison`で「比較不能」と明示され、要因分解の対象は厚生価値グループ内のペアのみに限定されている。
