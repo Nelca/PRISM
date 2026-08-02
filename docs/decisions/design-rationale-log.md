@@ -1029,6 +1029,20 @@ build-plan §4.3「後から変えられないものが固まったか」の確�
 
 ---
 
+## 2.21 M7(開示生成と整合検証)の実装(2026-08-02、`packages/core/src/disclosure/`)
+
+要件定義(D-1〜D-6)をロジックとして実装する過程で判明した具体的な実装判断を記録する。要件定義書自身が「M1・M6のような外部確認は生じていない」(§8)と明記している通り、新たな業務判断は発生しなかった。段階1(PDF抽出)・段階2(主張タイプの分類)はAIの使用が前提だが外部のPDF処理・LLM呼び出しを要するため`packages/core`のスコープ外とし、build-planが「LLMを使わない」と明示的に制約する段階3(根拠の紐付けと充足度判定)・段階4(ギャップ類型の判定)のみを実装した。
+
+### D-95 段階3の照合対象(MaterialIssue・ValuationRecord)には「対象期間」「対象範囲(scope)」に相当するフィールドが存在しない
+
+**発見:** D-2は「`DisclosureClaim.extractedMetadata`の`category`・`periodMentioned`・`scopeMentioned`と、既存の`MaterialIssue`・`ValuationRecord`の対応フィールドを構造化フィールドの一致で照合する」としているが、実際にはどちらの型にも「対象期間」「対象範囲(Scope1・2、国内主要拠点等)」に相当するフィールドが存在しなかった。`category`相当(`MaterialIssue.impactCategory`)のみは既存フィールドで賄えた。
+
+**対応:** M1・M3の型に期間・範囲の概念を新設しなかった(何を「範囲」とするかは組織構造・報告方針に依存する解釈を伴い、M1・M3が扱うべき概念ではないと判断)。代わりに、M7専用の軽量な射影型`EvidenceCandidate`(`disclosure/evidence-match.ts`)を定義し、`category`・`transferFitnessTier`はMaterialIssue・ValuationRecordの実フィールドから転記できるが、`period`・`scope`は呼び出し側(データ統合層)が組織の報告方針に基づいて明示的に付与する設計にした。M1のD-91・M6のD-7と同じ「この判断はこのモジュールでは行わない」パターンの適用。
+
+**「自然言語的な類似度判定は行わない」(D-2)の徹底:** `scope`は文字列の完全一致でのみ照合する(`gap-finding.ts`の`determineGapType`)。「国内主要拠点」と個別拠点IDが意味的に包含関係にあるかどうかをM7が判定することはしない。呼び出し側が、対象となる拠点のEvidenceCandidateに同一のscope文字列を付与しておく必要があり、これを怠ると(たとえ実際には対象範囲に含まれる拠点であっても)G3(範囲不一致)と判定される。これは意図した挙動であり、意味的推論に頼らないことの直接的な帰結である。
+
+---
+
 ## 6. 用語の混同に注意
 
 | 用語 | 定義 | 混同しやすいもの |

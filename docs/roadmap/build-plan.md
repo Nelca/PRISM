@@ -570,7 +570,7 @@ docs/
 - [x] M1 要件定義済 / **実装済**(`packages/core/src/site/`。座標解決(D-3)・拠点データ取込・Locate(注入可能なレイヤ照会)・TNFD LEAP L3の5基準判定(D-2)・MaterialIssue組み立て。実際のジオコーディング・WDPA/IBAT/Aqueduct/ENCORE照会は注入インターフェースのみ実装(ライセンス契約未締結)。要件定義書§2の具体例(sensitivityScore=3)を再現。テスト27件通過、design-rationale-log D-89〜D-91) / 完了判定は未実施(M2接続後)
 - [x] M2 要件定義済 / **実装済**(`packages/core/src/assessment/`。汎用パーセンタイル順位・開示必須性対応表・優先度算定(PriorityScore)・深掘り昇格判定(DepthDecision、D-3上位20%+手動上書き、D-4除外理由記録)。M1・M3の実データで通しテストを追加。要件定義書§2.2の数値例のタイ列に不整合を発見し標準定義を採用(design-rationale-log D-92)。テスト17件通過) / 完了判定は未実施(M5接続後)
 - [x] M5 要件定義済 / **実装済**(`packages/core/src/financial-bridge/`。ブリッジ1(自然調整後利益)・ブリッジ2(社会的費用ビュー)・未内部化コスト/内部化率・自然債務・比較先。2ブリッジの合算不能性を型テストで確認。要件定義書に欠けていた`NatureDebt`型を追加(design-rationale-log D-93〜D-94)。テスト19件通過) / 完了判定は未実施(M7接続後)
-- [ ] M7 要件定義済 / 実装 / 完了判定
+- [x] M7 要件定義済 / **実装済**(`packages/core/src/disclosure/`。段階3・4のルールベース判定のみ(段階1・2のPDF抽出・AI分類はスコープ外)。EvidenceCandidate射影型・G1〜G4優先順位判定・推奨アクション3種・意図的判断記録。要件定義書§1の具体例(G3範囲不一致)を再現。M1・M3の型に存在しない期間・範囲フィールドをM7専用の射影型で解決(design-rationale-log D-95)。テスト21件通過) / 完了判定は未実施(M8接続後)
 - [ ] M8 要件定義済 / 実装 / 完了判定
 
 ### 統合・検証
