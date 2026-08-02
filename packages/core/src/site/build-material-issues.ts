@@ -35,3 +35,30 @@ export function buildMaterialIssues(
 
   return issues;
 }
+
+const UNEVALUATED_CRITERIA: MaterialIssue["criteriaMet"] = {
+  highEcosystemIntegrity: false,
+  rapidIntegrityDecline: false,
+  highBiodiversityImportance: false,
+  waterStress: false,
+  likelySignificantDependencyImpact: false,
+};
+
+/**
+ * M1 D-3:座標・住所ともに解決できずLocateを実行できなかった場合、MaterialIssueを生成しない
+ * のではなく、excluded=true・exclusionReason付きの監査可能なレコードとして残す
+ * (「生成せず」は「評価を実行せず」の意であり、除外の事実自体は記録する。M2の除外理由記録と
+ * 同じ原則)。5基準はいずれも評価していないためすべてfalse、sensitivityScoreは0とする。
+ */
+export function buildExcludedMaterialIssue(siteId: string, category: ImpactCategory, exclusionReason: string): MaterialIssue {
+  return {
+    id: `${siteId}-mi-${category}`,
+    siteId,
+    impactCategory: category,
+    sensitivityScore: 0,
+    criteriaMet: UNEVALUATED_CRITERIA,
+    excluded: true,
+    exclusionReason,
+    assumptionEntryIds: [],
+  };
+}

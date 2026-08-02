@@ -31,8 +31,11 @@ function formatRatioChange(before: number, after: number): string {
 export function computeComparisonTargets(input: ComparisonTargetsInput): ComparisonTargets {
   const totalDebt = input.natureDebt.totalDebt as number;
   const threshold = input.existingImpairmentThreshold as number;
+  const reportedOperatingProfit = input.reportedOperatingProfit as number;
 
-  const operatingProfitRatio = totalDebt / (input.reportedOperatingProfit as number);
+  // internalization-status.tsと同じ規律:報告営業利益が0の場合、比率は定義できないため0として扱う
+  // (0除算を避ける構造的な既定値であり、ドメイン上の推定ではない)。
+  const operatingProfitRatio = reportedOperatingProfit === 0 ? 0 : totalDebt / reportedOperatingProfit;
 
   const changesAssumption = totalDebt > threshold;
   const details = changesAssumption

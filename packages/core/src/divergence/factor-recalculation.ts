@@ -51,8 +51,25 @@ export function classifyGeographicCalibration(
   return { factor: "geographicCalibration", kind: "recalculable", ratio: multiplierA / multiplierB };
 }
 
+export class InconsistentDiscountRateStatusError extends Error {}
+
+/**
+ * この関数はdiscountRateStatusが"explicit"または"documented_zero"の場合のみ呼ばれる
+ * (呼び出し元のclassifyDiscountRateがno_time_dimensionを先に処理済み)。"explicit"であれば
+ * discountRateは必ず数値のはずであり、nullは型では表現できてもデータとして矛盾した状態である。
+ * `?? 0`で静かに0扱いにすると、この矛盾を「割引率0%」という別の正当な状態と区別できなくなる
+ * (推定で埋めない、D-15と同じ規律)。
+ */
 function effectiveDiscountRate(record: ValuationRecord): number {
-  return record.discountRateStatus === "documented_zero" ? 0 : (record.discountRate ?? 0);
+  if (record.discountRateStatus === "documented_zero") {
+    return 0;
+  }
+  if (record.discountRate === null) {
+    throw new InconsistentDiscountRateStatusError(
+      `M4: discountRateStatusが"explicit"なのにdiscountRateがnullです(ValuationRecord id: ${record.id})。データが矛盾しています。`
+    );
+  }
+  return record.discountRate;
 }
 
 /** 割引率(F-5a/b/c)。explicit同士で値が異なる場合の再計算式は未実装のためF-4に倒す。 */

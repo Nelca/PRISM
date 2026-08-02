@@ -1,0 +1,75 @@
+{
+  "physicalQuantityId": "pq-site001-water-2027",
+  "deepDive": {
+    "category": "water",
+    "physicalQuantity": 45000,
+    "unit": "m3",
+    "siteId": "site-001",
+    "sourceRegion": "JP",
+    "targetRegion": "JP"
+  },
+  "methodConfig": {
+    "depth": "deep_dive",
+    "unitReplacementCost": 620,
+    "externalValueFactors": {
+      "lime3-water": 28500,
+      "ifvi-vfnutrition": 1.35,
+      "ifvi-vfdisease": 1.05,
+      "ifvi-vfes": 1.62,
+      "ifvi-vfaccess": 0.34
+    },
+    "vfesFitnessDimensions": {
+      "ecologicalFit": 0.75,
+      "socioeconomicFit": 0.68,
+      "serviceDefinitionFit": 0.85,
+      "temporalDistance": 0.6,
+      "spatialScaleFit": 0.7
+    }
+  },
+  "calibration": {
+    "pppSource": "世界銀行ICP 2024年版",
+    "pppValue": 1.0,
+    "incomeElasticity": 0.7,
+    "sourceIncomeLevel": 100,
+    "targetIncomeLevel": 100,
+    "deflator": 1.0,
+    "relativePriceEscalationRate": 1.0,
+    "elapsedYears": 0,
+    "areaScaling": 1.0
+  },
+  "baselineNpv": {
+    "value": 1200000000,
+    "discountRate": 0.06,
+    "horizon": 10,
+    "source": "manual_entry"
+  },
+  "approvalThreshold": "pending",
+  "bindingMechanism": { "kind": "weak_reference" },
+  "countermeasures": [
+    {
+      "type": "reduction",
+      "targetSiteId": "site-001",
+      "investmentCost": { "initial": 80000000, "recurring": 3000000 },
+      "avoidedNatureCost": [
+        { "year": 0, "amount": 27900000, "sourceValuationMethodId": "replacement-cost" },
+        { "year": 1, "amount": 27900000, "sourceValuationMethodId": "replacement-cost" }
+      ]
+    }
+  ],
+  "disclosureClaims": [
+    {
+      "id": "claim-2027-report-p18-01",
+      "sourceDocument": "統合報告書2027",
+      "sourcePageOrSection": "p.18",
+      "rawText": "当社は2030年までに本社工場における水使用量を20%削減することを目指します。",
+      "claimType": "future_commitment",
+      "category": "water",
+      "quantityValue": 20,
+      "quantityUnit": "%",
+      "periodStartYear": 2027,
+      "periodEndYear": 2030,
+      "scopeMentioned": "本社工場",
+      "extractionConfidence": "high"
+    }
+  ]
+}

@@ -4,6 +4,7 @@
  */
 
 import type { LicenseMode } from "./common";
+import type { GapType } from "./disclosure";
 
 export type AssumptionSourceModule = "M1" | "M2" | "M3" | "M4" | "M6" | "M7";
 
@@ -32,7 +33,8 @@ export type AssumptionEntryPayload =
     }
   | { module: "M4"; kind: "representative_value_selection"; selectedMethodId: string; reason: string }
   | { module: "M6"; kind: "binding_mechanism_change"; previous: string; next: string; reason: string }
-  | { module: "M7"; kind: "gap_finding"; gapType: string }
+  /** "none"はGapFinding.gapTypeがnull(根拠充足、ギャップなし)だったことを表す明示的な区分値。 */
+  | { module: "M7"; kind: "gap_finding"; gapType: GapType | "none" }
   | { module: "M7"; kind: "intentional_decision"; reason: string };
 
 export interface AssumptionEntry {

@@ -22,6 +22,17 @@ describe("computeComparisonTargets", () => {
     expect(result.operatingProfitRatio).toBeCloseTo(1_000_000 / 10_000_000, 9);
   });
 
+  it("reportedOperatingProfitが0の場合、operatingProfitRatioは0として扱う(0除算を避ける)", () => {
+    const result = computeComparisonTargets({
+      reportedOperatingProfit: exchangeAmount(0),
+      natureDebt,
+      existingImpairmentThreshold: exchangeAmount(2_000_000),
+      leverage: { before: 2.1, after: 2.4 },
+      interestCoverage: { before: 8.2, after: 7.5 },
+    });
+    expect(result.operatingProfitRatio).toBe(0);
+  });
+
   it("自然債務が既存の減損テスト閾値を上回る場合、changesAssumption=true", () => {
     const result = computeComparisonTargets({
       reportedOperatingProfit: exchangeAmount(10_000_000),

@@ -9,7 +9,7 @@ import type { SiteRow } from "./ingest";
 import { resolveSiteLocation } from "./location";
 import { buildNatureInterfaces } from "./locate";
 import type { LayerLookup } from "./locate";
-import { buildMaterialIssues } from "./build-material-issues";
+import { buildExcludedMaterialIssue, buildMaterialIssues } from "./build-material-issues";
 
 describe("M1統合テスト:CSV相当の行データからMaterialIssueまで通しで検証する", () => {
   it("座標がある拠点はジオコーディングなしでそのままLocateに進む", () => {
@@ -54,7 +54,7 @@ describe("M1統合テスト:CSV相当の行データからMaterialIssueまで通
     expect(errors[0].reason).toContain("座標・住所ともに不明");
   });
 
-  it("住所はあるがジオコーディングに失敗した拠点はexcluded=trueになりMaterialIssueを生成しない運用になる", () => {
+  it("住所はあるがジオコーディングに失敗した拠点は、Locateを実行せずexcluded=trueのMaterialIssueを生成する(M1 D-3)", () => {
     const rows: SiteRow[] = [
       { id: "site-004", name: "拠点D", siteType: "own_site", industrySector: "steel", address: "存在しない住所" },
     ];
@@ -64,7 +64,13 @@ describe("M1統合テスト:CSV相当の行データからMaterialIssueまで通
 
     expect(resolution.excluded).toBe(true);
     expect(resolution.exclusionReason).toBeDefined();
-    // 運用上、excluded=trueのSiteに対してはbuildMaterialIssuesを呼び出さない
+
+    // 座標が解決できずLocateが実行できないため、buildNatureInterfaces/buildMaterialIssuesは呼ばず、
+    // 「評価対象にすら入らなかった」ことを監査可能なMaterialIssueとして直接記録する。
+    const issue = buildExcludedMaterialIssue(resolution.site.id, "water", resolution.exclusionReason!);
+    expect(issue.excluded).toBe(true);
+    expect(issue.exclusionReason).toBe(resolution.exclusionReason);
+    expect(issue.sensitivityScore).toBe(0);
   });
 
   it("要件定義書§2の具体例(化学工場・水ストレス地域)を、行データからMaterialIssueまで通しで再現する", () => {

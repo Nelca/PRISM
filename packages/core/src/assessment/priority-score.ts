@@ -23,11 +23,19 @@ export interface PriorityScoreInput {
   impactCategory: ImpactCategory;
 }
 
+export class InvalidQuantileRangeError extends Error {}
+
 export function computePriorityScores(inputs: PriorityScoreInput[]): PriorityScore[] {
   const sensitivities = inputs.map((input) => input.sensitivityScore);
   const financialExposures = inputs.map((input) => input.screeningValuationRecord.centralValue as number);
   const uncertaintyMagnitudes = inputs.map((input) => {
     const { p5, p95 } = input.screeningValuationRecord.quantileRange;
+    if (p5 <= 0 || p95 <= 0) {
+      throw new InvalidQuantileRangeError(
+        `M2 D-2: materialIssueId "${input.materialIssueId}" のquantileRangeが不正です(p5=${p5}, p95=${p95})。` +
+          "不確実性の大きさ(log(P95/P5))はP5・P95がともに正である必要があります。"
+      );
+    }
     return Math.log(p95 / p5);
   });
   const disclosureRequirements = inputs.map((input) => getDisclosureRequirement(input.impactCategory));

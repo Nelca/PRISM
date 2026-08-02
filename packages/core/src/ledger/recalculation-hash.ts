@@ -22,12 +22,21 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(value);
 }
 
+// FNV-1a(64bit)。監査用の指紋として使うため、32bitの単純ローリングハッシュ(誕生日限界で
+// 2^16程度の入力組合せから衝突が現実的になる)では不十分と判断し、衝突確率を大幅に下げる
+// 64bit幅のハッシュに変更した(BigIntを使用。target=ES2017のためBigIntリテラル構文(123n)ではなく
+// BigInt()コンストラクタ呼び出しの形で書く)。
+const FNV_OFFSET_BASIS = BigInt("14695981039346656037");
+const FNV_PRIME = BigInt("1099511628211");
+const MASK_64 = (BigInt(1) << BigInt(64)) - BigInt(1);
+
 function hashString(input: string): string {
-  let hash = 0;
+  let hash = FNV_OFFSET_BASIS;
   for (let i = 0; i < input.length; i++) {
-    hash = (Math.imul(31, hash) + input.charCodeAt(i)) | 0;
+    hash ^= BigInt(input.charCodeAt(i));
+    hash = (hash * FNV_PRIME) & MASK_64;
   }
-  return (hash >>> 0).toString(16);
+  return hash.toString(16);
 }
 
 export function computeRecalculationHash(inputs: RecalculationHashInputs): RecalculationHash {

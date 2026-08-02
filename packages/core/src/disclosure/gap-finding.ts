@@ -35,6 +35,13 @@ export function determineGapType(
     return { gapType: "G4_period_mismatch", matchedRecordIds: [] };
   }
 
+  // categoryMatches全体では混在(全件tier Cではない)だったとしても、scope・period絞り込みの結果
+  // 実際に主張を裏付ける根拠がtier Cのみになるケースがある(例:強い根拠が範囲外・弱い根拠のみ範囲内)。
+  // その場合、絞り込み後の実際の根拠集合で改めてtier Cを判定し、根拠充足と誤判定しない。
+  if (periodMatches.every((c) => c.transferFitnessTier === "C")) {
+    return { gapType: "G2_weak_evidence", matchedRecordIds: periodMatches.map((c) => c.recordId) };
+  }
+
   return { gapType: null, matchedRecordIds: periodMatches.map((c) => c.recordId) };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMaterialIssues } from "./build-material-issues";
+import { buildExcludedMaterialIssue, buildMaterialIssues } from "./build-material-issues";
 import type { NatureInterface } from "../types/site";
 
 function iface(overrides: Partial<NatureInterface> & Pick<NatureInterface, "layerType" | "rawResult">): NatureInterface {
@@ -39,5 +39,16 @@ describe("buildMaterialIssues", () => {
 
   it("カテゴリ指定がない場合は空配列を返す", () => {
     expect(buildMaterialIssues("site-042", {})).toEqual([]);
+  });
+});
+
+describe("buildExcludedMaterialIssue", () => {
+  it("excluded=true・exclusionReason付きの監査可能なレコードを返す(M1 D-3)", () => {
+    const issue = buildExcludedMaterialIssue("site-042", "water", "座標・住所ともに不明です(M1 D-3)。");
+
+    expect(issue.excluded).toBe(true);
+    expect(issue.exclusionReason).toBe("座標・住所ともに不明です(M1 D-3)。");
+    expect(issue.sensitivityScore).toBe(0);
+    expect(Object.values(issue.criteriaMet).every((v) => v === false)).toBe(true);
   });
 });

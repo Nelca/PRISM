@@ -102,6 +102,20 @@ describe("determineGapType", () => {
     const result = determineGapType(claim, candidates);
     expect(result.gapType).toBe("G2_weak_evidence"); // scopeも不一致だがG2が先に該当
   });
+
+  it("categoryMatches全体では混在していても、scope絞り込み後に実際の根拠がtier Cのみになる場合はG2と判定する", () => {
+    // 強い根拠(tier A)は範囲外(site-B)、弱い根拠(tier C)のみが範囲内(国内主要拠点)。
+    // categoryMatches.every(tier==="C")はfalseのため早期のG2判定はすり抜けるが、
+    // 実際にscope・periodを満たす根拠はr2(tier C)のみであり、根拠充足と誤判定してはならない。
+    const claim = makeClaim();
+    const candidates = [
+      makeCandidate({ recordId: "r1", scope: "site-B", transferFitnessTier: "A" }),
+      makeCandidate({ recordId: "r2", transferFitnessTier: "C" }),
+    ];
+    const result = determineGapType(claim, candidates);
+    expect(result.gapType).toBe("G2_weak_evidence");
+    expect(result.matchedRecordIds).toEqual(["r2"]);
+  });
 });
 
 describe("buildRecommendedActions", () => {

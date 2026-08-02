@@ -1,65 +1,62 @@
-import Image from "next/image";
+import Link from "next/link";
+import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { Num } from "./components/numeric";
 
 export default function Home() {
+  const result = runDemoPipeline();
+
+  const excludedSites = result.assessment.materialIssues.filter((i) => i.excluded).length;
+  const promoted = result.assessment.depthDecisions.filter((d) => d.depth === "deep_dive").length;
+  const gapsFound = result.disclosure.gapFindings.filter((f) => f.gapType !== null).length;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-xl font-semibold">{result.companyName}</h1>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          ダミーデータによるM1〜M8の通し確認(実データではありません)。
+        </p>
+      </div>
+
+      <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <SummaryCard label="拠点数" value={result.assessment.sites.length} href="/sites" />
+        <SummaryCard label="除外拠点(座標未解決)" value={excludedSites} href="/sites" />
+        <SummaryCard label="深掘り昇格件数" value={promoted} href="/assessment" />
+        <SummaryCard label="開示ギャップ検出件数" value={gapsFound} href="/disclosure" />
+      </dl>
+
+      <div className="rounded border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+        <p className="font-medium">意思決定(M6)</p>
+        {result.decision ? (
+          <p className="mt-1">
+            ★判定: <span className="font-semibold">{result.decision.decisionRecord.verdict}</span>
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        ) : (
+          <p className="mt-1 text-zinc-500">対象となる交換価値ValuationRecordがありません。</p>
+        )}
+      </div>
+
+      <div className="rounded border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+        <p className="font-medium">記録・版管理(M8)</p>
+        <p className="mt-1">
+          AssumptionEntry <Num value={result.assumptionEntries.length} />件を記録済み。 詳細は
+          <Link href="/ledger" className="ml-1 underline">
+            M8ページ
+          </Link>
+          を参照。
+        </p>
+      </div>
     </div>
+  );
+}
+
+function SummaryCard({ label, value, href }: { label: string; value: number; href: string }) {
+  return (
+    <Link href={href} className="rounded border border-zinc-200 p-4 hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900">
+      <dt className="text-xs text-zinc-500">{label}</dt>
+      <dd className="mt-1 text-2xl">
+        <Num value={value} />
+      </dd>
+    </Link>
   );
 }

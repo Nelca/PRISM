@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePriorityScores } from "./priority-score";
+import { computePriorityScores, InvalidQuantileRangeError } from "./priority-score";
 import type { PriorityScoreInput } from "./priority-score";
 import { exchangeAmount } from "../types/common";
 import type { ExchangeValuationRecord } from "../types/valuation";
@@ -92,5 +92,29 @@ describe("computePriorityScores", () => {
 
     const [score] = computePriorityScores(inputs);
     expect(score.normalizedScore).toBe(4.0);
+  });
+
+  it("quantileRangeのp5が0以下の場合はエラーを投げる(log(P95/P5)がNaN/Infinityになるのを防ぐ)", () => {
+    const inputs: PriorityScoreInput[] = [
+      {
+        materialIssueId: "bad",
+        sensitivityScore: 3,
+        impactCategory: "water",
+        screeningValuationRecord: makeExchangeRecord(1000, 0, 1200),
+      },
+    ];
+    expect(() => computePriorityScores(inputs)).toThrow(InvalidQuantileRangeError);
+  });
+
+  it("quantileRangeのp95が0以下の場合もエラーを投げる", () => {
+    const inputs: PriorityScoreInput[] = [
+      {
+        materialIssueId: "bad",
+        sensitivityScore: 3,
+        impactCategory: "water",
+        screeningValuationRecord: makeExchangeRecord(1000, -100, -50),
+      },
+    ];
+    expect(() => computePriorityScores(inputs)).toThrow(InvalidQuantileRangeError);
   });
 });

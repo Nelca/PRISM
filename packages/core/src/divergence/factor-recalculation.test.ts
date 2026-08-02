@@ -3,6 +3,7 @@ import {
   classifyDiscountRate,
   classifyEndpointCoverage,
   classifyGeographicCalibration,
+  InconsistentDiscountRateStatusError,
 } from "./factor-recalculation";
 import { IDENTITY_CALIBRATION, makeValuationRecord } from "./test-helpers";
 
@@ -84,6 +85,23 @@ describe("classifyDiscountRate", () => {
 
     const result = classifyDiscountRate(a, b);
     expect(result.kind).toBe("not_recalculable");
+  });
+
+  it("discountRateStatusがexplicitなのにdiscountRateがnullの矛盾したデータはエラーを投げる", () => {
+    const a = makeValuationRecord({
+      methodId: "a",
+      centralValue: 100,
+      discountRateStatus: "explicit",
+      discountRate: null,
+    });
+    const b = makeValuationRecord({
+      methodId: "b",
+      centralValue: 300,
+      discountRateStatus: "explicit",
+      discountRate: 0.03,
+    });
+
+    expect(() => classifyDiscountRate(a, b)).toThrow(InconsistentDiscountRateStatusError);
   });
 });
 

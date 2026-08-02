@@ -30,6 +30,23 @@ describe("buildSitesFromRows", () => {
     expect(errors[0].reason).toContain("座標・住所ともに不明");
   });
 
+  it("緯度・経度の片方しかなく住所もない場合、座標・住所ともに不明とは別の理由でエラーになる", () => {
+    const rows: SiteRow[] = [{ id: "s-partial", name: "拠点P", siteType: "own_site", industrySector: "steel", lat: 35.0 }];
+    const { sites, errors } = buildSitesFromRows(rows);
+    expect(sites).toHaveLength(0);
+    expect(errors[0].reason).toContain("片方しか指定されておらず");
+    expect(errors[0].reason).not.toContain("座標・住所ともに不明");
+  });
+
+  it("緯度・経度の片方しかなくても住所があれば住所を使う", () => {
+    const rows: SiteRow[] = [
+      { id: "s-fallback", name: "拠点Q", siteType: "own_site", industrySector: "steel", lat: 35.0, address: "東京都" },
+    ];
+    const { sites, errors } = buildSitesFromRows(rows);
+    expect(errors).toHaveLength(0);
+    expect(sites[0].location).toEqual({ kind: "address", address: "東京都", geocoded: false });
+  });
+
   it("siteTypeが不正な値の場合はエラーになる", () => {
     const rows: SiteRow[] = [
       { id: "s4", name: "拠点D", siteType: "invalid_type", industrySector: "steel", lat: 1, lng: 1 },

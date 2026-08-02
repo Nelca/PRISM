@@ -1,0 +1,11 @@
+# 拠点一覧(①顧客提供)。#で始まる行はコメントとして無視されます。
+# site_id: 任意の一意なID(半角英数字とハイフン推奨)
+# name: 拠点名
+# site_type: own_site(自社拠点)または supplier_site(サプライヤー拠点)
+# industry_sector: 業種(自由記述。例: chemicals, steel, textile 等)
+# lat, lng: 緯度・経度(わかる場合。両方埋めること)
+# address: 住所(座標がわからない場合。lat/lngとaddressのどちらか一方があればよい)
+site_id,name,site_type,industry_sector,lat,lng,address
+site-001,本社工場,own_site,chemicals,35.1,136.9,
+site-002,金属加工工場,own_site,steel,34.7,135.5,
+site-003,海外サプライヤー,supplier_site,textile,,,住所をここに記入
