@@ -1043,6 +1043,28 @@ build-plan §4.3「後から変えられないものが固まったか」の確�
 
 ---
 
+## 2.22 M8(記録・版管理基盤)の実装(2026-08-02、`packages/core/src/ledger/`)
+
+要件定義(D-1〜D-6)をロジックとして実装する過程で判明した具体的な実装判断を記録する。D-6(DecisionRecordへの`actualOutcomeReview`追加)はM6実装時に既に反映済みだったため、今回の実装対象はD-1〜D-5。build-planの実装順序(D-76)の最後のモジュールであり、M1〜M7が残してきた「M8実装時に接続する」プレースホルダーを解消する作業だった。
+
+### D-96 「自動生成する」の実装範囲を、payload導出関数の提供までとし、M1〜M7への実配線は行わなかった
+
+**論点:** D-1は「各モジュールの該当する判断ロジックが実行された時点で、そのロジック自身が自動的に生成する」としているが、M1〜M7は現時点で`assumptionEntryIds: []`という空配列のプレースホルダーを持つのみで、実際にAssumptionEntryを生成して自分のIDをそこに詰める呼び出しは行っていなかった。
+
+**採用した範囲:** `ledger/assumption-entry.ts`に、各モジュールの既存出力型(`SiteLocationResolution`・`DepthDecision`・`GeographicCalibrationRecord`・`ValuationRecordGroup`・`TransferFitness`・`PairwiseDecomposition`・`RepresentativeValueSelection`・`BindingMechanismChangeEntry`・`GapFinding`・`IntentionalDecisionRecord`)から対応する`AssumptionEntryPayload`を機械的に導出する関数(10種類、`deriveM1ExclusionPayload`等)を実装した。**これらの関数を実際にM1〜M7のソースコードから呼び出し、`assumptionEntryIds`に格納する配線自体は今回は行っていない。**
+
+**理由:** M1〜M7のソースを書き換えて呼び出しを埋め込むのは、既存の196件のテストとの整合を壊すリスクがあり、かつ本リポジトリにはまだM1〜M7を実際に順番に呼び出す統合・アプリケーション層が存在しない(各モジュールはpackages/core内の独立した関数群のまま)。統合テスト(`ledger/integration.test.ts`)で、M1〜M7の実際の出力を使ってこの導出関数群が正しく機能することを検証し、「自動生成できる状態にある」ことを実証した。実際の配線は、M1〜M7を連結するアプリケーション層が実装される段階で行う。
+
+---
+
+### D-97 `VersionedParameterSet`はパラメータ値そのものを保持しない、版のメタデータ台帳として実装した
+
+**発見:** `VersionedParameterSet`型(`{setId, version, effectiveFrom, supersededBy?, changeReason?}`)には、その版が実際に使っていたパラメータ値(PPP出典・η値等)自体を保持するフィールドがない。
+
+**対応:** これは設計漏れではなく、パラメータ値自体は既にM3の`GeographicCalibrationRecord`という形で各ValuationRecordに自己完結して保存されている(M3 D-3の既存設計)ため、M8側で二重に保持する必要がないと判断した。`ledger/versioned-parameter-set.ts`は「この版がいつ有効になり、いつ・なぜ次の版に置き換わったか」を追跡する台帳としてのみ実装し(追記のみ、旧版削除しない、changeReason必須)、「旧版係数での再計算」自体は、当該版のパラメータ値(過去のValuationRecordに保存済み)をそのままM3の計算関数(`applyGeographicCalibration`等)に渡せば実現できることを統合テストで実証した。新しい再計算エンジンは作っていない。
+
+---
+
 ## 6. 用語の混同に注意
 
 | 用語 | 定義 | 混同しやすいもの |
