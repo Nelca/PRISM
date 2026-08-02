@@ -61,6 +61,23 @@ export interface InternalizationProbability {
   period: number;
 }
 
+/**
+ * 自然債務(M5 D-4、2026-08-02追記)。要件定義書の算出式
+ * 「自然債務 = Σ[未内部化コスト × 内部化確率(シナリオ,時期) × 割引係数]」の結果を保持する型が
+ * 実装検討まで存在しなかったため追加した。`ComparisonTargets.operatingProfitRatio`が使う
+ * 「期待損失」はこの`totalDebt`を指す。
+ */
+export interface NatureDebt {
+  totalDebt: ExchangeAmount;
+  breakdown: {
+    scenario: CarbonPriceScenario;
+    period: number;
+    probability: number;
+    discountedAmount: ExchangeAmount;
+  }[];
+  nonGaapLabel: NonGaapLabel;
+}
+
 export interface ComparisonTargets {
   /** 期待損失 ÷ 報告営業利益。 */
   operatingProfitRatio: number;
