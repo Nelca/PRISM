@@ -104,6 +104,7 @@ function buildValuationRecordFromOutput(
     metric: output.metric,
     cicesRef: output.cicesRef,
     quantileRange,
+    parameterUncertainty: output.parameterUncertainty,
     transferFitness: output.transferFitness,
     discountRate: output.discountRate,
     discountRateStatus: output.discountRateStatus,

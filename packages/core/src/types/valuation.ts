@@ -182,6 +182,14 @@ interface ValuationRecordCommon {
   cicesRef?: CicesReference;
   /** 層i×層iiを合成した最終分位点(P5/P50/P95)。 */
   quantileRange: QuantileRange;
+  /**
+   * 層i(パラメータ不確実性)の分布パラメータ(2026-08-02追記、M6実装時に発見)。
+   * M6 D-3が前提とする「M3のトルネード図」はM3実装時には作られておらず、複合後の
+   * quantileRangeだけでは層i・層iiのどちらがレンジを支配しているか判別できなかった。
+   * MethodOutputが既に持つ値をそのまま引き継ぐことで、M6がtransferFitness(層ii)と
+   * 同じ尺度(対数正規sigma)で比較できるようにする。
+   */
+  parameterUncertainty: Distribution;
   transferFitness: TransferFitness;
   discountRate: number | null;
   discountRateStatus: DiscountRateStatus;
