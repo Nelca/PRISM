@@ -567,8 +567,8 @@ docs/
 - [x] M3 要件定義済 / **実装済**(`packages/core/src/monetization/`。地理較正・適合度ティア・モンテカルロ不確実性合成・3プラグイン(代替費用法/LIME3/IFVI)・整合性検証・統合パイプライン。テスト35件通過) / 完了判定は未実施(実データ通し・M4接続後)
 - [x] M4 要件定義済 / **実装済**(`packages/core/src/divergence/`。価値概念分割・F-0〜F-3/F-8事前条件チェック・F-4/F-5要因別再計算可能性判定・対数空間Shapleyエンジン・F-9表示規則+読み下し文生成。M3の水パイロット実データで§7.3.1「乖離の100%が残差」ケースを再現。テスト44件通過、design-rationale-log D-83〜D-85) / 完了判定は未実施(M6接続後)
 - [x] M6 要件定義済 / **実装済**(`packages/core/src/decision/`。自然調整後NPV算出・深掘り推奨・拘束方式出力整形+変更履歴・判定カウント判定・トップレベル組み立て関数。M3実データでpending/crosses/does_not_crossを検証。M3実装にトルネード図が存在しなかったため`ValuationRecord.parameterUncertainty`を追加し、トルネード図自体は`packages/core/src/monetization/tornado.ts`としてM3側に実装、M6はそれを消費するのみ(design-rationale-log D-86〜D-88)。テスト32件通過) / 完了判定は未実施(実際の投資判断接続後、build-plan §7.2)
-- [ ] M1 要件定義済 / 実装 / 完了判定
-- [ ] M2 要件定義済 / 実装 / 完了判定
+- [x] M1 要件定義済 / **実装済**(`packages/core/src/site/`。座標解決(D-3)・拠点データ取込・Locate(注入可能なレイヤ照会)・TNFD LEAP L3の5基準判定(D-2)・MaterialIssue組み立て。実際のジオコーディング・WDPA/IBAT/Aqueduct/ENCORE照会は注入インターフェースのみ実装(ライセンス契約未締結)。要件定義書§2の具体例(sensitivityScore=3)を再現。テスト27件通過、design-rationale-log D-89〜D-91) / 完了判定は未実施(M2接続後)
+- [x] M2 要件定義済 / **実装済**(`packages/core/src/assessment/`。汎用パーセンタイル順位・開示必須性対応表・優先度算定(PriorityScore)・深掘り昇格判定(DepthDecision、D-3上位20%+手動上書き、D-4除外理由記録)。M1・M3の実データで通しテストを追加。要件定義書§2.2の数値例のタイ列に不整合を発見し標準定義を採用(design-rationale-log D-92)。テスト17件通過) / 完了判定は未実施(M5接続後)
 - [ ] M5 要件定義済 / 実装 / 完了判定
 - [ ] M7 要件定義済 / 実装 / 完了判定
 - [ ] M8 要件定義済 / 実装 / 完了判定

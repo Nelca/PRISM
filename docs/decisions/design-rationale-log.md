@@ -967,6 +967,46 @@ build-plan §4.3「後から変えられないものが固まったか」の確�
 
 ---
 
+## 2.18 M1(対象定義とLocate)の実装(2026-08-02、`packages/core/src/site/`)
+
+要件定義(D-1〜D-4)をロジックとして実装する過程で判明した具体的な実装判断を記録する。「薄く実装する」ことが要件定義書で明示されたモジュールであり、実際のジオコーディング・WDPA/IBAT/Aqueduct/ENCORE照会は注入可能な関数として外出しし、コアロジックはオーケストレーションのみに留めた。
+
+### D-89 ジオコーディング成功後の座標は`SiteLocation`の`address`バリアントに保持する
+
+**発見:** `SiteLocation`の`address`バリアント(`{kind:"address"; address:string; geocoded:boolean}`)には、ジオコーディング成功後の実際の緯度経度を保持するフィールドがなかった。Locate(空間突合)は座標がなければ機械的に成立せず、`geocoded:true`なのに座標がどこにも残らないのは実装上成立しない。
+
+**対応:** `address`バリアントに`lat?: number; lng?: number`を追加した(D-77・D-73・D-86と同じ「後方互換的なフィールド追加」パターン)。今回はM1自身の型ファイルへの追加であり、他モジュールへの越境ではない(D-86の教訓を踏まえ、まず「この不足はどのモジュールの関心事か」を確認した上で着手した)。
+
+---
+
+### D-90 NatureInterface→CriteriaMetの対応は、layerTypeで決め打ちせず`resolveCriterion`として外出しする
+
+**論点:** `NatureInterface.layerType`(5値)と`CriteriaMet`の5基準は1:1に対応しない。`protected_area`・`kba`の2つは`highBiodiversityImportance`という1つの基準にOR集約され、逆に`ecosystem_integrity`という1つのlayerTypeから`highEcosystemIntegrity`(水準)と`rapidIntegrityDecline`(トレンド)という2つの基準を導出する必要があるが、後者を表すデータソースがMVPのlayerType一覧に存在しない。
+
+**採用した設計:** `criteria.ts`の`evaluateCriteriaMet()`は`resolveCriterion: (iface) => CriterionKey | null`を引数に取り、既定実装(`defaultResolveCriterion`)は素直な対応(`protected_area`/`kba`→`highBiodiversityImportance`、`water_stress`→`waterStress`、`dependency_impact`→`likelySignificantDependencyImpact`、`ecosystem_integrity`→`highEcosystemIntegrity`のみ)に限定し、**`rapidIntegrityDecline`は既定では常にfalseとする**(推定で埋めない、D-15)。トレンドデータを持つ呼び出し側は、`dataSource`文字列等で個々のNatureInterfaceを識別し、`resolveCriterion`をカスタム実装して上書きできる。
+
+**根拠:** 存在しないデータソースをlayerType一つから2つの基準に無理に按分すると、片方(rapidIntegrityDecline)が実質的にでっち上げの推定になる。「基準を満たしていると判定できない」という状態を、判定不能な`null`ではなく構造的な`false`として扱う点は、TNFDの基準自体が「満たしていることの立証責任は肯定側にある」screening的な性質を持つことと整合する。
+
+---
+
+### D-91 MaterialIssueのカテゴリ振り分けはM1では行わない。呼び出し側が明示的に渡す
+
+`MaterialIssue`は拠点×影響カテゴリの組だが、`NatureInterface`自体にはカテゴリを表すフィールドがない(ENCOREの依存・影響レーティングはカテゴリごとに異なりうる)。`buildMaterialIssues()`は`Partial<Record<ImpactCategory, NatureInterface[]>>`という形で、どのNatureInterfaceをどのカテゴリの判定に使うかを呼び出し側(データ取込層)に委ねる設計とした。M6 D-7(代表値選択はM4の結果をそのまま引き継ぐ、M6独自のロジックは作らない)と同型の「この関心事はここでは判断しない」設計判断。
+
+---
+
+## 2.19 M2(評価実行・深度可変)の実装(2026-08-02、`packages/core/src/assessment/`)
+
+要件定義(D-1〜D-4)をロジックとして実装する過程で判明した具体的な実装判断を記録する。M2要件定義書自身が「今回はユーザー確認が必要な論点が生じなかった」(§6)と明記している通り、実装検討でも新たな業務判断は発生しなかった。唯一判明したのは、要件定義書の数値例自体の内部的な不整合。
+
+### D-92 要件定義書§2.2の数値例のうち、開示必須性列(タイあり)の記載値が標準的なパーセンタイル順位の計算と整合しない
+
+**発見:** 感応度・財務エクスポージャ・不確実性の3列(いずれもタイなし)は、標準的な「1始まりの順位÷N、タイは平均順位」という定義で厳密に再現できる(`percentile-rank.test.ts`で確認済み)。しかし開示必須性列(A=高(3)・B=中(2)・C=高(3)・D=低(1)、AとCがタイ)は、同じ標準的な定義で計算するとD=0.25・B=0.50・A=C=0.875になるはずだが、要件定義書の表はD=0.375・B=0.625・A=C=0.875と記載されている(A・Cのみ標準計算と一致、D・Bはそれぞれ+0.125だけずれている)。行ごとの合計値(3.125/2.625/2.625/1.875)は表内の数値同士では一貫しているため、単純な転記ミスではなく、開示必須性列の算出過程に何らかの一貫しない手順が混入したものと判断した。
+
+**対応:** `percentile-rank.ts`は標準的な統計的定義(タイは平均順位)をそのまま実装し、要件定義書の数値例は「タイのない3列を検証する目的では正確、開示必須性列の具体的な数値は参考程度」として扱う。独自の非標準的なタイ処理を発明してまで要件定義書の特定の数値に合わせることはしなかった(D-15「推定で埋めない」と同じ、存在しない/一貫しない基準に無理に合わせない姿勢)。要件定義書の結論そのもの(「Aが最上位になり深掘りに昇格する」)は、実装のテスト(`priority-score.test.ts`)で別途正しく再現できることを確認済み。
+
+---
+
 ## 6. 用語の混同に注意
 
 | 用語 | 定義 | 混同しやすいもの |

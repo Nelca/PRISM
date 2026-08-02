@@ -9,7 +9,18 @@ export type SiteType = "own_site" | "supplier_site";
 
 export type SiteLocation =
   | { kind: "coordinates"; lat: number; lng: number }
-  | { kind: "address"; address: string; geocoded: boolean }; // m1 §3: ジオコーディング失敗時は geocoded=false
+  | {
+      kind: "address";
+      address: string;
+      geocoded: boolean; // m1 §3: ジオコーディング失敗時は geocoded=false
+      /**
+       * ジオコーディング成功時の解決済み座標(2026-08-02追記、M1実装時に発見)。
+       * Locate(空間突合)は座標がなければ成立しないため、geocoded=trueの場合は必須で
+       * 埋まる想定(型上はoptionalのまま、location.tsが構築を担う)。
+       */
+      lat?: number;
+      lng?: number;
+    };
 
 export interface Site {
   id: string;
