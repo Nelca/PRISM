@@ -38,6 +38,7 @@ docs/
     design-rationale-log.md          判断の経緯(実装前に必読)
     0001-mvp-pilot-category-scope.md            MVP実データ検証の対象カテゴリ
     0002-phase0-continuation-gate.md            フェーズ0末の継続判定(条件2〜4は未完了)
+    0003-data-model-review-gate.md               データモデルレビュー(条件付き通過、6件修正済み)
 
   roadmap/
     build-plan.md                  フェーズ0からMVP完成までの作業指示
@@ -88,7 +89,10 @@ docs/
 
 - フェーズ0(検証)進行中。AoP正規化対応表・手法別再計算可能性・ライセンス条件(WDPA/ENCORE/ESVD/CE Delft/IFVIの料金・条項確認)は初版完了
 - **[GATE] フェーズ0末の継続判定(ADR-0002)を実施。乖離分解の技術検証(文書レベル)は通過。支払意思検証(C-1)はユーザー判断により充足扱い。LOI獲得(0件)・主要係数の商用契約締結は未完了だが、実行計画(ターゲット企業リスト・問い合わせメール下書き等)は`docs/business/outreach-action-plan.md`に準備済みで、残るは人間による送信・交渉のみ(design-rationale-log D-72)。**
-- 実装未着手。ただし条件3・4の未達はモジュール実装の着手を妨げない(D-72)
-- **M1〜M8、全モジュールの要件定義が完了。** 次は[P1]データモデル確定(型定義の実装着手)、または残るアクションアイテム(LOI獲得・ライセンス契約・ESVD等の確認)への対応
+- **[P1] データモデル確定が完了。** `packages/core/src/types/`にM1〜M8の型定義を実装済み(共通の branded type による価値概念ガード込み)。`tsc --noEmit`・ESLintとも通過、型ガードが実際にコンパイルエラーを起こすことも検証済み
+- **[GATE] データモデルレビューを実施(ADR-0003)。条件付き通過。** 構想書との突き合わせで6件の齟齬(地理較正の計算式に1項目欠落、`DisclosureView`型の完全な欠如等)を発見し、すべて修正済み
+- **実装順序を見直し、M3→M4→M6→M1→M2→M5→M7→M8に変更(design-rationale-log D-76)。** 当初のM1先頭という順序は型定義の作り直し回避が理由だったが、データモデルレビュー通過により解消
+- **[P2] M3(貨幣化エンジン)の実装が完了。** `packages/core/src/monetization/`(地理較正・適合度ティア・モンテカルロ不確実性合成・代替費用法/LIME3/IFVIの3プラグイン・集計整合性検証・統合パイプライン)。テストランナー(vitest)を新規導入し、35件のテストすべて通過、`tsc --noEmit`・ESLintも通過(design-rationale-log D-77〜D-82)
+- 次はM4(乖離分解)の実装
 
 次にやることは `roadmap/build-plan.md` §12 のチェックリストを参照。

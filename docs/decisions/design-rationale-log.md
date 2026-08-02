@@ -794,6 +794,111 @@ M1が記録したWDPAの`pending_review`状態を、実行時に強制する仕�
 
 ---
 
+## 2.14 データモデルレビュー([GATE]、2026-08-02)の発見
+
+build-plan §4.3「後から変えられないものが固まったか」の確認として、`packages/core/src/types/`の実装をM1〜M8要件定義書・構想書に照らして再点検した(ADR-0003参照)。6件の齟齬が見つかり、すべて修正した。
+
+### D-73 地理較正の記録に「相対価格上昇係数^経過年数」が欠落していた
+
+**発見:** 構想書8.4の較正式は5項の掛け算(PPP × 所得弾力性^η × デフレータ × **生態系サービス相対価格上昇係数^経過年数** × 面積スケーリング)だが、`GeographicCalibrationRecord`型には4項目しか実装されていなかった。**M3要件定義書§3.3の数値例自体が、コードを書く前の段階で既にこの項目を落としていたことも判明した**(要件定義の時点で構想書からのドリフトが発生していた)。
+
+**重大度:** 高。地理較正はM4のShapley分解の3要因の1つであり、「自前で完全に再計算可能」という前提(M4要件定義書§5.4)がこの欠落により静かに崩れていた。後から追加すると既存のValuationRecordを作り直すことになる典型例。
+
+**対応:** `GeographicCalibrationRecord`に`relativePriceEscalationRate`(年率)・`elapsedYears`(経過年数)を追加。M3要件定義書§3.3の数値例も5項目に修正した。
+
+---
+
+### D-74 `DisclosureView`型が要件定義段階から完全に欠落していた
+
+**発見:** 構想書8.1は出力を3層(ValuationRecord → DecisionRecord → **DisclosureView**)と定義し、9.1の中心オブジェクト一覧も「DisclosureClaim / DisclosureView」を並べて挙げているが、M7要件定義書は`DisclosureView`に一切言及しておらず、実装にも存在しなかった。
+
+**原因:** M7のMVP範囲(既存開示PDFのギャップ検出、D-1〜D-6)は「基準別に開示文を組み替えて生成する」機能を含んでいないため、要件定義時にこの型の存在自体が見過ごされた。
+
+**対応:** 生成ロジックはスコープ外のまま、型の骨格(`DisclosureView`、`DisclosureStandard`)のみ`disclosure.ts`に追加した(build-plan §4.1と同じ理由)。M7要件定義書にも追記済み。
+
+---
+
+### D-75 その他4件の齟齬(いずれも修正済み)
+
+| # | 内容 | 対応 |
+|---|---|---|
+| 1 | `GapFinding`に`id`がなく、`AssumptionEntry.relatedRecordId`・`IntentionalDecisionRecord.gapFindingId`が実際には参照できなかった | `id`フィールドを追加 |
+| 2 | M5の`ComparisonTargets`に`nonGaapLabel`がなく、D-6(全出力に必須)の対象から漏れていた | `nonGaapLabel`を追加 |
+| 3 | M5要件定義書が示していた`valueConceptGuard`という文字列タグを実装では省略していた(Bridge1/Bridge2が別インターフェースのため判別タグ自体が不要と判断) | 意図的な代替であることをコードコメントに明記 |
+| 4 | `PairwiseDecomposition.valueA/valueB`が素の`number`型で、branded typeによる価値概念の保証が及んでいなかった | `ExchangeAmount \| WelfareAmount`に変更 |
+| 5 | `EndpointCoverage`をValuationRecordに統合した際、`sourceLabel`(原表記)・`mappingConfidence`(対応付けの確度)・`metric`が欠落していた | 3フィールドを`MethodOutput`・`ValuationRecord`双方に追加 |
+| 6 | M1(`MaterialIssue`)・M2(`DepthDecision`)に`assumptionEntryIds`がなく、他のパイプラインレコードとの一貫性が崩れていた | 両方に追加 |
+
+**教訓:** D-73・D-74はいずれも「要件定義の時点で構想書からのドリフトが発生し、その後の実装も気づかずそれをそのまま引き継いだ」パターン。要件定義書のレビューだけでは検出できず、構想書の一次資料に立ち返って型実装と突き合わせて初めて見つかった。詳細な調査結果はADR-0003に記録する。
+
+---
+
+### D-76 [P2]モジュール実装順序をM1先頭からM2直前に変更する
+
+**論点:** build-plan §2の実装順序(M1→M3→M4→M6→M2→M5→M7→M8)の根拠は「M4の型定義がM1・M3に波及し、番号順に作るとM4到達時点で作り直しになる」というものだったが、これは[GATE]データモデルレビュー(ADR-0003)を通過し型定義が全モジュール確定した時点で解消されている。
+
+**確認した実際の依存関係:** M3は依存なし(PhysicalQuantityInputはSite IDの参照で足りる)。M4はM3のみに依存。M6はM3+M4(代表値選択、M6 D-7)に依存。**M1はM3・M4・M6のいずれからも必要とされない。** M1が必要になるのはM2(感応度スコアの入力)からのみ。
+
+**根拠:** この事実は、M1・M3・M4・M6の要件定義を実際に「M3→M4→M6→M1→M2→M5→M7→M8」の順で進めて支障がなかったことで既に実証されている(本ログの過去のセッション記録を参照)。
+
+**採用した変更:** 実装順序を「M3→M4→M6→M1→M2→M5→M7→M8」に変更する。購入理由の中心(M3・M4・M6、構想書9.2)を最優先で実装するという一貫した優先順位を、要件定義フェーズに続き実装フェーズでも維持する。
+
+詳細:`docs/roadmap/build-plan.md` §2。
+
+---
+
+## 2.15 M3(貨幣化エンジン)の実装(2026-08-02、`packages/core/src/monetization/`)
+
+要件定義(D-1〜D-8)をロジックとして実装する過程で判明した具体的な実装判断を記録する。plan modeで8フェーズに分割して実装し、各フェーズでtypecheck・lint・testを確認しながら進めた。
+
+### D-77 `GeographicCalibrationRecord`に所得水準(source/target)フィールドが必要だった
+
+**発見:** 較正関数`applyGeographicCalibration`を実装する際、所得弾力性調整`(targetIncome/sourceIncome)^η`の計算に所得水準の実数値が必要だが、型には所得弾力性(η)しか保持しておらず、比率の分母・分子(所得水準そのもの)が欠けていた。ADR-0003で見つけた欠落(D-73)と同じ性質のパターン。
+
+**対応:** `sourceIncomeLevel`・`targetIncomeLevel`を追加(後方互換的な追加のみで、既存フィールドは変更していない)。較正パラメータが完全に自己完結し、後から再計算できるようにするため。
+
+---
+
+### D-78 手法プラグインは係数を計算しない。外部から価値係数を受け取るだけにする
+
+**論点:** LIME3・IFVIの各プラグインを実装する際、これらの手法が公表する具体的な貨幣価値係数($/DALY相当、Global Value Factor Database等)をプラグイン内で計算・ハードコードすべきかを検討した。
+
+**採用した設計:** プラグインは係数を計算しない。`MethodConfig.externalValueFactors`(手法ID→単位あたり価値係数のレコード)として外部から受け取り、物理量に掛けるだけにする。実際の係数データベース照会(IFVI Global Value Factor Database・LIME3重み付けテーブル等)は将来のデータ接続実装で行う。
+
+**根拠:** design-rationale-log D-03「係数は既存資産、切替・比較基盤は自前構築」の原則をそのまま適用した。プラグインがIFVI/LIME3の内部計算式(GNI PPP・AETデータ等を使った複雑な国別算出)を再実装すると、この原則に反し、かつライセンスされていない外部データへの依存を実装に埋め込むことになる。**代替費用法だけは例外**(自社定義のため`unitReplacementCost`として企業提供データを受け取る、性質は同じだが値の出どころが異なる)。
+
+---
+
+### D-79 集計整合性検証(reconciliation)は、公式集計値が外部から提供された場合のみ実行時にエラーとする
+
+**論点:** M3 D-2は「復元集計値と期待値の差が許容誤差を超えた場合、分解結果を提示せずエラーとする」としているが、実運用のある1回の`evaluate()`呼び出しにおいて、比較対象となる「期待値」がどこから来るのかが要件定義時点では明確でなかった。
+
+**採用した設計:** 復元集計値(`reconciliation.reconstruct(outputs)`)は常に算出し呼び出し元に返す(D-2の「常時算出・併記」要件)。ただし、外部データ源がIFVI等の公式集計値も独立に提供している場合(`officialAggregates`引数)のみ、それと突き合わせてエラーを投げる。提供されない場合は比較自体をスキップする(値は常に返るが、検証はできない)。
+
+**根拠:** D-2のゴールデンテスト(開発時、既知の期待値との照合)と、実運用時の整合性検証(顧客の実データに対して行う場合、独立した「正解」を持たない)は性質が異なる。開発時の検証は`ifviWaterConsumptionPlugin.reconciliation.goldenTestVectors`(自己整合性チェック用の手計算ベクタ、IFVI公式のworked exampleではない。§詳細は下記D-80)で担保し、実運用時は「比較対象がもしあれば使う」という設計にした。
+
+**実装:** `ReconciliationError`(`build-valuation-records.ts`)。`officialAggregates`未提供時はエラーを投げない。
+
+---
+
+### D-80 IFVIのゴールデンテストベクタは自己整合性チェック用の手計算値であり、IFVI公式のworked exampleではない
+
+事前調査(このセッション内)で、IFVIのBasis for Conclusions文書に具体的な計算例が見当たらないことを確認済み。M3 D-2が定める代替手順(「含まれていなければ、既知の入力から4本の内訳値を手計算し、テストベクタとして固定する」)に従い、実装者が手計算した合成テストベクタ(`SYNTHETIC_GOLDEN_VECTORS`、`ifvi-water-consumption.ts`)を使用した。コード中・出典フィールドの両方に「IFVI公式のworked exampleではない」ことを明記し、将来IFVIの一次資料から実例が見つかった場合に差し替えられるようにしてある。
+
+---
+
+### D-81 `recalculability`(F-4判定材料)は既存フィールドから導出する。プラグインに新しいフィールドを追加させない
+
+`ValuationRecord.recalculability`(`endpointBreakdownPublished`・`damageTimeProfilePublished`)は、`MethodOutput`が既に持つ`aopMappingConfidence`(`"unmapped"`でなければbreakdown公開ありと推定)・`discountRateStatus`(`"explicit"`の場合のみdamage time profile公開ありと推定)から`build-valuation-records.ts`側で機械的に導出する。プラグインごとに冗長なフィールドを追加させない設計判断。
+
+---
+
+### D-82 テストランナーにvitestを採用
+
+リポジトリにテストランナーが存在しなかったため追加した。Next.js 16との組み合わせで設定コストが低いことを理由に選定(Jestより軽量)。`npm test`(`vitest run`)、決定論的なテストにはシード可能なPRNG(mulberry32)をテストファイル内に注入して使用し、本番コード側は`Math.random()`をデフォルトのまま使う。
+
+---
+
 ## 6. 用語の混同に注意
 
 | 用語 | 定義 | 混同しやすいもの |
