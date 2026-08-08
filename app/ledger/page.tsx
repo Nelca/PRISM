@@ -6,6 +6,22 @@ import { Card } from "../components/ui";
 export default async function LedgerPage() {
   const result = await getOrCreateLatestResult(getDefaultTenantId());
 
+  const recordHashes = [
+    ...Object.values(result.valuation.valuationRecordsByMaterialIssue)
+      .flat()
+      .map((record) => ({ id: record.id, kind: "算定(ValuationRecord)", hash: record.recalculationHash })),
+    ...result.valuation.divergenceDecompositions.map((decomposition) => ({
+      id: decomposition.id,
+      kind: "比較(DivergenceDecomposition)",
+      hash: decomposition.recalculationHash,
+    })),
+    ...result.decisions.map((entry) => ({
+      id: entry.decision.decisionRecord.id,
+      kind: "判定(DecisionRecord)",
+      hash: entry.decision.decisionRecord.recalculationHash,
+    })),
+  ];
+
   return (
     <div className="screen">
       <div className="screen__head">
@@ -18,6 +34,40 @@ export default async function LedgerPage() {
         <p>
           <Mono>{result.recalculationHash.hash}</Mono>
         </p>
+      </Card>
+
+      {/* GAP-06:レコード1件からも「何で計算したか」を辿れる。以前はすべてplaceholderだった。 */}
+      <Card title="レコード単位の再計算ハッシュ" subtitle="1件ごとに、計算に入った係数版・較正パラメータの指紋" padBody={false}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>レコード</th>
+              <th>種別</th>
+              <th>ハッシュ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recordHashes.length === 0 ? (
+              <tr>
+                <td colSpan={3} style={{ color: "var(--ink-faint)" }}>
+                  まだ算定結果がありません。
+                </td>
+              </tr>
+            ) : (
+              recordHashes.map((row) => (
+                <tr key={row.id}>
+                  <td className="num" style={{ fontSize: 11 }}>
+                    <Mono>{row.id}</Mono>
+                  </td>
+                  <td>{row.kind}</td>
+                  <td className="num" style={{ fontSize: 11 }}>
+                    <Mono>{row.hash}</Mono>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </Card>
 
       <div className="grid-2">

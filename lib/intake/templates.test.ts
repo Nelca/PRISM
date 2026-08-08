@@ -16,6 +16,7 @@ import { exchangeAmount } from "@core/types/common";
 import type { ExchangeValuationRecord } from "@core/types/valuation";
 import type { EvidenceCandidate } from "@core/disclosure/evidence-match";
 import type { DisclosureClaim } from "@core/types/disclosure";
+import { TEST_DECISION_VERSIONS, TEST_VALUATION_VERSIONS } from "@core/divergence/test-helpers";
 
 const TEMPLATES_DIR = join(__dirname, "templates");
 const NOW = "2027-02-14T09:12:00Z";
@@ -96,8 +97,10 @@ describe("templates/の記入例からM1〜M8を通しで実行できる", () =>
         config: dataset.engagementConfig.methodConfig,
         calibration: dataset.engagementConfig.calibration,
         plugins: ALL_PLUGINS,
+        versions: TEST_VALUATION_VERSIONS,
         calibrationSetVersion: "ifvi-water-consumption-v1",
         reconciliationFunctionVersion: "ifvi-reconciliation-v1",
+        fitnessTierThresholdVersion: "fitness-tier-v1",
       }),
       decompositionVersions: {
         algorithmVersion: "shapley-v1",
@@ -142,6 +145,7 @@ describe("templates/の記入例からM1〜M8を通しで実行できる", () =>
       countermeasures,
       valuationRecordsById: { [replacementCost!.id]: replacementCost! },
       bindingMechanism: dataset.engagementConfig.bindingMechanism,
+      versions: TEST_DECISION_VERSIONS,
       idSequence,
       now: NOW,
     });

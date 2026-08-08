@@ -63,6 +63,9 @@ import type { InteractionState } from "./interaction-state";
 const NOW = "2027-02-14T09:12:00Z";
 const DECISION_MAKER = "宮里(サステナビリティ推進室)";
 
+/** M6 D-6の拘束方式定義の版。DecisionRecordの再計算ハッシュに入る(GAP-06)。 */
+const DECISION_VERSIONS = { bindingMechanismDefinitionVersion: "binding-mechanism-v1" };
+
 const DECOMPOSITION_VERSIONS = {
   algorithmVersion: "shapley-v1",
   cicesMatchLevel: "group",
@@ -132,6 +135,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
           plugins: ALL_PLUGINS,
           calibrationSetVersion: "ifvi-water-consumption-v1",
           reconciliationFunctionVersion: "ifvi-reconciliation-v1",
+          fitnessTierThresholdVersion: "fitness-tier-v1",
         };
       }
       const params = deepDiveParamsBySiteId.get(siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
@@ -240,6 +244,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
         countermeasures: [candidate.countermeasure],
         valuationRecordsById: { [representative.id]: representative },
         bindingMechanism,
+        versions: DECISION_VERSIONS,
         idSequence,
         now: NOW,
       });
@@ -266,6 +271,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       countermeasures: [selectedCandidate.countermeasure],
       valuationRecordsById: { [representative.id]: representative },
       bindingMechanism,
+      versions: DECISION_VERSIONS,
       ...(latestBindingChange
         ? {
             bindingMechanismChange: {

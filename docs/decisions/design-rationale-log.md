@@ -1272,6 +1272,22 @@ M1実装時(`site/ingest.ts`)は「CSV文字列自体のパースはスコープ
 
 **How to apply:** 新しいテーブルを足したら `APPEND_ONLY_TABLES`(`lib/db/schema.ts`)と `0001_append_only_role.sql` の両方を更新する。片方を忘れると `append-only.db.test.ts` が落ちる。ユーザー操作を追加するときは、現在値のカラムを作らず `interaction_event` の新しい `kind` として追記する。
 
+### D-113 レコード単位の再計算ハッシュの入力定義(GAP-06)
+
+**背景:** `ValuationRecord`・`DivergenceDecomposition`・`DecisionRecord` の `recalculationHash` は全て `placeholder:` を返していた。build-plan §4.2は「**すべてのレコードに**再計算ハッシュのフィールドを持たせる」を型定義の完了条件としており、フィールドはあるが値がない状態だった。監査で「このValuationRecordはどの係数版・どの較正パラメータで計算されたか」を1レコードから辿れなかった。
+
+**採用した判断:**
+
+1. **パイプライン全体のハッシュと同じ関数を使う。**`ledger/recalculation-hash.ts` に `computeRecordHash(kind, inputs)` を追加した。モジュールごとに別のハッシュ実装を作らない
+2. **版情報は各ビルダーの必須引数にする**(`ValuationRecordVersions` / `DivergenceDecompositionVersions` / `DecisionRecordVersions`)。Optionalにすると渡し忘れても気づけない(build-plan §4.2「Optionalにしてよいのは、まだ確認していない外部データだけ」)
+3. **較正パラメータは版番号だけでなく実際の値もハッシュに入れる。**版を据え置いたまま値が差し替わった場合にハッシュが変わらないと、監査で「同じ条件で計算した」と誤って読める
+4. **上流レコードのハッシュを下流のハッシュに含める。**ValuationRecord → DivergenceDecomposition / DecisionRecord と伝播するため、**★判定の根拠になった評価が差し替わったのに判定だけ古いまま、という状態を検出できる**
+5. **モンテカルロの乱数シードはハッシュに含めない。**シードは分位点にのみ影響し、中心値とパラメータ版には影響しない。M8 D-2がハッシュを「パラメータ版を横断的に含むもの」と定義しているため、同じ版で計算した2つのrunのハッシュがシード違いでズレると「何か変わったのか」の比較ができなくなる。シードは `pipeline_run.rng_seed`(D-112)に別途保存する
+6. **AoP正規化対応表の版はM3とM4で1つを共有する。**M3(aopCodeの付与)とM4(グループ化)が同じ表を読むため、2つに分けると版が食い違いうる。パイプライン層が `decompositionVersions.aopMappingVersion` を両方に渡す
+7. デモ層のスクリーニング用レコード(`lib/demo/company.ts`)も同じ関数でハッシュを付けた。**M2の優先度算定の入力になるレコードだけが辿れない、という穴を残さないため**
+
+**How to apply:** 新しいパラメータ版を導入したら、対応する `*Versions` 型に足す。ハッシュに入れるべきか迷ったら「その値が変わったときに結果が変わるか」で判断する(変わるなら入れる)。乱数シードのように結果の一部にしか影響しない値は、ハッシュではなくrunのメタデータに置く。
+
 ---
 
 **本文書は構想書v1(2026年7月23日)・v2(7月25日)、競合調査、需要側実証、課金設計、M4要件定義に至る議論から、開発・実装に必要な判断のみを抽出したもの。網羅ではない。**

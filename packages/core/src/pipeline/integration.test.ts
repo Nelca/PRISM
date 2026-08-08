@@ -17,7 +17,7 @@ import { ALL_PLUGINS } from "../monetization/registry";
 import { buildBridge1NatureAdjustedProfit } from "../financial-bridge/bridge1";
 import { buildBridge2SocialCostView } from "../financial-bridge/bridge2";
 import { computeRecalculationHash } from "../ledger/recalculation-hash";
-import { IDENTITY_CALIBRATION } from "../divergence/test-helpers";
+import { IDENTITY_CALIBRATION, TEST_DECISION_VERSIONS, TEST_VALUATION_VERSIONS } from "../divergence/test-helpers";
 import { exchangeAmount } from "../types/common";
 import type { SiteRow } from "../site/ingest";
 import type { NatureInterface, Site } from "../types/site";
@@ -159,8 +159,10 @@ describe("パイプライン統合テスト:架空の1社分のデータでM1〜
         config,
         calibration,
         plugins: ALL_PLUGINS,
+        versions: TEST_VALUATION_VERSIONS,
         calibrationSetVersion: "ifvi-water-consumption-v1",
         reconciliationFunctionVersion: "ifvi-reconciliation-v1",
+        fitnessTierThresholdVersion: "fitness-tier-v1",
       }),
       decompositionVersions: {
         algorithmVersion: "shapley-v1",
@@ -213,6 +215,7 @@ describe("パイプライン統合テスト:架空の1社分のデータでM1〜
       countermeasures,
       valuationRecordsById: { [replacementCost.id]: replacementCost },
       bindingMechanism: { kind: "weak_reference" },
+      versions: TEST_DECISION_VERSIONS,
       idSequence,
       now: NOW,
     });

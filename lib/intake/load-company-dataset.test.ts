@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadCompanyDataset } from "./load-company-dataset";
+import { TEST_DECISION_VERSIONS } from "@core/divergence/test-helpers";
 
 const SITES_CSV = `site_id,name,site_type,industry_sector,lat,lng,address
 site-001,本社工場,own_site,chemicals,35.1,136.9,
@@ -36,6 +37,7 @@ function engagementConfigJson(overrides: Record<string, unknown> = {}): string {
     baselineNpv: { value: 1_000_000_000, discountRate: 0.06, horizon: 10, source: "manual_entry" },
     approvalThreshold: "pending",
     bindingMechanism: { kind: "weak_reference" },
+    versions: TEST_DECISION_VERSIONS,
     countermeasures: [
       {
         type: "reduction",

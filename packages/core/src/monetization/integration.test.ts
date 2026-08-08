@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { buildValuationRecords } from "./build-valuation-records";
 import { ALL_PLUGINS, getPluginsForCategory } from "./registry";
 import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput } from "../types/valuation";
+import { TEST_VALUATION_VERSIONS } from "../divergence/test-helpers";
 
 describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRecordを生成する", () => {
   const input: PhysicalQuantityInput = {
@@ -56,6 +57,7 @@ describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRe
       config,
       calibration,
       plugins: ALL_PLUGINS,
+      versions: TEST_VALUATION_VERSIONS,
     });
 
     const allRecords = groups.flatMap((g) => g.records);
@@ -92,13 +94,14 @@ describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRe
       config,
       calibration,
       plugins: ALL_PLUGINS,
+      versions: TEST_VALUATION_VERSIONS,
     });
 
     for (const record of groups.flatMap((g) => g.records)) {
       expect(record.quantileRange.p5).toBeLessThanOrEqual(record.quantileRange.p50);
       expect(record.quantileRange.p50).toBeLessThanOrEqual(record.quantileRange.p95);
       expect(record.transferFitness.tier).toMatch(/^(A|B|C|not_applicable)$/);
-      expect(record.recalculationHash).toMatch(/^placeholder:/);
+      expect(record.recalculationHash).toMatch(/^vr:[0-9a-f]+$/);
       expect(Array.isArray(record.scopeExclusions)).toBe(true);
     }
   });
@@ -110,6 +113,7 @@ describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRe
       config,
       calibration,
       plugins: ALL_PLUGINS,
+      versions: TEST_VALUATION_VERSIONS,
     });
 
     const ifviGroup = groups.find((g) => g.methodId === "ifvi-water-consumption")!;
@@ -130,6 +134,7 @@ describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRe
       config,
       calibration,
       plugins: ALL_PLUGINS,
+      versions: TEST_VALUATION_VERSIONS,
     });
 
     const replacementCostGroup = groups.find((g) => g.methodId === "replacement-cost")!;

@@ -31,6 +31,7 @@ import type { Site } from "../types/site";
 import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput } from "../types/valuation";
 import type { DisclosureClaim } from "../types/disclosure";
 import type { RecalculationHashInputs } from "../types/ledger";
+import { TEST_VALUATION_VERSIONS } from "../divergence/test-helpers";
 
 describe("M8統合テスト", () => {
   it("M1:座標解決の除外結果からAssumptionEntryを導出できる", () => {
@@ -86,6 +87,7 @@ describe("M8統合テスト", () => {
       config,
       calibration: calibrationV1,
       plugins: ALL_PLUGINS,
+      versions: TEST_VALUATION_VERSIONS,
     });
   }
 

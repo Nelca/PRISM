@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDecisionRecord } from "./build-decision-record";
-import { makeValuationRecord } from "../divergence/test-helpers";
+import { TEST_DECISION_VERSIONS, makeValuationRecord } from "../divergence/test-helpers";
 import { exchangeAmount } from "../types/common";
 import type { Countermeasure } from "../types/decision";
 import type { BaselineNpvInput } from "../types/financial-bridge";
@@ -44,6 +44,7 @@ describe("buildDecisionRecord", () => {
       countermeasures: buildCountermeasures(record),
       valuationRecordsById: { [record.id]: record },
       bindingMechanism: { kind: "weak_reference" },
+      versions: TEST_DECISION_VERSIONS,
     });
 
     expect(result.verdict).toBe("pending");
@@ -64,6 +65,7 @@ describe("buildDecisionRecord", () => {
       countermeasures: buildCountermeasures(record),
       valuationRecordsById: { [record.id]: record },
       bindingMechanism: { kind: "weak_reference" },
+      versions: TEST_DECISION_VERSIONS,
     });
 
     expect(result.verdict).toBe("crosses");
@@ -83,6 +85,7 @@ describe("buildDecisionRecord", () => {
       countermeasures: buildCountermeasures(record),
       valuationRecordsById: { [record.id]: record },
       bindingMechanism: { kind: "weak_reference" },
+      versions: TEST_DECISION_VERSIONS,
     });
 
     expect(result.verdict).toBe("does_not_cross");
@@ -101,6 +104,7 @@ describe("buildDecisionRecord", () => {
       countermeasures: buildCountermeasures(record),
       valuationRecordsById: { [record.id]: record },
       bindingMechanism: { kind: "weak_reference" },
+      versions: TEST_DECISION_VERSIONS,
     });
 
     expect(result.relatedValuationRecordIds).toEqual([record.id]);

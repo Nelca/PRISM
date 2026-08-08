@@ -11,6 +11,7 @@ import { exchangeAmount } from "../types/common";
 import type { Countermeasure } from "../types/decision";
 import type { BaselineNpvInput } from "../types/financial-bridge";
 import type { ExchangeValuationRecord, GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput } from "../types/valuation";
+import { TEST_DECISION_VERSIONS, TEST_VALUATION_VERSIONS } from "../divergence/test-helpers";
 
 describe("M6統合テスト:M3が生成する交換価値ValuationRecordからDecisionRecordを組み立てる", () => {
   const input: PhysicalQuantityInput = {
@@ -53,6 +54,7 @@ describe("M6統合テスト:M3が生成する交換価値ValuationRecordからDe
       config,
       calibration,
       plugins: ALL_PLUGINS,
+      versions: TEST_VALUATION_VERSIONS,
     });
     const records = groups.flatMap((g) => g.records).filter((r): r is ExchangeValuationRecord => r.valueConcept === "exchange");
     return Object.fromEntries(records.map((r) => [r.id, r]));
@@ -99,6 +101,7 @@ describe("M6統合テスト:M3が生成する交換価値ValuationRecordからDe
       countermeasures: buildCountermeasures(replacementCost),
       valuationRecordsById: records,
       bindingMechanism: { kind: "weak_reference" },
+      versions: TEST_DECISION_VERSIONS,
     });
 
     expect(decisionRecord.verdict).toBe("pending");
@@ -121,6 +124,7 @@ describe("M6統合テスト:M3が生成する交換価値ValuationRecordからDe
       countermeasures: buildCountermeasures(replacementCost),
       valuationRecordsById: records,
       bindingMechanism: { kind: "weak_reference" },
+      versions: TEST_DECISION_VERSIONS,
     });
 
     expect(decisionRecord.verdict).toBe("crosses");
@@ -143,6 +147,7 @@ describe("M6統合テスト:M3が生成する交換価値ValuationRecordからDe
       countermeasures: buildCountermeasures(replacementCost),
       valuationRecordsById: records,
       bindingMechanism: { kind: "weak_reference" },
+      versions: TEST_DECISION_VERSIONS,
     });
 
     expect(decisionRecord.verdict).toBe("does_not_cross");

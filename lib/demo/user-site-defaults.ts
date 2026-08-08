@@ -61,6 +61,7 @@ export function buildUserDeepDiveConfig(siteId: string, params: UserSiteDeepDive
     plugins: ALL_PLUGINS,
     calibrationSetVersion: "ifvi-water-consumption-v1",
     reconciliationFunctionVersion: "ifvi-reconciliation-v1",
+    fitnessTierThresholdVersion: "fitness-tier-v1",
   };
 }
 

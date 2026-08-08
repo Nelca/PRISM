@@ -8,6 +8,7 @@ import { buildPairwiseDecomposition } from "./pairwise-decomposition";
 import type { DivergenceDecomposition, ValueConceptGroup } from "../types/divergence";
 import type { ValuationRecord } from "../types/valuation";
 import type { ValueConcept } from "../types/common";
+import { computeRecordHash } from "../ledger/recalculation-hash";
 
 /** M4要件定義書§2.1:価値概念で分割した後の各グループ内での上限。 */
 const MAX_RECORDS_PER_GROUP = 5;
@@ -41,16 +42,31 @@ function buildValueConceptGroup(valueConcept: ValueConcept, records: ValuationRe
   };
 }
 
+/**
+ * この分解の結果を左右するパラメータ版(GAP-06)。M4 §9が「再計算ハッシュの入力に含める」と
+ * 定めている項目そのもの。Optionalにしない。
+ */
+export interface DivergenceDecompositionVersions {
+  algorithmVersion: string;
+  cicesMatchLevel: string;
+  aopMappingVersion: string;
+  /** F-3の桁差閾値の版(暫定10^-6)。 */
+  f3ThresholdVersion: string;
+  /** F-8の有意乖離閾値の版(暫定5%)。 */
+  f8ThresholdVersion: string;
+}
+
 export interface BuildDivergenceDecompositionOptions {
   id: string;
   targetPhysicalQuantityId: string;
   siteId: string;
   records: ValuationRecord[];
+  versions: DivergenceDecompositionVersions;
 }
 
 /**
- * representativeValueSelection・assumptionEntryIds・recalculationHashはM3同様、
- * M8実装時に実配線するプレースホルダーとする。
+ * representativeValueSelection はユーザーの選択が入るため、ここでは組み立てない
+ * (T-05で別途実装する)。assumptionEntryIds はパイプライン層が実配線する。
  */
 export function buildDivergenceDecomposition(options: BuildDivergenceDecompositionOptions): DivergenceDecomposition {
   const { exchange, welfare } = partitionByValueConcept(options.records);
@@ -72,6 +88,15 @@ export function buildDivergenceDecomposition(options: BuildDivergenceDecompositi
     groups,
     crossGroupComparison,
     assumptionEntryIds: [],
-    recalculationHash: `placeholder:${options.id}`,
+    /**
+     * 入力レコードのハッシュを含めることで、上流のValuationRecordが変われば
+     * この分解のハッシュも変わる(GAP-06)。分解結果だけ古いまま残る事故を検出できる。
+     */
+    recalculationHash: computeRecordHash("dd", {
+      targetPhysicalQuantityId: options.targetPhysicalQuantityId,
+      siteId: options.siteId,
+      sourceRecordHashes: options.records.map((record) => record.recalculationHash),
+      versions: options.versions,
+    }),
   };
 }

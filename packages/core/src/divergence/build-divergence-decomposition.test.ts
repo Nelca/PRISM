@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDivergenceDecomposition, TooManyRecordsInGroupError } from "./build-divergence-decomposition";
-import { makeValuationRecord } from "./test-helpers";
+import { TEST_DECOMPOSITION_VERSIONS, makeValuationRecord } from "./test-helpers";
 
 describe("buildDivergenceDecomposition", () => {
   it("価値概念で2グループに分割し、それぞれのペアを分解する", () => {
@@ -22,6 +22,7 @@ describe("buildDivergenceDecomposition", () => {
       targetPhysicalQuantityId: "pq-1",
       siteId: "site-042",
       records: [exchangeA, welfareA, welfareB],
+      versions: TEST_DECOMPOSITION_VERSIONS,
     });
 
     expect(result.groups).toHaveLength(2);
@@ -46,6 +47,7 @@ describe("buildDivergenceDecomposition", () => {
       targetPhysicalQuantityId: "pq-1",
       siteId: "site-042",
       records: [welfareA, welfareB],
+      versions: TEST_DECOMPOSITION_VERSIONS,
     });
 
     expect(result.groups).toHaveLength(1);
@@ -63,6 +65,7 @@ describe("buildDivergenceDecomposition", () => {
         targetPhysicalQuantityId: "pq-1",
         siteId: "site-042",
         records,
+        versions: TEST_DECOMPOSITION_VERSIONS,
       })
     ).toThrow(TooManyRecordsInGroupError);
   });
@@ -81,6 +84,7 @@ describe("buildDivergenceDecomposition", () => {
       targetPhysicalQuantityId: "pq-1",
       siteId: "site-042",
       records: [exchangeA, welfareA],
+      versions: TEST_DECOMPOSITION_VERSIONS,
     });
 
     expect(result.valuationRecordIds.sort()).toEqual([exchangeA.id, welfareA.id].sort());

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { runDecisionPipeline } from "./decision-pipeline";
 import { createIdSequence } from "./ids";
-import { makeValuationRecord } from "../divergence/test-helpers";
+import { TEST_DECISION_VERSIONS, makeValuationRecord } from "../divergence/test-helpers";
 import { exchangeAmount } from "../types/common";
 import type { Countermeasure } from "../types/decision";
 import type { BaselineNpvInput } from "../types/financial-bridge";
@@ -39,6 +39,7 @@ describe("runDecisionPipeline", () => {
       countermeasures,
       valuationRecordsById: { [record.id]: record },
       bindingMechanism: { kind: "weak_reference" },
+      versions: TEST_DECISION_VERSIONS,
       idSequence: createIdSequence("ae"),
       now: NOW,
     });
@@ -59,6 +60,7 @@ describe("runDecisionPipeline", () => {
       countermeasures,
       valuationRecordsById: { [record.id]: record },
       bindingMechanism: { kind: "npv_formula_replacement" },
+      versions: TEST_DECISION_VERSIONS,
       bindingMechanismChange: {
         previousMechanism: { kind: "weak_reference" },
         reason: "投資判断予算が確保されたため拘束方式を強化",

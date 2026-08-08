@@ -11,6 +11,7 @@
  */
 
 import { IDENTITY_CALIBRATION } from "@core/divergence/test-helpers";
+import { computeRecordHash } from "@core/ledger/recalculation-hash";
 import { exchangeAmount } from "@core/types/common";
 import { buildNatureInterfaces } from "@core/site/locate";
 import type { LayerLookup } from "@core/site/locate";
@@ -59,6 +60,16 @@ export function excludedCategoriesForSite(): ("water")[] {
 }
 
 /** M2 D-1が要求するスクリーニング深度のM3実行結果(モック)。 */
+/**
+ * スクリーニング深度で使うパラメータ版(M3 D-6:ESVD要約統計を使うためティアC相当・
+ * 5次元スコアは計算しない)。深掘りとは別の版として区別する。
+ */
+const SCREENING_VERSIONS = {
+  calibrationSetVersion: "screening-identity-v1",
+  fitnessTierThresholdVersion: "screening-not-applicable-v1",
+  aopMappingVersion: "aop-mapping-v1",
+};
+
 export function screeningValuationForMaterialIssue(siteId: string): ExchangeValuationRecord {
   const centralValue = siteId === "site-042" ? 12_000_000 : 1_500_000;
   return {
@@ -79,7 +90,17 @@ export function screeningValuationForMaterialIssue(siteId: string): ExchangeValu
     scopeExclusions: [],
     recalculability: { endpointBreakdownPublished: false, damageTimeProfilePublished: false },
     assumptionEntryIds: [],
-    recalculationHash: "placeholder:screening",
+    // 深掘り評価と同じ関数でハッシュを付ける(GAP-06)。スクリーニングだけ
+    // プレースホルダーのまま残すと、M2の優先度算定の入力になったレコードだけ
+    // 「何で計算したか」を辿れなくなる。
+    recalculationHash: computeRecordHash("vr", {
+      methodId: "replacement-cost",
+      methodVersion: "1.0.0",
+      physicalQuantityId: `pq-${siteId}-screening`,
+      siteId,
+      calibration: IDENTITY_CALIBRATION,
+      versions: SCREENING_VERSIONS,
+    }),
     valueConcept: "exchange",
     centralValue: exchangeAmount(centralValue),
   };

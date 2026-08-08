@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseEngagementConfig } from "./engagement-config";
+import { TEST_DECISION_VERSIONS } from "@core/divergence/test-helpers";
 
 function validConfigJson(overrides: Record<string, unknown> = {}): string {
   const base = {
@@ -27,6 +28,7 @@ function validConfigJson(overrides: Record<string, unknown> = {}): string {
     baselineNpv: { value: 1_000_000_000, discountRate: 0.06, horizon: 10, source: "manual_entry" },
     approvalThreshold: "pending",
     bindingMechanism: { kind: "weak_reference" },
+    versions: TEST_DECISION_VERSIONS,
     countermeasures: [
       {
         type: "reduction",

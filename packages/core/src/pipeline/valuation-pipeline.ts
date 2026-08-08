@@ -39,6 +39,8 @@ export interface DeepDiveConfig {
   calibrationSetVersion: string;
   /** M3 AssumptionEntry(reconciliation_check)に記録する版。 */
   reconciliationFunctionVersion: string;
+  /** 適合度ティア閾値の版(M3 D-5)。ValuationRecordの再計算ハッシュに入る。 */
+  fitnessTierThresholdVersion: string;
 }
 
 export interface ValuationPipelineOptions {
@@ -77,6 +79,13 @@ export function runValuationPipeline(options: ValuationPipelineOptions): Valuati
       plugins: deepDiveConfig.plugins,
       officialAggregates: deepDiveConfig.officialAggregates,
       rng: options.rng,
+      versions: {
+        calibrationSetVersion: deepDiveConfig.calibrationSetVersion,
+        fitnessTierThresholdVersion: deepDiveConfig.fitnessTierThresholdVersion,
+        // AoP正規化対応表はM3(aopCodeの付与)とM4(グループ化)が共有する1つの表なので、
+        // 分解側の版をそのまま使う。2つに分かれると対応表の版が食い違いうる。
+        aopMappingVersion: options.decompositionVersions.aopMappingVersion,
+      },
     });
 
     const records: ValuationRecord[] = [];
@@ -121,6 +130,7 @@ export function runValuationPipeline(options: ValuationPipelineOptions): Valuati
       targetPhysicalQuantityId: deepDiveConfig.physicalQuantityId,
       siteId: deepDiveConfig.input.siteId,
       records,
+      versions: options.decompositionVersions,
     });
 
     for (const group of decomposition.groups) {

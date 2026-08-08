@@ -4,6 +4,7 @@ import { replacementCostPlugin } from "./plugins/replacement-cost";
 import { ifviWaterConsumptionPlugin } from "./plugins/ifvi-water-consumption";
 import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput } from "../types/valuation";
 import { createSeededRng } from "./rng";
+import { TEST_VALUATION_VERSIONS } from "../divergence/test-helpers";
 
 const input: PhysicalQuantityInput = {
   category: "water",
@@ -35,6 +36,7 @@ describe("buildValuationRecordsForPlugin", () => {
       input,
       config,
       calibration: identityCalibration,
+      versions: TEST_VALUATION_VERSIONS,
     });
 
     expect(group.records).toHaveLength(1);
@@ -47,7 +49,7 @@ describe("buildValuationRecordsForPlugin", () => {
     // uncertainty.test.ts(シード可能な乱数生成器を使用)で別途行っている。
     expect(record.quantileRange.p50).toBeGreaterThan(475);
     expect(record.quantileRange.p50).toBeLessThan(525);
-    expect(record.recalculationHash).toMatch(/^placeholder:/);
+    expect(record.recalculationHash).toMatch(/^vr:[0-9a-f]+$/);
   });
 
   it("IFVI(複数内訳)は methodId が {親手法ID}.{内訳ID} 形式になる", () => {
@@ -66,6 +68,7 @@ describe("buildValuationRecordsForPlugin", () => {
       input,
       config,
       calibration: identityCalibration,
+      versions: TEST_VALUATION_VERSIONS,
     });
 
     expect(group.records).toHaveLength(4);
@@ -99,6 +102,7 @@ describe("buildValuationRecordsForPlugin", () => {
         input,
         config,
         calibration: identityCalibration,
+        versions: TEST_VALUATION_VERSIONS,
         officialAggregates: { "ifvi-water-consumption": 999_999 }, // 明らかに食い違う値
       })
     ).toThrow(ReconciliationError);
@@ -122,6 +126,7 @@ describe("buildValuationRecordsForPlugin", () => {
         input,
         config,
         calibration: identityCalibration,
+        versions: TEST_VALUATION_VERSIONS,
         officialAggregates: { "ifvi-water-consumption": expectedAggregate },
       })
     ).not.toThrow();
@@ -138,6 +143,7 @@ describe("buildValuationRecords", () => {
       config,
       calibration: identityCalibration,
       plugins: [replacementCostPlugin],
+      versions: TEST_VALUATION_VERSIONS,
     });
 
     expect(groups).toHaveLength(1);
@@ -146,7 +152,14 @@ describe("buildValuationRecords", () => {
 
   it("同じシードのrngを渡すと、モンテカルロの結果まで含めて同一のValuationRecordが得られる", () => {
     const config: MethodConfig = { depth: "screening", unitReplacementCost: 500 };
-    const options = { physicalQuantityId: "pq-1", input, config, calibration: identityCalibration, plugins: [replacementCostPlugin] };
+    const options = {
+      physicalQuantityId: "pq-1",
+      input,
+      config,
+      calibration: identityCalibration,
+      plugins: [replacementCostPlugin],
+      versions: TEST_VALUATION_VERSIONS,
+    };
 
     const first = buildValuationRecords({ ...options, rng: createSeededRng(42) });
     const second = buildValuationRecords({ ...options, rng: createSeededRng(42) });

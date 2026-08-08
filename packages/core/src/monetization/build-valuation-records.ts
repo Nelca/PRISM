@@ -21,6 +21,7 @@ import type {
 import { exchangeAmount, welfareAmount } from "../types/common";
 import { applyGeographicCalibration } from "./calibration";
 import { combineUncertainty } from "./uncertainty";
+import { computeRecordHash } from "../ledger/recalculation-hash";
 
 export class ReconciliationError extends Error {
   constructor(
@@ -36,11 +37,26 @@ export class ReconciliationError extends Error {
   }
 }
 
+/**
+ * このValuationRecordの計算に実際に入ったパラメータ版(GAP-06)。
+ * `recalculationHash`の入力になるため **Optionalにしない**(build-plan §4.2:
+ * Optionalにしてよいのは「まだ確認していない外部データ」だけ)。
+ */
+export interface ValuationRecordVersions {
+  /** 地理較正のパラメータセットの版(M3 D-3の監査対応要件)。 */
+  calibrationSetVersion: string;
+  /** 適合度ティア閾値の版(M3 D-5)。 */
+  fitnessTierThresholdVersion: string;
+  /** AoP正規化対応表の版(M4 §0.2、判断を伴う対応付けのため)。 */
+  aopMappingVersion: string;
+}
+
 export interface BuildValuationRecordsOptions {
   physicalQuantityId: string;
   input: PhysicalQuantityInput;
   config: MethodConfig;
   plugins: MonetizationMethodPlugin[];
+  versions: ValuationRecordVersions;
   /**
    * 地理較正パラメータ(sourceRegion/targetRegionはinputから取るため除く)。
    * D-3の監査対応要件により、PPP出典・η・デフレータ・相対価格上昇係数・面積スケーリングを明示する。
@@ -74,19 +90,6 @@ function deriveRecalculability(output: MethodOutput): ValuationRecord["recalcula
   };
 }
 
-/**
- * 再計算ハッシュ(プレースホルダー)。M8の正式なハッシュ計算(パイプライン全体の版を
- * 横断的に含む、docs/requirements/m8-ledger-versioning.md §2)が実装されるまでの仮実装。
- * 少なくとも入力が変われば値が変わる程度の決定論的な文字列にしておく。
- */
-function placeholderRecalculationHash(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (Math.imul(31, hash) + seed.charCodeAt(i)) | 0;
-  }
-  return `placeholder:${(hash >>> 0).toString(16)}`;
-}
-
 function buildValuationRecordFromOutput(
   output: MethodOutput,
   methodId: string,
@@ -94,6 +97,7 @@ function buildValuationRecordFromOutput(
   physicalQuantityId: string,
   siteId: string,
   calibration: GeographicCalibrationRecord,
+  versions: ValuationRecordVersions,
   rng?: () => number
 ): ValuationRecord {
   const centralValue = applyGeographicCalibration(output.centralValue, calibration);
@@ -118,8 +122,20 @@ function buildValuationRecordFromOutput(
     geographicCalibration: calibration,
     scopeExclusions: output.scopeExclusions,
     recalculability: deriveRecalculability(output),
-    assumptionEntryIds: [] as string[], // M8との実配線は本フェーズのスコープ外
-    recalculationHash: placeholderRecalculationHash(`${methodId}:${physicalQuantityId}:${centralValue}`),
+    assumptionEntryIds: [] as string[], // パイプライン層(valuation-pipeline.ts)が実配線する
+    /**
+     * このレコードを再現するのに必要なものだけを入れる(GAP-06)。
+     * 較正パラメータは版番号だけでなく実際の値も含める。同じ版のまま値が差し替わった場合に
+     * ハッシュが変わらないと、監査で「同じ条件で計算した」と誤って読める。
+     */
+    recalculationHash: computeRecordHash("vr", {
+      methodId,
+      methodVersion,
+      physicalQuantityId,
+      siteId,
+      calibration,
+      versions,
+    }),
   };
 
   return output.valueConcept === "exchange"
@@ -131,7 +147,7 @@ export function buildValuationRecordsForPlugin(
   plugin: MonetizationMethodPlugin,
   options: Omit<BuildValuationRecordsOptions, "plugins">
 ): ValuationRecordGroup {
-  const { input, config, physicalQuantityId, calibration: calibrationParams, officialAggregates, rng } = options;
+  const { input, config, physicalQuantityId, calibration: calibrationParams, officialAggregates, versions, rng } = options;
 
   const outputs = plugin.evaluate(input, config);
 
@@ -165,6 +181,7 @@ export function buildValuationRecordsForPlugin(
       physicalQuantityId,
       input.siteId,
       calibration,
+      versions,
       rng
     );
   });

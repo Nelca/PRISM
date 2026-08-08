@@ -28,6 +28,28 @@ export const IDENTITY_CALIBRATION: GeographicCalibrationRecord = {
   areaScaling: 1,
 };
 
+/**
+ * 再計算ハッシュ(GAP-06)に入るパラメータ版のテスト用フィクスチャ。
+ * 本番の版番号ではなく、テストで固定するためだけの値。
+ */
+export const TEST_VALUATION_VERSIONS = {
+  calibrationSetVersion: "test-calibration-v1",
+  fitnessTierThresholdVersion: "test-fitness-tier-v1",
+  aopMappingVersion: "test-aop-mapping-v1",
+};
+
+export const TEST_DECOMPOSITION_VERSIONS = {
+  algorithmVersion: "test-shapley-v1",
+  cicesMatchLevel: "group",
+  aopMappingVersion: "test-aop-mapping-v1",
+  f3ThresholdVersion: "test-f3-v1",
+  f8ThresholdVersion: "test-f8-v1",
+};
+
+export const TEST_DECISION_VERSIONS = {
+  bindingMechanismDefinitionVersion: "test-binding-mechanism-v1",
+};
+
 export interface ValuationRecordFixtureOptions {
   methodId: string;
   centralValue: number;

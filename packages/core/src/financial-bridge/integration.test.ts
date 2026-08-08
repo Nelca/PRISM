@@ -12,6 +12,7 @@ import { computeInternalizationStatus } from "./internalization-status";
 import { computeNatureDebt } from "./nature-debt";
 import { computeComparisonTargets } from "./comparison-targets";
 import { exchangeAmount } from "../types/common";
+import { TEST_VALUATION_VERSIONS } from "../divergence/test-helpers";
 import type {
   ExchangeValuationRecord,
   GeographicCalibrationRecord,
@@ -61,6 +62,7 @@ describe("M5統合テスト:M3のValuationRecordから2ブリッジ・自然債�
       config,
       calibration,
       plugins: ALL_PLUGINS,
+      versions: TEST_VALUATION_VERSIONS,
     });
     const records = groups.flatMap((g) => g.records);
     return {

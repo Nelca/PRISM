@@ -11,7 +11,7 @@ import { buildValuationRecordsForPlugin } from "../monetization/build-valuation-
 import { replacementCostPlugin } from "../monetization/plugins/replacement-cost";
 import { computePriorityScores } from "./priority-score";
 import { computeDepthDecisions } from "./depth-decision";
-import { IDENTITY_CALIBRATION } from "../divergence/test-helpers";
+import { IDENTITY_CALIBRATION, TEST_VALUATION_VERSIONS } from "../divergence/test-helpers";
 import type { Site } from "../types/site";
 import type { ExchangeValuationRecord, PhysicalQuantityInput } from "../types/valuation";
 
@@ -51,6 +51,7 @@ describe("M2統合テスト:M1のMaterialIssueとM3のスクリーニング結�
       input,
       config: { depth: "screening", unitReplacementCost: 500 },
       calibration: IDENTITY_CALIBRATION,
+      versions: TEST_VALUATION_VERSIONS,
     });
     // replacement-costは常にexchange概念を返す(monetization/plugins/replacement-cost.ts)
     return group.records[0] as ExchangeValuationRecord;

@@ -56,6 +56,7 @@ describe("runValuationPipeline", () => {
     plugins: ALL_PLUGINS,
     calibrationSetVersion: "ifvi-water-consumption-v1",
     reconciliationFunctionVersion: "ifvi-reconciliation-v1",
+    fitnessTierThresholdVersion: "fitness-tier-v1",
   };
 
   it("M3のValuationRecordが生成され、AssumptionEntry(較正・適合度ティア・整合性検証)が実際に反映される", () => {

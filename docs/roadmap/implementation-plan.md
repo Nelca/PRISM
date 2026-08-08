@@ -82,7 +82,7 @@
 | T-01 | 17 | `not_applicable` ティアを "A" に読み替えている箇所の削除 | A | **完了** | — |
 | T-02 | 08 | ライセンスゲーティングをM1〜M2パイプラインに配線 | A | **完了**(D-110) | — |
 | T-03 | 13 | 評価不能基準(ライセンス保留・データ源なし)の可視化 | A | **完了**(D-110) | — |
-| T-04 | 06 | レコード単位の再計算ハッシュ(placeholder の解消) | A | 未着手 | `build-valuation-records.ts:76` / `build-divergence-decomposition.ts:75` / `build-decision-record.ts:69` |
+| T-04 | 06 | レコード単位の再計算ハッシュ(placeholder の解消) | A | **完了**(D-113) | — |
 | T-05 | 09 | 代表値選択と前年度手法での再計算値の並記 | A | 未着手 | `DivergenceDecomposition.representativeValueSelection` が常にundefined。デモ層の `interaction-store` が持っている責務をcoreに移す |
 | T-06 | 10 | M5パイプライン + 比較先(営業利益比・減損・格付)の算出と表示 | A | 未着手 | `packages/core/src/pipeline/financial-bridge-pipeline.ts` を新設。`comparison-targets.ts` の `after` を自然債務から導出する |
 | T-07 | 18 | 財務画面のレッドフラグ固定文言をデータ由来にする | A | 未着手 | `app/financial-bridge/page.tsx:85-124` |
@@ -148,6 +148,16 @@
 **完了条件:** スコアの分母が何基準だったかがレコードと画面の両方から判別できる。
 
 ---
+
+### T-04 GAP-06 【完了。詳細は design-rationale-log D-113】
+
+**実装したもの:** `ledger/recalculation-hash.ts` に `computeRecordHash()` を追加し(パイプライン全体のハッシュと同じ関数を使う)、`ValuationRecord`・`DivergenceDecomposition`・`DecisionRecord` の3つで placeholder を解消した。版情報は各ビルダーの必須引数(`versions`)にしたため、渡し忘れるとコンパイルが通らない。
+
+**ハッシュに入れたもの / 入れなかったもの:**
+- 入れた:レコードの同一性(methodId・physicalQuantityId・siteId等)、パラメータ版、**較正パラメータの実値**(版が同じまま値が差し替わった場合を検出するため)、**上流レコードのハッシュ**(ValuationRecord → DivergenceDecomposition / DecisionRecord へ伝播する)
+- 入れなかった:**モンテカルロの乱数シード。**シードは分位点にしか影響せず、M8 D-2がハッシュを「パラメータ版」と定義しているため。シードは `pipeline_run.rng_seed` に別途保存済み
+
+**以下は当初の作業メモ(履歴として残す):**
 
 ### T-04 GAP-06 レコード単位の再計算ハッシュ
 

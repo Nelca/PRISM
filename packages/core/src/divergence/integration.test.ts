@@ -9,6 +9,7 @@ import { buildValuationRecords } from "../monetization/build-valuation-records";
 import { ALL_PLUGINS } from "../monetization/registry";
 import { buildDivergenceDecomposition } from "./build-divergence-decomposition";
 import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput } from "../types/valuation";
+import { TEST_DECOMPOSITION_VERSIONS, TEST_VALUATION_VERSIONS } from "./test-helpers";
 
 describe("M4統合テスト:M3が生成する水カテゴリ6本のValuationRecordを分解する", () => {
   const input: PhysicalQuantityInput = {
@@ -55,6 +56,7 @@ describe("M4統合テスト:M3が生成する水カテゴリ6本のValuationReco
       config,
       calibration,
       plugins: ALL_PLUGINS,
+      versions: TEST_VALUATION_VERSIONS,
     });
     return groups.flatMap((g) => g.records);
   }
@@ -66,6 +68,7 @@ describe("M4統合テスト:M3が生成する水カテゴリ6本のValuationReco
       targetPhysicalQuantityId: "pq-site042-water-2027",
       siteId: "site-042",
       records,
+      versions: TEST_DECOMPOSITION_VERSIONS,
     });
 
     const exchangeGroup = decomposition.groups.find((g) => g.valueConcept === "exchange")!;
@@ -94,6 +97,7 @@ describe("M4統合テスト:M3が生成する水カテゴリ6本のValuationReco
       targetPhysicalQuantityId: "pq-site042-water-2027",
       siteId: "site-042",
       records,
+      versions: TEST_DECOMPOSITION_VERSIONS,
     });
 
     const welfareGroup = decomposition.groups.find((g) => g.valueConcept === "welfare")!;
@@ -121,6 +125,7 @@ describe("M4統合テスト:M3が生成する水カテゴリ6本のValuationReco
       targetPhysicalQuantityId: "pq-site042-water-2027",
       siteId: "site-042",
       records,
+      versions: TEST_DECOMPOSITION_VERSIONS,
     });
 
     const welfareGroup = decomposition.groups.find((g) => g.valueConcept === "welfare")!;
@@ -149,6 +154,7 @@ describe("M4統合テスト:M3が生成する水カテゴリ6本のValuationReco
       targetPhysicalQuantityId: "pq-site042-water-2027",
       siteId: "site-042",
       records,
+      versions: TEST_DECOMPOSITION_VERSIONS,
     });
 
     const exchangeGroup = decomposition.groups.find((g) => g.valueConcept === "exchange")!;

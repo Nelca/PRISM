@@ -42,3 +42,20 @@ function hashString(input: string): string {
 export function computeRecalculationHash(inputs: RecalculationHashInputs): RecalculationHash {
   return { hash: `m8:${hashString(stableStringify(inputs))}`, inputs };
 }
+
+/**
+ * 個別レコード(ValuationRecord / DivergenceDecomposition / DecisionRecord)の再計算ハッシュ。
+ * build-plan §4.2「すべてのレコードに再計算ハッシュのフィールドを持たせる」に対応する。
+ *
+ * パイプライン全体のハッシュ(computeRecalculationHash)と同じ関数で計算するが、
+ * 入力は「そのレコードの計算に実際に入ったもの」だけに絞る。1レコードから
+ * 「どの係数版・どの較正パラメータ・どのAoP対応表版で計算されたか」を辿れるようにするため。
+ *
+ * **モンテカルロの乱数シードは含めない。**シードは分位点にのみ影響し、中心値と
+ * パラメータ版には影響しない。M8 D-2がハッシュを「パラメータ版を横断的に含むもの」と
+ * 定義しているため、同じ版で計算した2つのrunのハッシュが seed 違いでズレると
+ * 「何か変わったのか」の比較ができなくなる。シードは pipeline_run 側に別途保存する。
+ */
+export function computeRecordHash(kind: string, inputs: unknown): string {
+  return `${kind}:${hashString(stableStringify(inputs))}`;
+}

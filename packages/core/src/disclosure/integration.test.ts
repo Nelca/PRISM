@@ -10,6 +10,7 @@ import { buildGapFinding } from "./gap-finding";
 import type { EvidenceCandidate } from "./evidence-match";
 import type { DisclosureClaim } from "../types/disclosure";
 import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput } from "../types/valuation";
+import { TEST_VALUATION_VERSIONS } from "../divergence/test-helpers";
 
 const calibration: Omit<GeographicCalibrationRecord, "sourceRegion" | "targetRegion"> = {
   pppSource: "test",
@@ -50,6 +51,7 @@ function buildWaterRecords() {
     config,
     calibration,
     plugins: ALL_PLUGINS,
+    versions: TEST_VALUATION_VERSIONS,
   });
   return groups.flatMap((g) => g.records);
 }

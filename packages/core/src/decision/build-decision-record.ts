@@ -16,6 +16,7 @@ import type { BaselineNpvInput } from "../types/financial-bridge";
 import type { ExchangeValuationRecord } from "../types/valuation";
 import { computeNatureAdjustedNpv } from "./nature-adjusted-npv";
 import { identifyDominantAssumption } from "./dominant-assumption";
+import { computeRecordHash } from "../ledger/recalculation-hash";
 
 export interface BuildDecisionRecordOptions {
   id: string;
@@ -30,12 +31,16 @@ export interface BuildDecisionRecordOptions {
   countermeasures: Countermeasure[];
   valuationRecordsById: Record<string, ExchangeValuationRecord>;
   bindingMechanism: BindingMechanism;
+  versions: DecisionRecordVersions;
 }
 
-/**
- * assumptionEntryIds・recalculationHashはM3・M4同様プレースホルダーとし、
- * M8実装時に実配線する。
- */
+/** この判定の再現に必要なパラメータ版(GAP-06)。Optionalにしない。 */
+export interface DecisionRecordVersions {
+  /** 拘束方式の定義の版(M6 D-6)。 */
+  bindingMechanismDefinitionVersion: string;
+}
+
+/** assumptionEntryIds はパイプライン層(decision-pipeline.ts)が実配線する。 */
 export function buildDecisionRecord(options: BuildDecisionRecordOptions): DecisionRecord {
   const relatedValuationRecordIds = buildDecisionRecordValuationRefs(options.relatedValuationRecords);
 
@@ -66,6 +71,18 @@ export function buildDecisionRecord(options: BuildDecisionRecordOptions): Decisi
     bindingMechanism: options.bindingMechanism,
     bindingMechanismHistory: [],
     assumptionEntryIds: [],
-    recalculationHash: `placeholder:${options.id}`,
+    /**
+     * 上流のValuationRecordのハッシュを含める(GAP-06)。★判定の根拠になった評価が
+     * 差し替わったのに、判定だけ古いまま残っている、という状態を検出できるようにするため。
+     * 承認閾値・通常NPVも判定を左右するので入力に含める。
+     */
+    recalculationHash: computeRecordHash("dr", {
+      decisionTarget: options.decisionTarget,
+      approvalThreshold: options.approvalThreshold,
+      baselineNpv: options.baselineNpv,
+      sourceRecordHashes: options.relatedValuationRecords.map((record) => record.recalculationHash),
+      bindingMechanismKind: options.bindingMechanism.kind,
+      versions: options.versions,
+    }),
   };
 }
