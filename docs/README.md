@@ -35,6 +35,7 @@ docs/
     m6-decision-record.md            済(対策評価と意思決定注入)
     m7-disclosure-verification.md    済(開示生成と整合検証)
     m8-ledger-versioning.md          済(記録・版管理基盤)
+    mvp-completion-gap.md            MVP完成までのギャップ(実装済みコードの監査結果とGAP-01〜21)
 
   decisions/                     設計判断の記録
     design-rationale-log.md          判断の経緯(実装前に必読)
@@ -48,8 +49,11 @@ docs/
   data/                          外部データの調査結果(フェーズ0の成果物)
     aop-mapping-v1.md                初版済 — AoP正規化対応表(IFVI/LIME3確認済、CE Delft未着手)
     method-recalculability.md        初版済 — 手法別の再計算可能性
-    cices-v51-notes.md               未 — CICES階層構造
+    cices-v51-notes.md               部分済 — CICES階層構造(5階層・コード体系を確認。Abiotic拡張は未確認。V5.2の存在を発見)
     licensing.md                     初版済 — ライセンス条件(WDPA/ENCORE/ESVD/CE Delft/IFVIの料金・条項を確認済み、契約締結は未)
+    calibration-parameters-v1.md     初版済 — 地理較正パラメータの実値と出典(World Bank PPP/所得/デフレータ、η、相対価格上昇率)
+    carbon-price-scenarios.md        初版済 — NGFS(未取得)・GX-ETS(二次資料一致)の確認状況
+    acquisition-runbook.md           初版済 — コード実装以外に必要なものの一覧と取得手順書
 
   business/                      事業側の資料
     board-proposal.md                経営会議提案資料
