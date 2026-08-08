@@ -8,11 +8,15 @@ const initialState: ChangeRepresentativeFormState = {};
 export function RepresentativeSelector({
   materialIssueId,
   recordId,
+  methodId,
+  valueConcept,
   fromLabel,
   toLabel,
 }: {
   materialIssueId: string;
   recordId: string;
+  methodId: string;
+  valueConcept: "exchange" | "welfare";
   fromLabel: string;
   toLabel: string;
 }) {
@@ -24,7 +28,7 @@ export function RepresentativeSelector({
       action={changeRepresentativeRecordAction}
       initialState={initialState}
       confirmLabel="変更を確定して記録"
-      hiddenFields={{ materialIssueId, recordId, fromLabel, toLabel }}
+      hiddenFields={{ materialIssueId, recordId, methodId, valueConcept, fromLabel, toLabel }}
     >
       <div className="field">
         <label htmlFor="reason">変更理由(必須)</label>

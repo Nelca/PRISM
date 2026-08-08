@@ -78,6 +78,13 @@ export default async function DecompositionPage({ searchParams }: { searchParams
   const currentRepresentativeId = representativeRecordByMaterialIssue[selectedIssueId];
   const changeLog = m4ChangeLogByMaterialIssue[selectedIssueId];
 
+  // M4 §7.4:代表値の選択(利用者が実際に選んだ場合のみ存在する)。
+  const selection = decomposition?.representativeValueSelection;
+  const selectionStatus = result.valuation.representativeSelectionStatus[selectedIssueId];
+  const selectedCentralValue = selection
+    ? (records.find((r) => r.methodId === selection.selectedMethodId)?.centralValue as unknown as number | undefined)
+    : undefined;
+
   return (
     <div className="screen">
       <div className="screen__head">
@@ -184,6 +191,8 @@ export default async function DecompositionPage({ searchParams }: { searchParams
                         <RepresentativeSelector
                           materialIssueId={selectedIssueId}
                           recordId={r.id}
+                          methodId={r.methodId}
+                          valueConcept={r.valueConcept}
                           fromLabel={METHOD_LABEL[records.find((rr) => rr.id === currentRepresentativeId)?.methodId ?? ""] ?? "—"}
                           toLabel={METHOD_LABEL[r.methodId] ?? r.methodId}
                         />
@@ -214,6 +223,41 @@ export default async function DecompositionPage({ searchParams }: { searchParams
           )}
         </div>
       </Card>
+
+      {/*
+        M4 §7.4・構想書9.3の必須要件:手法を変更したときは、前年度手法での再計算値を並記する。
+        これがないと、手法変更による差分と実態変化による差分が混ざる(GAP-09)。
+      */}
+      {selection && (
+        <Card title="前年度手法との比較" subtitle="手法変更による差分を切り分ける">
+          <KV k="前年度に採用していた手法" v={METHOD_LABEL[selection.priorYearMethodId ?? ""] ?? selection.priorYearMethodId ?? "記録なし(初年度)"} />
+          <KV k="今年度に選択した手法" v={METHOD_LABEL[selection.selectedMethodId] ?? selection.selectedMethodId} />
+          <KV k="選択理由" v={selection.reason} />
+          <hr className="rule" />
+
+          {selectionStatus?.status === "recalculated" && selection.recalculatedWithPriorMethod !== undefined ? (
+            <>
+              <KV
+                k="前年度手法を今年度の物理量で再計算した値"
+                v={<Num value={selection.recalculatedWithPriorMethod} unit="円" />}
+              />
+              <KV k="今年度の選択手法の値" v={<Num value={selectedCentralValue ?? 0} unit="円" />} />
+              <KV
+                k="手法変更による差分"
+                v={<Num value={(selectedCentralValue ?? 0) - selection.recalculatedWithPriorMethod} unit="円" />}
+              />
+              <p className="tooltip-note">
+                いずれも<b>今年度の物理量</b>で計算した値です。したがってこの差分は手法変更のみによるものです。
+                実態変化による差分を出すには前年度の実績値が必要ですが、本システムはまだ過年度の実績を保持していないため算出しません。
+              </p>
+            </>
+          ) : selectionStatus?.status === "method_unavailable" ? (
+            <p className="tooltip-note">{selectionStatus.unavailableReason}</p>
+          ) : (
+            <p className="tooltip-note">前年度から手法を変更していないため、再計算値の並記は行いません。</p>
+          )}
+        </Card>
+      )}
 
       <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>

@@ -45,6 +45,7 @@ import {
   DISCLOSURE_CLAIM,
   excludedCategoriesForSite,
   interfacesByCategoryForSite,
+  PRIOR_YEAR_METHOD_BY_MATERIAL_ISSUE,
   screeningValuationForMaterialIssue,
   SITE_ROWS,
 } from "./company";
@@ -140,6 +141,21 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       }
       const params = deepDiveParamsBySiteId.get(siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
       return buildUserDeepDiveConfig(siteId, params);
+    },
+    /**
+     * M4 §7.4:代表値の選択。**利用者が実際に選んだときだけ**渡す。
+     * 未選択のまま既定値(代替費用法)を使っている状態を「選択した」と記録しない
+     * (選択には理由が必須であり、理由をシステムが捏造しないため)。
+     */
+    representativeSelectionForMaterialIssue: (materialIssueId) => {
+      const selection = interactions.representativeSelection.get(materialIssueId);
+      if (!selection) return undefined;
+      return {
+        groupValueConcept: selection.valueConcept,
+        selectedMethodId: selection.methodId,
+        reason: selection.reason,
+        priorYearMethodId: PRIOR_YEAR_METHOD_BY_MATERIAL_ISSUE[materialIssueId],
+      };
     },
     decompositionVersions: DECOMPOSITION_VERSIONS,
     idSequence,

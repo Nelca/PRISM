@@ -106,6 +106,18 @@ export function screeningValuationForMaterialIssue(siteId: string): ExchangeValu
   };
 }
 
+/**
+ * 前年度に採用していた貨幣化手法(顧客提供の事実、M4 §7.4)。
+ *
+ * 実データでは顧客のサステナビリティ部門から受領する項目であり
+ * (`docs/data/acquisition-runbook.md` D-9)、まだ受け入れテンプレートに欄がない。
+ * ここでは架空企業のデモ値として固定する。**PRISM側が推定した値ではない。**
+ * 代表値をこれと違う手法に変更すると、前年度手法での再計算値が並記される。
+ */
+export const PRIOR_YEAR_METHOD_BY_MATERIAL_ISSUE: Record<string, string> = {
+  "site-042-mi-water": "replacement-cost",
+};
+
 /** 深掘り深度でのM3実行に使う設定(本社工場・水カテゴリのみ)。 */
 export const DEEP_DIVE_PHYSICAL_QUANTITY_ID = "pq-site042-water-2027";
 

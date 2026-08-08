@@ -113,4 +113,72 @@ describe("runValuationPipeline", () => {
     const totalPairwise = decomposition.groups.reduce((sum, g) => sum + g.pairwiseDecompositions.length, 0);
     expect(m4Entries).toHaveLength(totalPairwise);
   });
+
+  const DECOMPOSITION_VERSIONS = {
+    algorithmVersion: "shapley-v1",
+    cicesMatchLevel: "group",
+    aopMappingVersion: "aop-mapping-v1",
+    f3ThresholdVersion: "f3-v1",
+    f8ThresholdVersion: "f8-v1",
+  };
+
+  describe("M4 §7.4:代表値の選択(GAP-09)", () => {
+    function run(selection?: {
+      groupValueConcept: "exchange" | "welfare";
+      selectedMethodId: string;
+      reason: string;
+      priorYearMethodId?: string;
+    }) {
+      return runValuationPipeline({
+        materialIssueIds: ["mi-site042-water"],
+        deepDiveConfigForMaterialIssue: () => deepDiveConfig,
+        representativeSelectionForMaterialIssue: () => selection,
+        decompositionVersions: DECOMPOSITION_VERSIONS,
+        idSequence: createIdSequence("ae"),
+        now: NOW,
+      });
+    }
+
+    it("利用者が選択していなければ、代表値の選択は記録されない(理由を捏造しない)", () => {
+      const result = run();
+      expect(result.divergenceDecompositions[0].representativeValueSelection).toBeUndefined();
+      expect(result.assumptionEntries.some((e) => e.payload.kind === "representative_value_selection")).toBe(false);
+    });
+
+    it("手法を変更すると、前年度手法での再計算値が並記され、AssumptionEntryが生成される", () => {
+      const result = run({
+        groupValueConcept: "exchange",
+        selectedMethodId: "ifvi-water-consumption.VFaccess",
+        reason: "IFVIが水消費方法論の最終版を公開したため",
+        priorYearMethodId: "replacement-cost",
+      });
+
+      const selection = result.divergenceDecompositions[0].representativeValueSelection!;
+      expect(selection.selectedMethodId).toBe("ifvi-water-consumption.VFaccess");
+      expect(selection.priorYearMethodId).toBe("replacement-cost");
+
+      // 構想書9.3の必須要件:前年度手法での再計算値の並記
+      const records = result.valuationRecordsByMaterialIssue["mi-site042-water"];
+      const priorRecord = records.find((r) => r.methodId === "replacement-cost")!;
+      expect(selection.recalculatedWithPriorMethod).toBe(priorRecord.centralValue as unknown as number);
+      expect(result.representativeSelectionStatus["mi-site042-water"].status).toBe("recalculated");
+
+      const entry = result.assumptionEntries.find((e) => e.payload.kind === "representative_value_selection")!;
+      expect(entry).toBeDefined();
+      expect(entry.relatedRecordId).toBe(result.divergenceDecompositions[0].id);
+      expect(result.divergenceDecompositions[0].assumptionEntryIds).toContain(entry.id);
+    });
+
+    it("前年度と同じ手法を選んだ場合は、再計算値の並記は行わない", () => {
+      const result = run({
+        groupValueConcept: "exchange",
+        selectedMethodId: "replacement-cost",
+        reason: "前年度から継続",
+        priorYearMethodId: "replacement-cost",
+      });
+
+      expect(result.divergenceDecompositions[0].representativeValueSelection?.recalculatedWithPriorMethod).toBeUndefined();
+      expect(result.representativeSelectionStatus["mi-site042-water"].status).toBe("same_method");
+    });
+  });
 });

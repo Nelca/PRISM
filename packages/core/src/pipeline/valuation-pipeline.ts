@@ -10,12 +10,15 @@
 import { buildValuationRecords } from "../monetization/build-valuation-records";
 import { computeFitnessTier } from "../monetization/fitness";
 import { buildDivergenceDecomposition } from "../divergence/build-divergence-decomposition";
+import { buildRepresentativeValueSelection } from "../divergence/representative-value";
+import type { RepresentativeValueSelectionResult } from "../divergence/representative-value";
 import {
   buildAssumptionEntry,
   deriveM3CoefficientCalibrationPayload,
   deriveM3FitnessTierPayload,
   deriveM3ReconciliationCheckPayload,
   deriveM4DecompositionPayload,
+  deriveM4RepresentativeValueSelectionPayload,
 } from "../ledger/assumption-entry";
 import type { M4DecompositionVersions } from "../ledger/assumption-entry";
 import type {
@@ -27,6 +30,7 @@ import type {
 } from "../types/valuation";
 import type { DivergenceDecomposition } from "../types/divergence";
 import type { AssumptionEntry } from "../types/ledger";
+import type { ValueConcept } from "../types/common";
 
 export interface DeepDiveConfig {
   physicalQuantityId: string;
@@ -43,10 +47,25 @@ export interface DeepDiveConfig {
   fitnessTierThresholdVersion: string;
 }
 
+/** 利用者が選んだ代表値(M4 §7.4)。システムは推奨しないため、選択は必ず外から渡される。 */
+export interface RepresentativeSelectionInput {
+  groupValueConcept: ValueConcept;
+  selectedMethodId: string;
+  /** 変更理由。必須(デフォルト値を設けない)。 */
+  reason: string;
+  /** 前年度に採用した手法(顧客提供の事実)。初年度は未指定。 */
+  priorYearMethodId?: string;
+}
+
 export interface ValuationPipelineOptions {
   /** assessment-pipelineのDepthDecisionでdepth==="deep_dive"だったMaterialIssueのID一覧。 */
   materialIssueIds: string[];
   deepDiveConfigForMaterialIssue: (materialIssueId: string) => DeepDiveConfig;
+  /**
+   * 代表値の選択(M4 §7.4)。未選択のMaterialIssueにはundefinedを返す。
+   * 選択があると、手法変更時に前年度手法での再計算値が並記される(構想書9.3)。
+   */
+  representativeSelectionForMaterialIssue?: (materialIssueId: string) => RepresentativeSelectionInput | undefined;
   decompositionVersions: M4DecompositionVersions;
   idSequence: () => string;
   now: string;
@@ -60,6 +79,12 @@ export interface ValuationPipelineOptions {
 export interface ValuationPipelineResult {
   valuationRecordsByMaterialIssue: Record<string, ValuationRecord[]>;
   divergenceDecompositions: DivergenceDecomposition[];
+  /**
+   * 代表値選択の結果ステータス(MaterialIssueId → 結果)。
+   * 前年度手法での再計算ができなかった場合(手法セットから消えている等)、
+   * 画面がその事実を表示できるように理由を持ち回る。推定で埋めない(D-15)。
+   */
+  representativeSelectionStatus: Record<string, RepresentativeValueSelectionResult>;
   assumptionEntries: AssumptionEntry[];
 }
 
@@ -67,6 +92,7 @@ export function runValuationPipeline(options: ValuationPipelineOptions): Valuati
   const assumptionEntries: AssumptionEntry[] = [];
   const valuationRecordsByMaterialIssue: Record<string, ValuationRecord[]> = {};
   const divergenceDecompositions: DivergenceDecomposition[] = [];
+  const representativeSelectionStatus: Record<string, RepresentativeValueSelectionResult> = {};
 
   for (const materialIssueId of options.materialIssueIds) {
     const deepDiveConfig = options.deepDiveConfigForMaterialIssue(materialIssueId);
@@ -141,8 +167,43 @@ export function runValuationPipeline(options: ValuationPipelineOptions): Valuati
       }
     }
 
-    divergenceDecompositions.push(decomposition);
+    // --- M4 §7.4:代表値の選択と、手法変更時の前年度手法での再計算値の並記 ---
+    const selectionInput = options.representativeSelectionForMaterialIssue?.(materialIssueId);
+    let decompositionWithSelection = decomposition;
+
+    if (selectionInput) {
+      const group = decomposition.groups.find((g) => g.valueConcept === selectionInput.groupValueConcept);
+      const groupRecords = records.filter((record) => record.valueConcept === selectionInput.groupValueConcept);
+
+      if (group && groupRecords.length > 0) {
+        const result = buildRepresentativeValueSelection({
+          groupValueConcept: selectionInput.groupValueConcept,
+          records: groupRecords,
+          selectedMethodId: selectionInput.selectedMethodId,
+          reason: selectionInput.reason,
+          priorYearMethodId: selectionInput.priorYearMethodId,
+        });
+
+        const payload = deriveM4RepresentativeValueSelectionPayload(result.selection);
+        const entry = buildAssumptionEntry(options.idSequence(), options.now, "M4", decomposition.id, payload);
+        assumptionEntries.push(entry);
+
+        decompositionWithSelection = {
+          ...decomposition,
+          representativeValueSelection: result.selection,
+          assumptionEntryIds: [...decomposition.assumptionEntryIds, entry.id],
+        };
+        representativeSelectionStatus[materialIssueId] = result;
+      }
+    }
+
+    divergenceDecompositions.push(decompositionWithSelection);
   }
 
-  return { valuationRecordsByMaterialIssue, divergenceDecompositions, assumptionEntries };
+  return {
+    valuationRecordsByMaterialIssue,
+    divergenceDecompositions,
+    representativeSelectionStatus,
+    assumptionEntries,
+  };
 }

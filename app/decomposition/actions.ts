@@ -19,11 +19,13 @@ export async function changeRepresentativeRecordAction(
 ): Promise<ChangeRepresentativeFormState> {
   const materialIssueId = String(formData.get("materialIssueId") ?? "");
   const recordId = String(formData.get("recordId") ?? "");
+  const methodId = String(formData.get("methodId") ?? "");
+  const valueConcept = String(formData.get("valueConcept") ?? "");
   const fromLabel = String(formData.get("fromLabel") ?? "");
   const toLabel = String(formData.get("toLabel") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
 
-  if (!materialIssueId || !recordId) {
+  if (!materialIssueId || !recordId || !methodId) {
     return { error: "対象のレコードを指定してください。" };
   }
   if (!reason) {
@@ -37,7 +39,16 @@ export async function changeRepresentativeRecordAction(
     actor: ACTOR,
     kind: "representative_selection",
     subjectId: materialIssueId,
-    payload: { recordId, fromLabel, toLabel, reason, logMessage: `代表値を「${toLabel}」に変更(理由:${reason})` },
+    payload: {
+      recordId,
+      // core側は methodId と価値概念で代表値を受け取る(M4 §7.4)。
+      methodId,
+      valueConcept,
+      fromLabel,
+      toLabel,
+      reason,
+      logMessage: `代表値を「${toLabel}」に変更(理由:${reason})`,
+    },
   });
   await executeAndPersistRun(tenantId);
 

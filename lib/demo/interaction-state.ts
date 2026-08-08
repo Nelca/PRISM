@@ -7,6 +7,7 @@
  */
 
 import type { BindingMechanism, CountermeasureType } from "@core/types/decision";
+import type { ValueConcept } from "@core/types/common";
 
 export interface BindingMechanismState {
   mechanism: BindingMechanism;
@@ -37,9 +38,21 @@ export interface InteractionEvent {
   payload: Record<string, unknown>;
 }
 
+/**
+ * 代表値の選択(M4 §7.4)。core側は methodId と価値概念で受け取るため、
+ * recordId だけでなく methodId も保持する。理由は必須。
+ */
+export interface RepresentativeSelectionState {
+  recordId: string;
+  methodId: string;
+  valueConcept: ValueConcept;
+  reason: string;
+}
+
 export interface InteractionState {
   depthOverrides: Map<string, "promote" | "demote">;
   representativeRecordId: Map<string, string>;
+  representativeSelection: Map<string, RepresentativeSelectionState>;
   m4ChangeLog: Map<string, { from: string; to: string; reason: string }>;
   selectedCountermeasureKey: Map<string, CountermeasureType>;
   bindingMechanismState: Map<string, BindingMechanismState>;
@@ -53,6 +66,7 @@ export function emptyInteractionState(): InteractionState {
   return {
     depthOverrides: new Map(),
     representativeRecordId: new Map(),
+    representativeSelection: new Map(),
     m4ChangeLog: new Map(),
     selectedCountermeasureKey: new Map(),
     bindingMechanismState: new Map(),
@@ -83,6 +97,16 @@ export function projectInteractionState(events: InteractionEvent[]): Interaction
       }
       case "representative_selection": {
         state.representativeRecordId.set(event.subjectId, event.payload.recordId as string);
+        // methodId・valueConcept は 2026-08-09 以降のイベントにのみ含まれる(GAP-09)。
+        // 古いイベントには無いため、その場合は選択として扱わない(推定で補完しない)。
+        if (typeof event.payload.methodId === "string" && typeof event.payload.valueConcept === "string") {
+          state.representativeSelection.set(event.subjectId, {
+            recordId: event.payload.recordId as string,
+            methodId: event.payload.methodId,
+            valueConcept: event.payload.valueConcept as ValueConcept,
+            reason: event.payload.reason as string,
+          });
+        }
         state.m4ChangeLog.set(event.subjectId, {
           from: event.payload.fromLabel as string,
           to: event.payload.toLabel as string,
