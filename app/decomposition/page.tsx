@@ -1,0 +1,219 @@
+import Link from "next/link";
+import type { FactorContribution, PairwiseDecomposition } from "@core/types/divergence";
+import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { Num } from "../components/numeric";
+import { Card, Guide, KV, Tag } from "../components/ui";
+import { Football } from "../components/charts/Football";
+import { Waterfall, type WaterfallStepInput } from "../components/charts/Waterfall";
+import { RepresentativeSelector } from "./representative-selector";
+
+const METHOD_LABEL: Record<string, string> = {
+  "replacement-cost": "代替費用法(浄水コスト)",
+  "lime3-water": "LIME3(水消費統合指標)",
+  "ifvi-water-consumption": "IFVI 水ストレス係数",
+};
+
+const FACTOR_LABEL: Record<FactorContribution["factor"], string> = {
+  endpointCoverage: "何を測っているかの違い(対象範囲)",
+  discountRate: "割引率の違い",
+  geographicCalibration: "地域差による調整の違い",
+};
+
+function pairwiseToWaterfallSteps(pair: PairwiseDecomposition, labelA: string, labelB: string): WaterfallStepInput[] {
+  const steps: WaterfallStepInput[] = [{ label: `${labelA} 中心値`, value: pair.valueA as unknown as number, isTotal: true }];
+  let running = pair.valueA as unknown as number;
+  for (const c of pair.contributions) {
+    const next = running * c.multiplier;
+    steps.push({ label: FACTOR_LABEL[c.factor], value: next - running, isTotal: false });
+    running = next;
+  }
+  if (pair.residual) {
+    const next = running * pair.residual.multiplier;
+    steps.push({ label: "分解不能な残差", value: next - running, isTotal: false });
+    running = next;
+  }
+  steps.push({ label: `${labelB} 中心値`, value: pair.valueB as unknown as number, isTotal: true });
+  return steps;
+}
+
+export default async function DecompositionPage({ searchParams }: { searchParams: Promise<{ issue?: string }> }) {
+  const { issue: issueParam } = await searchParams;
+  const result = runDemoPipeline();
+  const { valuationRecordsByMaterialIssue, divergenceDecompositions, representativeRecordByMaterialIssue, m4ChangeLogByMaterialIssue } =
+    result.valuation;
+  const materialIssueIds = Object.keys(valuationRecordsByMaterialIssue);
+
+  if (materialIssueIds.length === 0) {
+    return (
+      <div className="screen">
+        <h1 className="screen__title">算定結果の比較</h1>
+        <p style={{ color: "var(--ink-faint)", marginTop: 12 }}>深掘り評価に昇格した課題がまだありません。</p>
+      </div>
+    );
+  }
+
+  const selectedIssueId = issueParam && materialIssueIds.includes(issueParam) ? issueParam : materialIssueIds[0];
+  const records = valuationRecordsByMaterialIssue[selectedIssueId];
+  const decomposition = divergenceDecompositions.find((d) => d.targetPhysicalQuantityId === records[0]?.physicalQuantityId);
+  const site = result.assessment.sites.find((s) => s.id === records[0]?.siteId);
+
+  const footballMethods = records.map((r) => ({
+    name: METHOD_LABEL[r.methodId] ?? r.methodId,
+    tier: r.transferFitness.tier === "not_applicable" ? "A" : r.transferFitness.tier,
+    concept: r.valueConcept,
+    low: r.quantileRange.p5,
+    mid: r.quantileRange.p50,
+    high: r.quantileRange.p95,
+  }));
+
+  const allRatios = (decomposition?.groups ?? []).flatMap((g) => g.pairwiseDecompositions.map((p) => p.ratio)).filter((r): r is number => r !== null);
+  const maxRatio = allRatios.length > 0 ? Math.max(...allRatios) : null;
+
+  const exchangeGroup = decomposition?.groups.find((g) => g.valueConcept === "exchange");
+  const welfareGroup = decomposition?.groups.find((g) => g.valueConcept === "welfare");
+  const primaryPair = exchangeGroup?.pairwiseDecompositions[0];
+
+  const currentRepresentativeId = representativeRecordByMaterialIssue[selectedIssueId];
+  const changeLog = m4ChangeLogByMaterialIssue[selectedIssueId];
+
+  return (
+    <div className="screen">
+      <div className="screen__head">
+        <div className="screen__title-row">
+          <h1 className="screen__title">算定結果の比較</h1>
+          <Guide>
+            同じ対象に複数の算定方法を使うと、結果に大きな差が出ることがあります。これは誤差ではなく、各方法が異なる問いに答えているためです。
+            差が生じる理由を確認したうえで、投資判断に使う代表値を選びます。推奨値は表示されません。方法を変更する場合は理由の入力が必須です。
+          </Guide>
+        </div>
+      </div>
+
+      {materialIssueIds.length > 1 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {materialIssueIds.map((id) => (
+            <Link
+              key={id}
+              href={`/decomposition?issue=${encodeURIComponent(id)}`}
+              className={`pill-btn pill-btn--sm${id === selectedIssueId ? " pill-btn--accent" : ""}`}
+            >
+              {id}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <Card
+        title="方法別の試算"
+        subtitle={site?.name ?? records[0]?.siteId}
+        headExtra={maxRatio !== null && maxRatio > 1.5 ? <Tag variant="warn">最大で{maxRatio.toFixed(1)}倍の差</Tag> : undefined}
+        foot="単位:円/年 ・ 紫は社会全体への影響(投資判断には使用しません)"
+      >
+        <Football methods={footballMethods} />
+      </Card>
+
+      {primaryPair && (
+        <Card title="差が生じる理由" subtitle="中心値の差を要因に分解">
+          <Waterfall
+            steps={pairwiseToWaterfallSteps(
+              primaryPair,
+              METHOD_LABEL[primaryPair.methodIdA] ?? primaryPair.methodIdA,
+              METHOD_LABEL[primaryPair.methodIdB] ?? primaryPair.methodIdB
+            )}
+          />
+          <p className="tooltip-note">{primaryPair.narrative}</p>
+        </Card>
+      )}
+
+      <div className="grid-2">
+        {exchangeGroup && (
+          <div style={{ border: "1px solid var(--accent-line)", background: "var(--accent-soft)", borderRadius: 6, padding: 14 }}>
+            <div className="section-label" style={{ color: "var(--accent-ink)" }}>
+              交換価値グループ ・ {exchangeGroup.usage}
+            </div>
+            {exchangeGroup.methodIds.map((id) => {
+              const r = records.find((rec) => rec.methodId === id && rec.valueConcept === "exchange");
+              if (!r) return null;
+              return <KV key={id} k={METHOD_LABEL[id] ?? id} v={<Num value={r.centralValue as unknown as number} unit="円" />} />;
+            })}
+            <div style={{ marginTop: 10 }}>
+              <Tag variant="exchange">投資判断に反映できます</Tag>
+            </div>
+          </div>
+        )}
+        {welfareGroup && (
+          <div style={{ border: "1px solid #cbbedd", background: "var(--welfare-soft)", borderRadius: 6, padding: 14 }}>
+            <div className="section-label" style={{ color: "var(--welfare)" }}>
+              厚生価値グループ ・ {welfareGroup.usage}
+            </div>
+            {welfareGroup.methodIds.map((id) => {
+              const r = records.find((rec) => rec.methodId === id && rec.valueConcept === "welfare");
+              if (!r) return null;
+              return <KV key={id} k={METHOD_LABEL[id] ?? id} v={<Num value={r.centralValue as unknown as number} unit="円" />} />;
+            })}
+            <div style={{ marginTop: 10 }}>
+              <Tag variant="welfare">開示にのみ使用します</Tag>
+            </div>
+            <p className="tooltip-note">この値は投資判断には使用せず、開示の参考情報としてのみ使用します。</p>
+          </div>
+        )}
+      </div>
+
+      <Card title="投資判断に使う代表値の選択" padBody={false}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>方法</th>
+              <th>適合度ティア</th>
+              <th>中心値</th>
+            </tr>
+          </thead>
+          <tbody>
+            {records
+              .filter((r) => r.valueConcept === "exchange")
+              .map((r) => {
+                const selected = r.id === currentRepresentativeId;
+                return (
+                  <tr key={r.id} style={selected ? { background: "var(--accent-soft)" } : undefined}>
+                    <td>
+                      {selected ? (
+                        <Tag variant="ok">選択中</Tag>
+                      ) : (
+                        <RepresentativeSelector
+                          materialIssueId={selectedIssueId}
+                          recordId={r.id}
+                          fromLabel={METHOD_LABEL[records.find((rr) => rr.id === currentRepresentativeId)?.methodId ?? ""] ?? "—"}
+                          toLabel={METHOD_LABEL[r.methodId] ?? r.methodId}
+                        />
+                      )}
+                    </td>
+                    <td>
+                      <b>{METHOD_LABEL[r.methodId] ?? r.methodId}</b>
+                    </td>
+                    <td>{r.transferFitness.tier}</td>
+                    <td className="num">
+                      <Num value={r.centralValue as unknown as number} unit="円" />
+                    </td>
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+        <div style={{ padding: "12px 18px" }}>
+          {changeLog ? (
+            <>
+              <div className="section-label">変更履歴</div>
+              <KV k="変更前" v={changeLog.from} />
+              <KV k="変更後" v={changeLog.to} />
+              <KV k="変更理由" v={changeLog.reason} />
+            </>
+          ) : (
+            <p style={{ color: "var(--ink-faint)", fontSize: 12 }}>代表値の変更履歴はまだありません。</p>
+          )}
+        </div>
+      </Card>
+
+      <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
+    </div>
+  );
+}

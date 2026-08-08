@@ -42,6 +42,28 @@ describe("computeDepthDecisions", () => {
     expect(byId.A.promotedManually).toBe(false);
   });
 
+  it("手動降格は自動昇格対象でも概算評価に戻す(manualDemotions)", () => {
+    const scores = [score("A", 3.125), score("B", 2.375), score("C", 2.625), score("D", 1.875)];
+    const decisions = computeDepthDecisions(scores, { manualDemotions: new Set(["A"]) });
+    const byId = Object.fromEntries(decisions.map((d) => [d.materialIssueId, d]));
+
+    expect(byId.A.depth).toBe("screening");
+    expect(byId.A.excludedFromDeepDive).toBe(true);
+    expect(byId.A.exclusionReason).toContain("手動で概算評価に戻された");
+  });
+
+  it("同一IDがmanualOverridesとmanualDemotionsの両方に含まれる場合は昇格を優先する", () => {
+    const scores = [score("A", 3.125), score("B", 2.375), score("C", 2.625), score("D", 1.875)];
+    const decisions = computeDepthDecisions(scores, {
+      manualOverrides: new Set(["D"]),
+      manualDemotions: new Set(["D"]),
+    });
+    const byId = Object.fromEntries(decisions.map((d) => [d.materialIssueId, d]));
+
+    expect(byId.D.depth).toBe("deep_dive");
+    expect(byId.D.promotedManually).toBe(true);
+  });
+
   it("promotionPercentileを変更すると昇格件数が変わる", () => {
     const scores = [score("A", 4), score("B", 3), score("C", 2), score("D", 1)];
     const decisions = computeDepthDecisions(scores, { promotionPercentile: 0.5 });

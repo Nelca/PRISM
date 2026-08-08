@@ -1,44 +1,69 @@
 import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
-import { DISCLOSURE_CLAIM } from "@/lib/demo/company";
+import { Card, Guide, Tag } from "../components/ui";
+import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
+
+const GAP_LABEL: Record<string, string> = {
+  G1_no_evidence: "根拠なし",
+  G2_weak_evidence: "根拠がやや弱い",
+  G3_scope_mismatch: "対象範囲が一致しない",
+  G4_period_mismatch: "対象期間が一致しない",
+};
 
 export default function DisclosurePage() {
   const result = runDemoPipeline();
+  const claimsById = new Map(result.disclosureClaims.map((claim) => [claim.id, claim]));
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold">M7:開示生成と整合検証</h1>
+    <div className="screen">
+      <div className="screen__head">
+        <div className="screen__title-row">
+          <h1 className="screen__title">開示内容の確認</h1>
+          <Guide>
+            登録済みの開示claimから記載内容と根拠の整合を確認します。真偽の断定は行わず、根拠の充足状況のみを示します。
+            根拠が不足している場合、①記載を弱める・②根拠を追加取得する(詳細評価キューへ追加)・③判断の理由を記録する、の3つの対応から選べます。
+          </Guide>
+        </div>
+      </div>
 
-      <section className="rounded border border-zinc-200 p-4 text-sm dark:border-zinc-800">
-        <p className="text-xs text-zinc-500">
-          {DISCLOSURE_CLAIM.sourceDocument} {DISCLOSURE_CLAIM.sourcePageOrSection}
-        </p>
-        <p className="mt-1">{DISCLOSURE_CLAIM.rawText}</p>
-      </section>
+      {result.disclosure.gapFindings.map((finding) => {
+        const claim = claimsById.get(finding.claimId);
+        const siteId = result.disclosureClaimSiteId[finding.claimId];
+        return (
+          <Card
+            key={finding.id}
+            title={claim?.rawText}
+            subtitle={claim ? `${claim.sourceDocument} ${claim.sourcePageOrSection}` : undefined}
+            headExtra={
+              finding.gapType ? <Tag variant="warn">{GAP_LABEL[finding.gapType] ?? finding.gapType}</Tag> : <Tag variant="ok">根拠充足</Tag>
+            }
+          >
+            <table className="data-table" style={{ marginBottom: finding.recommendedActions.length > 0 ? 14 : 0 }}>
+              <thead>
+                <tr>
+                  <th>GapFinding ID</th>
+                  <th>一致した根拠件数</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="num">{finding.id}</td>
+                  <td className="num">{finding.evidenceMatch.matchedRecordIds.length}</td>
+                </tr>
+              </tbody>
+            </table>
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 text-left dark:border-zinc-800">
-            <th className="py-1 pr-4">GapFinding ID</th>
-            <th className="py-1 pr-4">判定</th>
-            <th className="py-1 pr-4">一致した根拠件数</th>
-            <th className="py-1 pr-4">推奨アクション</th>
-          </tr>
-        </thead>
-        <tbody>
-          {result.disclosure.gapFindings.map((finding) => (
-            <tr key={finding.id} className="border-b border-zinc-100 dark:border-zinc-900">
-              <td className="py-1 pr-4">{finding.id}</td>
-              <td className="py-1 pr-4">{finding.gapType ?? "根拠充足(ギャップなし)"}</td>
-              <td className="py-1 pr-4">{finding.evidenceMatch.matchedRecordIds.length}</td>
-              <td className="py-1 pr-4">
-                {finding.recommendedActions.length === 0
-                  ? "—"
-                  : finding.recommendedActions.map((a) => a.kind).join(" / ")}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            {finding.recommendedActions.length > 0 && claim && (
+              <div className="grid-3">
+                <WeakenClaimAction claimId={claim.id} currentText={claim.rawText} />
+                {siteId && <AcquireEvidenceAction siteId={siteId} />}
+                <RecordIntentionalDecisionAction claimId={claim.id} />
+              </div>
+            )}
+          </Card>
+        );
+      })}
+
+      <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>
   );
 }

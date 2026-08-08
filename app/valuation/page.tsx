@@ -1,79 +1,151 @@
+import Link from "next/link";
+import { computeTornadoChart } from "@core/monetization/tornado";
+import type { ValuationRecord } from "@core/types/valuation";
 import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
 import { Num } from "../components/numeric";
+import { Card, Guide, KV, Stat, Tag } from "../components/ui";
+import { tierTagVariant } from "../components/tag-utils";
+import { Football } from "../components/charts/Football";
+import { Tornado } from "../components/charts/Tornado";
 
-export default function ValuationPage() {
+const METHOD_LABEL: Record<string, string> = {
+  "replacement-cost": "代替費用法(浄水コスト)",
+  "lime3-water": "LIME3(水消費統合指標)",
+  "ifvi-water-consumption": "IFVI 水ストレス係数",
+};
+
+export default async function ValuationPage({ searchParams }: { searchParams: Promise<{ issue?: string }> }) {
+  const { issue: issueParam } = await searchParams;
   const result = runDemoPipeline();
-  const records = Object.values(result.valuation.valuationRecordsByMaterialIssue).flat();
+  const { valuationRecordsByMaterialIssue } = result.valuation;
+  const materialIssueIds = Object.keys(valuationRecordsByMaterialIssue);
+
+  if (materialIssueIds.length === 0) {
+    return (
+      <div className="screen">
+        <h1 className="screen__title">価値の算定</h1>
+        <p style={{ color: "var(--ink-faint)", marginTop: 12 }}>深掘り評価に昇格した課題がまだありません。</p>
+      </div>
+    );
+  }
+
+  const selectedIssueId = issueParam && materialIssueIds.includes(issueParam) ? issueParam : materialIssueIds[0];
+  const records = valuationRecordsByMaterialIssue[selectedIssueId];
+  const site = result.assessment.sites.find((s) => s.id === records[0]?.siteId);
+  const issue = result.assessment.materialIssues.find((i) => i.id === selectedIssueId);
+  const input = records[0]?.physicalQuantityId;
+
+  const footballMethods = records.map((r) => ({
+    name: METHOD_LABEL[r.methodId] ?? r.methodId,
+    tier: r.transferFitness.tier === "not_applicable" ? "A" : r.transferFitness.tier,
+    concept: r.valueConcept,
+    low: r.quantileRange.p5,
+    mid: r.quantileRange.p50,
+    high: r.quantileRange.p95,
+  }));
+
+  const primaryRecord: ValuationRecord | undefined = records.find((r) => r.methodId === "replacement-cost") ?? records[0];
+  const tornadoEntries = primaryRecord ? computeTornadoChart(primaryRecord) : [];
+  const tornadoCenter = primaryRecord ? (primaryRecord.centralValue as unknown as number) : 0;
+  const tornadoFactors = tornadoEntries.map((e, i) => ({
+    name: e.label,
+    low: tornadoCenter * (1 - e.sigma),
+    high: tornadoCenter * (1 + e.sigma),
+    dominant: i === 0,
+  }));
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold">M3:貨幣化エンジン / M4:乖離分解</h1>
+    <div className="screen">
+      <div className="screen__head">
+        <div className="screen__title-row">
+          <h1 className="screen__title">価値の算定</h1>
+          <Guide>
+            同じ対象に複数の算定方法を並行して適用し、幅を持った試算を出します。M3は現状waterカテゴリの
+            3手法(代替費用法・LIME3・IFVI水ストレス係数)を実装しており、深掘り対象になった課題には常にこの3手法を並行実行します。
+          </Guide>
+        </div>
+      </div>
 
-      <section>
-        <h2 className="text-sm font-medium text-zinc-500">ValuationRecord(深掘り深度)</h2>
-        <table className="mt-2 w-full text-sm">
+      {materialIssueIds.length > 1 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {materialIssueIds.map((id) => (
+            <Link
+              key={id}
+              href={`/valuation?issue=${encodeURIComponent(id)}`}
+              className={`pill-btn pill-btn--sm${id === selectedIssueId ? " pill-btn--accent" : ""}`}
+            >
+              {id}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <Card title="算定の対象" subtitle={`${issue?.impactCategory ?? "water"} ・ ${site?.name ?? records[0]?.siteId}`}>
+        <div className="grid-3">
+          <Stat label="物理量入力ID" value={input ?? "—"} />
+          <Stat label="対象カテゴリ" value={issue?.impactCategory ?? "water"} />
+          <Stat label="感応度スコア" value={issue ? `${issue.sensitivityScore}/5` : "—"} />
+        </div>
+      </Card>
+
+      <Card title="適用している算定方法" subtitle={`${records.length}件を並行して適用中`} padBody={false} foot="単位:円/年 ・ 使用した基準データのバージョンも記録されます">
+        <table className="data-table">
           <thead>
-            <tr className="border-b border-zinc-200 text-left dark:border-zinc-800">
-              <th className="py-1 pr-4">手法</th>
-              <th className="py-1 pr-4">価値概念</th>
-              <th className="py-1 pr-4">AoP</th>
-              <th className="py-1 pr-4">中心値</th>
-              <th className="py-1 pr-4">P5〜P95</th>
-              <th className="py-1 pr-4">適合度ティア</th>
+            <tr>
+              <th>方法</th>
+              <th>価値の性質</th>
+              <th>適合度ティア</th>
+              <th>中心値</th>
+              <th>幅(P5〜P95)</th>
             </tr>
           </thead>
           <tbody>
-            {records.map((record) => (
-              <tr key={record.id} className="border-b border-zinc-100 dark:border-zinc-900">
-                <td className="py-1 pr-4">{record.methodId}</td>
-                <td className="py-1 pr-4">{record.valueConcept === "exchange" ? "交換価値" : "厚生価値"}</td>
-                <td className="py-1 pr-4">{record.aopCode}</td>
-                <td className="py-1 pr-4">
-                  <Num value={record.centralValue as unknown as number} unit="円" />
+            {records.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <b>{METHOD_LABEL[r.methodId] ?? r.methodId}</b>
                 </td>
-                <td className="py-1 pr-4">
-                  <Num value={record.quantileRange.p5} /> 〜 <Num value={record.quantileRange.p95} />
+                <td>
+                  <Tag variant={r.valueConcept === "welfare" ? "welfare" : "exchange"}>
+                    {r.valueConcept === "welfare" ? "厚生価値" : "交換価値"}
+                  </Tag>
                 </td>
-                <td className="py-1 pr-4">{record.transferFitness.tier}</td>
+                <td>
+                  <Tag variant={tierTagVariant(r.transferFitness.tier)}>{r.transferFitness.tier}</Tag>
+                </td>
+                <td className="num" style={{ fontWeight: 700 }}>
+                  <Num value={r.centralValue as unknown as number} unit="円" />
+                </td>
+                <td className="num">
+                  <Num value={r.quantileRange.p5} /> 〜 <Num value={r.quantileRange.p95} />
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </section>
+      </Card>
 
-      {result.valuation.divergenceDecompositions.map((decomposition) => (
-        <section key={decomposition.id}>
-          <h2 className="text-sm font-medium text-zinc-500">乖離分解:{decomposition.id}</h2>
-          {decomposition.crossGroupComparison && (
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              交換価値グループと厚生価値グループは比較不能です:
-              {decomposition.crossGroupComparison.metadataDifferences.join(" / ")}
-            </p>
-          )}
-          {decomposition.groups.map((group) => (
-            <div key={group.valueConcept} className="mt-3">
-              <p className="text-xs uppercase text-zinc-500">
-                {group.valueConcept === "exchange" ? "交換価値グループ" : "厚生価値グループ"}({group.usage})
-              </p>
-              <ul className="mt-1 flex flex-col gap-2">
-                {group.pairwiseDecompositions.map((pair, i) => (
-                  <li key={i} className="rounded border border-zinc-200 p-2 text-sm dark:border-zinc-800">
-                    <p className="font-medium">
-                      {pair.methodIdA} / {pair.methodIdB}
-                      {pair.ratio !== null && (
-                        <span className="ml-2 font-normal">
-                          <Num value={pair.ratio} digits={2} />倍
-                        </span>
-                      )}
-                    </p>
-                    <p className="mt-1 text-zinc-600 dark:text-zinc-400">{pair.narrative}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </section>
-      ))}
+      <div className="grid-2">
+        <Card title="試算の幅(手法別)">
+          <Football methods={footballMethods} />
+        </Card>
+        <Card title="試算の幅に影響する要因" subtitle={primaryRecord ? METHOD_LABEL[primaryRecord.methodId] : undefined}>
+          <Tornado center={tornadoCenter} factors={tornadoFactors} />
+          <p className="tooltip-note">
+            パラメータ不確実性(層i)と適合度ティア由来の移転誤差(層ii)のsigmaを中心値からの近似的な振れ幅として表示しています。
+          </p>
+        </Card>
+      </div>
+
+      <Card title="試算に含めていない項目">
+        {primaryRecord?.scopeExclusions.length ? (
+          primaryRecord.scopeExclusions.map((ex, i) => <KV key={i} k={ex} v="対象外" />)
+        ) : (
+          <p style={{ color: "var(--ink-faint)" }}>この手法に明示的な除外項目はありません。</p>
+        )}
+      </Card>
+
+      <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>
   );
 }

@@ -128,17 +128,72 @@ export const DEEP_DIVE_CONFIG: MethodConfig = {
   },
 };
 
-/** M6:本社工場の水リスク低減策(節水設備投資)。 */
-export function buildCountermeasures(replacementCostRecordId: string): Countermeasure[] {
+/**
+ * M6:対策案。coreの`Countermeasure`型には案のラベル・回避物理量フィールドが無いため、
+ * デモ層でこのサイドカー型に包んで保持する(M6画面で複数案を並べて比較するため)。
+ */
+export interface CountermeasureCandidate {
+  key: Countermeasure["type"];
+  label: string;
+  avoidedPhysicalQuantity: number; // m3/年
+  countermeasure: Countermeasure;
+}
+
+/** M6:本社工場の水リスク対策案4種(企業提供の想定値)。 */
+export function buildCountermeasureCandidates(replacementCostRecordId: string): CountermeasureCandidate[] {
   return [
     {
-      type: "reduction",
-      targetSiteId: "site-042",
-      investmentCost: { initial: 80_000_000, recurring: 3_000_000 },
-      avoidedNatureCost: [
-        { year: 0, amount: exchangeAmount(27_900_000), sourceValuationRecordId: replacementCostRecordId },
-        { year: 1, amount: exchangeAmount(27_900_000), sourceValuationRecordId: replacementCostRecordId },
-      ],
+      key: "reduction",
+      label: "取水設備の効率化投資",
+      avoidedPhysicalQuantity: 45_000,
+      countermeasure: {
+        type: "reduction",
+        targetSiteId: "site-042",
+        investmentCost: { initial: 80_000_000, recurring: 3_000_000 },
+        avoidedNatureCost: [
+          { year: 0, amount: exchangeAmount(27_900_000), sourceValuationRecordId: replacementCostRecordId },
+          { year: 1, amount: exchangeAmount(27_900_000), sourceValuationRecordId: replacementCostRecordId },
+        ],
+      },
+    },
+    {
+      key: "avoidance",
+      label: "調達先の変更(水源の多様化)",
+      avoidedPhysicalQuantity: 50_000,
+      countermeasure: {
+        type: "avoidance",
+        targetSiteId: "site-042",
+        investmentCost: { initial: 150_000_000, recurring: 2_000_000 },
+        avoidedNatureCost: [
+          { year: 0, amount: exchangeAmount(20_000_000), sourceValuationRecordId: replacementCostRecordId },
+          { year: 1, amount: exchangeAmount(31_000_000), sourceValuationRecordId: replacementCostRecordId },
+        ],
+      },
+    },
+    {
+      key: "transfer",
+      label: "水リスク保険契約",
+      avoidedPhysicalQuantity: 0,
+      countermeasure: {
+        type: "transfer",
+        targetSiteId: "site-042",
+        investmentCost: { initial: 0, recurring: 5_000_000 },
+        avoidedNatureCost: [
+          { year: 0, amount: exchangeAmount(8_000_000), sourceValuationRecordId: replacementCostRecordId },
+          { year: 1, amount: exchangeAmount(8_000_000), sourceValuationRecordId: replacementCostRecordId },
+        ],
+      },
+    },
+    {
+      key: "acceptance",
+      label: "対策を実施せず監視を継続",
+      avoidedPhysicalQuantity: 0,
+      countermeasure: {
+        type: "acceptance",
+        targetSiteId: "site-042",
+        investmentCost: { initial: 0, recurring: 500_000 },
+        avoidedNatureCost: [],
+      },
     },
   ];
 }

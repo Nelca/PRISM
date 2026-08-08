@@ -34,15 +34,16 @@ describe("GATE検証(ダミーデータ):M1〜M8が最後まで通る", () => {
   });
 
   it("M5:2つのブリッジ・比較先が生成され、非GAAPラベルが付く", () => {
-    expect(result.financialBridge).not.toBeNull();
-    expect(result.financialBridge!.bridge1.nonGaapLabel.label).toBe("非GAAP指標");
-    expect(result.financialBridge!.bridge2?.disclosureOnlyLabel).toBe(true);
-    expect(result.comparisonTargets?.nonGaapLabel.label).toBe("非GAAP指標");
+    expect(result.decisions).toHaveLength(1);
+    const { financialBridge, comparisonTargets } = result.decisions[0];
+    expect(financialBridge.bridge1.nonGaapLabel.label).toBe("非GAAP指標");
+    expect(financialBridge.bridge2?.disclosureOnlyLabel).toBe(true);
+    expect(comparisonTargets.nonGaapLabel.label).toBe("非GAAP指標");
   });
 
   it("M6:DecisionRecordが生成され、★判定が確定する", () => {
-    expect(result.decision).not.toBeNull();
-    expect(["does_not_cross", "crosses", "pending"]).toContain(result.decision!.decisionRecord.verdict);
+    expect(result.decisions).toHaveLength(1);
+    expect(["does_not_cross", "crosses", "pending"]).toContain(result.decisions[0].decision.decisionRecord.verdict);
   });
 
   it("M7:開示claimに対するギャップ判定が行われる", () => {

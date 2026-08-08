@@ -15,6 +15,12 @@ export interface ComputeDepthDecisionsOptions {
   promotionPercentile?: number;
   /** 優先度算定の結果によらず深掘り対象に指定するmaterialIssueIdの集合。 */
   manualOverrides?: Set<string>;
+  /**
+   * 優先度算定の結果によらず概算評価に戻すmaterialIssueIdの集合(手動降格)。
+   * manualOverridesと同じIDが両方に含まれることは呼び出し側で発生させない前提とし、
+   * その場合はmanualOverrides(昇格)を優先する。
+   */
+  manualDemotions?: Set<string>;
 }
 
 export function computeDepthDecisions(
@@ -23,6 +29,7 @@ export function computeDepthDecisions(
 ): DepthDecision[] {
   const promotionPercentile = options.promotionPercentile ?? DEFAULT_PROMOTION_PERCENTILE;
   const manualOverrides = options.manualOverrides ?? new Set<string>();
+  const manualDemotions = options.manualDemotions ?? new Set<string>();
 
   const promotionCount = Math.ceil(priorityScores.length * promotionPercentile);
   const sortedDescending = [...priorityScores].sort((a, b) => b.normalizedScore - a.normalizedScore);
@@ -30,7 +37,8 @@ export function computeDepthDecisions(
 
   return priorityScores.map((score): DepthDecision => {
     const promotedManually = manualOverrides.has(score.materialIssueId);
-    const promoted = promotedManually || autoPromotedIds.has(score.materialIssueId);
+    const demotedManually = !promotedManually && manualDemotions.has(score.materialIssueId);
+    const promoted = promotedManually || (autoPromotedIds.has(score.materialIssueId) && !demotedManually);
 
     if (promoted) {
       return {
@@ -47,9 +55,11 @@ export function computeDepthDecisions(
       depth: "screening",
       promotedManually: false,
       excludedFromDeepDive: true,
-      exclusionReason: `優先度算定の結果(normalizedScore=${score.normalizedScore.toFixed(3)})が上位${Math.round(
-        promotionPercentile * 100
-      )}%に入らなかったため、深掘り評価には進みません。`,
+      exclusionReason: demotedManually
+        ? "優先度算定では深掘り対象だったが、手動で概算評価に戻された。"
+        : `優先度算定の結果(normalizedScore=${score.normalizedScore.toFixed(3)})が上位${Math.round(
+            promotionPercentile * 100
+          )}%に入らなかったため、深掘り評価には進みません。`,
       assumptionEntryIds: [],
     };
   });

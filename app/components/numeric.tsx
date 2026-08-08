@@ -1,6 +1,6 @@
 /**
- * 数値表示の統一(build-plan §6「IBM Plex Monoを数値・台帳表示に使用」)。
- * このコンポーネントを通した数値は常に等幅フォント+桁区切りで表示する。
+ * 数値表示の統一(build-plan §6「等幅フォント+桁区切りで数値・台帳表示を統一する」)。
+ * このコンポーネントを通した数値は常にJetBrains Mono+桁区切りで表示する(globals.cssの.num)。
  */
 
 export function Num({ value, unit, digits = 0 }: { value: number; unit?: string; digits?: number }) {
@@ -10,14 +10,14 @@ export function Num({ value, unit, digits = 0 }: { value: number; unit?: string;
   }).format(value);
 
   return (
-    <span style={{ fontFamily: "var(--font-ibm-plex-mono)" }}>
+    <span className="num">
       {formatted}
-      {unit ? <span className="ml-0.5 text-zinc-500">{unit}</span> : null}
+      {unit ? <span style={{ color: "var(--ink-faint)", marginLeft: 2 }}>{unit}</span> : null}
     </span>
   );
 }
 
 /** ハッシュ・ID等、桁区切りをしない等幅文字列表示。 */
 export function Mono({ children }: { children: React.ReactNode }) {
-  return <span style={{ fontFamily: "var(--font-ibm-plex-mono)" }}>{children}</span>;
+  return <span className="num">{children}</span>;
 }
