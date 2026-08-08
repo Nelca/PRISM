@@ -1,9 +1,10 @@
-import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Mono } from "../components/numeric";
 import { Card } from "../components/ui";
 
-export default function LedgerPage() {
-  const result = runDemoPipeline();
+export default async function LedgerPage() {
+  const result = await getOrCreateLatestResult(getDefaultTenantId());
 
   return (
     <div className="screen">

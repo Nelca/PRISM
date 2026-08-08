@@ -2,18 +2,7 @@ import { describe, expect, it } from "vitest";
 import { combineUncertainty, cvToLognormalSigma } from "./uncertainty";
 import type { Distribution } from "../types/common";
 import type { TransferFitness } from "../types/valuation";
-
-/** mulberry32: 小さく決定論的なシード可能PRNG。テストの再現性のためだけに使う。 */
-function createSeededRng(seed: number): () => number {
-  let state = seed;
-  return () => {
-    state |= 0;
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { createSeededRng } from "./rng";
 
 describe("cvToLognormalSigma", () => {
   it("CVが小さい場合はsigma≈CV(近似が成立する領域)", () => {

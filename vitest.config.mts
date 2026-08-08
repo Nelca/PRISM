@@ -8,6 +8,13 @@ import { defineConfig } from "vitest/config";
  * エイリアスで参照するために追加した)。
  */
 export default defineConfig({
+  test: {
+    /**
+     * *.db.test.ts は起動中のPostgresを必要とするため、既定の`npm test`からは除外する。
+     * DBありのテストは `npm run test:db`(vitest.db.config.mts)で実行する。
+     */
+    exclude: ["**/node_modules/**", "**/.next/**", "**/*.db.test.ts"],
+  },
   resolve: {
     alias: {
       "@core": path.resolve(import.meta.dirname, "./packages/core/src"),

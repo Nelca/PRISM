@@ -27,6 +27,17 @@ export const metadata: Metadata = {
   description: "自然関連情報の財務判断変換レイヤー",
 };
 
+/**
+ * 全ページがDBの最新runを読むため、リクエスト時レンダリングに固定する。
+ *
+ * 既定(auto)のままだとビルド時にプリレンダリングされ、**その時点のDBの内容がビルド成果物に
+ * 焼き込まれる**(DBのない環境ではビルド自体が落ちる)。revalidatePathによる無効化と
+ * 組み合わせれば結果は正しくなるが、「画面は常に保存済みの最新runを読む」という設計
+ * (計画B-2)を素直に表すため、ここで明示する。
+ * 参照: node_modules/next/dist/docs/01-app/02-guides/caching-without-cache-components.md
+ */
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja" className={`${shipporiMincho.variable} ${notoSansJP.variable} ${jetbrainsMono.variable}`}>

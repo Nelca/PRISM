@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addActionLogEntry, setM4ChangeLog, setRepresentativeRecordId } from "@/lib/demo/interaction-store";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
+import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
+
+const ACTOR = "宮里";
 
 const REVALIDATE_PATHS = ["/", "/valuation", "/decomposition", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
 
@@ -26,9 +30,16 @@ export async function changeRepresentativeRecordAction(
     return { error: "変更理由を入力してください。" };
   }
 
-  setRepresentativeRecordId(materialIssueId, recordId);
-  setM4ChangeLog(materialIssueId, { from: fromLabel, to: toLabel, reason });
-  addActionLogEntry("宮里", `代表値を「${toLabel}」に変更(理由:${reason})`);
+  const tenantId = getDefaultTenantId();
+
+  // 選択と変更理由を1つのイベントとして追記する。現在値と履歴が同じ1つの真実から出る(計画B-1)。
+  await appendInteractionEvent(tenantId, {
+    actor: ACTOR,
+    kind: "representative_selection",
+    subjectId: materialIssueId,
+    payload: { recordId, fromLabel, toLabel, reason, logMessage: `代表値を「${toLabel}」に変更(理由:${reason})` },
+  });
+  await executeAndPersistRun(tenantId);
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};

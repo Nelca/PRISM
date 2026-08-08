@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Card, Stat, Tag } from "./components/ui";
 import { Num } from "./components/numeric";
 
-export default function Home() {
-  const result = runDemoPipeline();
+export default async function Home() {
+  const result = await getOrCreateLatestResult(getDefaultTenantId());
 
   const promoted = result.assessment.depthDecisions.filter((d) => d.depth === "deep_dive").length;
   const gapsFound = result.disclosure.gapFindings.filter((f) => f.gapType !== null).length;

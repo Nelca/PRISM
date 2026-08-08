@@ -52,6 +52,12 @@ export interface BuildValuationRecordsOptions {
    * 検証はスキップされる(復元集計値の算出自体は常に行われるが、比較対象がないため)。
    */
   officialAggregates?: Record<string, number>;
+  /**
+   * モンテカルロの乱数源。省略時は Math.random。
+   * シード固定の生成器(rng.ts の createSeededRng)を渡すと結果が再現可能になり、
+   * 呼び出し側は「同じシードから同じValuationRecordが出る」ことに依存できる。
+   */
+  rng?: () => number;
 }
 
 export interface ValuationRecordGroup {
@@ -87,10 +93,11 @@ function buildValuationRecordFromOutput(
   methodVersion: string,
   physicalQuantityId: string,
   siteId: string,
-  calibration: GeographicCalibrationRecord
+  calibration: GeographicCalibrationRecord,
+  rng?: () => number
 ): ValuationRecord {
   const centralValue = applyGeographicCalibration(output.centralValue, calibration);
-  const quantileRange = combineUncertainty(centralValue, output.parameterUncertainty, output.transferFitness);
+  const quantileRange = combineUncertainty(centralValue, output.parameterUncertainty, output.transferFitness, { rng });
 
   const common = {
     id: `${methodId}-${physicalQuantityId}`,
@@ -124,7 +131,7 @@ export function buildValuationRecordsForPlugin(
   plugin: MonetizationMethodPlugin,
   options: Omit<BuildValuationRecordsOptions, "plugins">
 ): ValuationRecordGroup {
-  const { input, config, physicalQuantityId, calibration: calibrationParams, officialAggregates } = options;
+  const { input, config, physicalQuantityId, calibration: calibrationParams, officialAggregates, rng } = options;
 
   const outputs = plugin.evaluate(input, config);
 
@@ -157,7 +164,8 @@ export function buildValuationRecordsForPlugin(
       plugin.version,
       physicalQuantityId,
       input.siteId,
-      calibration
+      calibration,
+      rng
     );
   });
 

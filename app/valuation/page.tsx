@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { computeTornadoChart } from "@core/monetization/tornado";
 import type { ValuationRecord } from "@core/types/valuation";
-import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
 import { Card, Guide, KV, Stat, Tag } from "../components/ui";
 import { tierLabel, tierTagVariant } from "../components/tag-utils";
@@ -16,7 +17,7 @@ const METHOD_LABEL: Record<string, string> = {
 
 export default async function ValuationPage({ searchParams }: { searchParams: Promise<{ issue?: string }> }) {
   const { issue: issueParam } = await searchParams;
-  const result = runDemoPipeline();
+  const result = await getOrCreateLatestResult(getDefaultTenantId());
   const { valuationRecordsByMaterialIssue } = result.valuation;
   const materialIssueIds = Object.keys(valuationRecordsByMaterialIssue);
 

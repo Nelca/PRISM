@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addActionLogEntry, setDepthOverride } from "@/lib/demo/interaction-store";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
+import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
+
+const ACTOR = "宮里";
 
 const REVALIDATE_PATHS = ["/", "/sites", "/assessment", "/valuation", "/decomposition", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
 
@@ -23,9 +27,16 @@ export async function setDepthOverrideAction(
     return { error: "評価深度を指定してください。" };
   }
 
-  setDepthOverride(materialIssueId, mode);
   const label = mode === "promote" ? "詳細評価" : mode === "demote" ? "概算評価" : "自動判定";
-  addActionLogEntry("宮里", `評価対象「${materialIssueId}」の深度を${label}に変更`);
+  const tenantId = getDefaultTenantId();
+
+  await appendInteractionEvent(tenantId, {
+    actor: ACTOR,
+    kind: "depth_override",
+    subjectId: materialIssueId,
+    payload: { mode, logMessage: `評価対象「${materialIssueId}」の深度を${label}に変更` },
+  });
+  await executeAndPersistRun(tenantId);
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};

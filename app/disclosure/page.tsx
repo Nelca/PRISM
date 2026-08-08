@@ -1,4 +1,5 @@
-import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Card, Guide, Tag } from "../components/ui";
 import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
 
@@ -9,8 +10,8 @@ const GAP_LABEL: Record<string, string> = {
   G4_period_mismatch: "対象期間が一致しない",
 };
 
-export default function DisclosurePage() {
-  const result = runDemoPipeline();
+export default async function DisclosurePage() {
+  const result = await getOrCreateLatestResult(getDefaultTenantId());
   const claimsById = new Map(result.disclosureClaims.map((claim) => [claim.id, claim]));
 
   return (

@@ -1,0 +1,29 @@
+# 開発用のPostgres。アプリ(next dev)はホスト側で動かし、DBだけをコンテナで立てる。
+# 参照: docs/roadmap/implementation-plan.md §1.1(D-111:永続化層はpackages/coreの外側に置く)
+#
+# ホスト側ポートを5433にしているのは、ローカルに既存のPostgres(5432)がある場合に
+# 衝突させないため。接続文字列は .env の DATABASE_URL で切り替える。
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: prism-db
+    environment:
+      # このユーザーがスキーマの所有者(マイグレーション実行者)になる。
+      # アプリ接続用のロール(prism_app)はマイグレーションの中で作成し、
+      # 台帳テーブルへのUPDATE/DELETEを剥奪する(M8 D-5を権限で担保する)。
+      POSTGRES_USER: prism_migrator
+      POSTGRES_PASSWORD: prism_local_dev
+      POSTGRES_DB: prism
+    ports:
+      - "5433:5432"
+    volumes:
+      - prism-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prism_migrator -d prism"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  prism-db-data:

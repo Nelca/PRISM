@@ -48,6 +48,11 @@ export interface ValuationPipelineOptions {
   decompositionVersions: M4DecompositionVersions;
   idSequence: () => string;
   now: string;
+  /**
+   * モンテカルロの乱数源。省略時は Math.random。
+   * シードを保存しておけば、この run を後から同じ結果で再現できる(monetization/rng.ts)。
+   */
+  rng?: () => number;
 }
 
 export interface ValuationPipelineResult {
@@ -71,6 +76,7 @@ export function runValuationPipeline(options: ValuationPipelineOptions): Valuati
       calibration: deepDiveConfig.calibration,
       plugins: deepDiveConfig.plugins,
       officialAggregates: deepDiveConfig.officialAggregates,
+      rng: options.rng,
     });
 
     const records: ValuationRecord[] = [];

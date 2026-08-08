@@ -1,5 +1,22 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## セットアップ(DBが必要です)
+
+```bash
+cp .env.example .env   # 初回のみ。PRISM_API_KEY に任意の値を入れる
+npm install
+npm run db:up          # Postgres をDockerで起動(ホスト側ポート5433)
+npm run db:migrate     # スキーマと権限設定を適用
+npm run dev            # 最初の計算結果は初回アクセス時に自動生成される
+```
+
+テスト:
+
+```bash
+npm test               # DB不要(298件)
+npm run test:db        # 要DB。追記のみの権限と永続化の検証(15件)
+```
+
 ## Getting Started
 
 First, run the development server:

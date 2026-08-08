@@ -3,6 +3,7 @@ import { buildValuationRecords, buildValuationRecordsForPlugin, ReconciliationEr
 import { replacementCostPlugin } from "./plugins/replacement-cost";
 import { ifviWaterConsumptionPlugin } from "./plugins/ifvi-water-consumption";
 import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput } from "../types/valuation";
+import { createSeededRng } from "./rng";
 
 const input: PhysicalQuantityInput = {
   category: "water",
@@ -141,5 +142,19 @@ describe("buildValuationRecords", () => {
 
     expect(groups).toHaveLength(1);
     expect(groups[0].methodId).toBe("replacement-cost");
+  });
+
+  it("同じシードのrngを渡すと、モンテカルロの結果まで含めて同一のValuationRecordが得られる", () => {
+    const config: MethodConfig = { depth: "screening", unitReplacementCost: 500 };
+    const options = { physicalQuantityId: "pq-1", input, config, calibration: identityCalibration, plugins: [replacementCostPlugin] };
+
+    const first = buildValuationRecords({ ...options, rng: createSeededRng(42) });
+    const second = buildValuationRecords({ ...options, rng: createSeededRng(42) });
+
+    // シードを保存しておけば同じrunを後から再現できる、という永続化層の前提(計画B-3)。
+    expect(second[0].records[0].quantileRange).toEqual(first[0].records[0].quantileRange);
+
+    const different = buildValuationRecords({ ...options, rng: createSeededRng(43) });
+    expect(different[0].records[0].quantileRange).not.toEqual(first[0].records[0].quantileRange);
   });
 });

@@ -86,10 +86,10 @@
 | T-05 | 09 | 代表値選択と前年度手法での再計算値の並記 | A | 未着手 | `DivergenceDecomposition.representativeValueSelection` が常にundefined。デモ層の `interaction-store` が持っている責務をcoreに移す |
 | T-06 | 10 | M5パイプライン + 比較先(営業利益比・減損・格付)の算出と表示 | A | 未着手 | `packages/core/src/pipeline/financial-bridge-pipeline.ts` を新設。`comparison-targets.ts` の `after` を自然債務から導出する |
 | T-07 | 18 | 財務画面のレッドフラグ固定文言をデータ由来にする | A | 未着手 | `app/financial-bridge/page.tsx:85-124` |
-| T-08 | 01 | Docker Compose + Postgres + Drizzle の足場 | B | 未着手 | §1.1の決定に従う |
-| T-09 | 01 | スキーマ・マイグレーション(追記のみを権限で強制) | B | 未着手 | — |
-| T-10 | 15/16 | テナント分離・出力APIの認証 | B | 未着手 | — |
-| T-11 | 01 | `lib/demo/*-store.ts` からDBへの移行、`Math.random` 差し替え(D-103)の廃止 | B | 未着手 | `combineUncertainty()` にrng注入口を公開APIとして追加する |
+| T-08 | 01 | Docker Compose + Postgres + Drizzle の足場 | B | **完了**(D-112) | — |
+| T-09 | 01 | スキーマ・マイグレーション(追記のみを権限で強制) | B | **完了**(D-112) | — |
+| T-10 | 15/16 | テナント分離・出力APIの認証 | B | **完了**(D-112) | — |
+| T-11 | 01 | `lib/demo/*-store.ts` からDBへの移行、`Math.random` 差し替え(D-103)の廃止 | B | **完了**(D-112) | — |
 | T-12 | 12 | 判定件数カウンタ(追記型) | C | 未着手 | `shouldCountDecision()` に呼び出し元がない |
 | T-13 | 07 | 版レジストリ画面と旧版係数での再計算 | C | 未着手 | `versioned-parameter-set.ts` は実装済み。UIがない |
 | T-14 | 02 | 取込UI + 取込エラー表示 | C | 未着手 | `lib/intake/` は完成済みで `app/` から未参照 |
@@ -190,6 +190,30 @@
 **完了条件:** 財務画面に比較先が表示され、変化後の比率がPRISMの算出結果になっている。
 
 ---
+
+### T-08〜T-11 DB基盤(波B)【完了。詳細は design-rationale-log D-112】
+
+**動かし方:**
+
+```bash
+cp .env.example .env     # 初回のみ。PRISM_API_KEY に任意の値を入れる
+npm run db:up            # Postgres(compose.yaml。ホスト側ポート5433)
+npm run db:migrate       # スキーマ + 追記のみの権限設定
+npm run dev              # 最初のrunは初回アクセス時に自動作成される
+npm run test:db          # 追記のみの権限テスト + 永続化のラウンドトリップ(15件)
+```
+
+**実装したもの:**
+- `lib/db/`(schema / client / migrations / repositories / serialize)、`lib/pipeline/execute-run.ts`
+- ユーザー操作は `interaction_event` への追記。現在値は最新イベントの射影(`lib/demo/interaction-state.ts`)
+- 計算結果は `pipeline_run` のスナップショット。ページは最新runを読むだけで再計算しない
+- 台帳・run系テーブルは `prism_app` ロールから `UPDATE`/`DELETE` を剥奪(DBが物理的に拒否)
+- `packages/core` の変更は rng 注入口の追加のみ(`monetization/rng.ts` を新設し、テスト・デモの重複実装を集約)。`Math.random` のグローバル差し替え(D-103)は廃止
+- 出力APIは fail closed(キー未設定=503、不一致=401)
+
+**計画から変えた点:** `db:seed` スクリプトは作らなかった。Node の型ストリッピングが tsconfig の path エイリアスを解決できず、seed だけのためにローダーを足す価値がないと判断した。**最初のrunは初回アクセス時に自動生成される**(`getOrCreateLatestResult`)ため、seedがなくても起動できる。永続化の検証は `lib/db/persistence.db.test.ts` が担う。
+
+**以下は当初の作業メモ(履歴として残す):**
 
 ### T-08〜T-11 DB基盤(波B)
 

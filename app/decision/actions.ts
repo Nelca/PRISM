@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { exchangeAmount } from "@core/types/common";
 import type { BindingMechanism, CountermeasureType } from "@core/types/decision";
-import {
-  addActionLogEntry,
-  getBindingMechanismState,
-  setBindingMechanismState,
-  setSelectedCountermeasureKey,
-} from "@/lib/demo/interaction-store";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
+import { loadInteractionState } from "@/lib/db/repositories/interactions";
+import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 
 const REVALIDATE_PATHS = ["/", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
+
+const ACTOR = "宮里";
 
 const BINDING_LABELS: Record<BindingMechanism["kind"], string> = {
   weak_reference: "稟議書に参考値として記載する",
@@ -32,7 +32,15 @@ export async function selectCountermeasureAction(
   if (!siteId || !key) {
     return { error: "対策案を指定してください。" };
   }
-  setSelectedCountermeasureKey(siteId, key);
+  const tenantId = getDefaultTenantId();
+  await appendInteractionEvent(tenantId, {
+    actor: ACTOR,
+    kind: "countermeasure_selection",
+    subjectId: siteId,
+    payload: { key },
+  });
+  await executeAndPersistRun(tenantId);
+
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};
 }
@@ -71,23 +79,26 @@ export async function recordDecisionAction(
     mechanism = { kind };
   }
 
-  const current = getBindingMechanismState(siteId);
+  const tenantId = getDefaultTenantId();
+  const state = await loadInteractionState(tenantId);
+  const current = state.bindingMechanismState.get(siteId);
   const previousMechanism = current?.mechanism ?? { kind: "weak_reference" };
   const mechanismChanged = JSON.stringify(previousMechanism) !== JSON.stringify(mechanism);
 
-  if (mechanismChanged) {
-    if (!reason) {
-      return { error: "反映先を変更する場合は理由を入力してください。" };
-    }
-    setBindingMechanismState(siteId, {
-      mechanism,
-      history: [...(current?.history ?? []), { previousMechanism, reason, changedAt: new Date().toISOString() }],
-    });
-  } else if (!current) {
-    setBindingMechanismState(siteId, { mechanism, history: [] });
+  // 変更時は理由を必須にする(M6 D-9:デフォルト値を設けず、明示選択と変更履歴の記録を必須とする)。
+  if (mechanismChanged && !reason) {
+    return { error: "反映先を変更する場合は理由を入力してください。" };
   }
 
-  addActionLogEntry("宮里", `対策の判定結果を「${BINDING_LABELS[kind]}」で選択・記録`);
+  if (mechanismChanged || !current) {
+    await appendInteractionEvent(tenantId, {
+      actor: ACTOR,
+      kind: "binding_mechanism_change",
+      subjectId: siteId,
+      payload: { mechanism, reason, logMessage: `対策の判定結果を「${BINDING_LABELS[kind]}」で選択・記録` },
+    });
+    await executeAndPersistRun(tenantId);
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};

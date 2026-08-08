@@ -1,11 +1,12 @@
-import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
 import { Card, Guide, Tag } from "../components/ui";
 import { sensitivityFraction, unevaluatedCriteriaNote } from "../components/criteria-labels";
 import { DepthToggle } from "./depth-toggle";
 
-export default function AssessmentPage() {
-  const result = runDemoPipeline();
+export default async function AssessmentPage() {
+  const result = await getOrCreateLatestResult(getDefaultTenantId());
   const { priorityScores, depthDecisions, materialIssues } = result.assessment;
 
   const depthById = new Map(depthDecisions.map((d) => [d.materialIssueId, d]));

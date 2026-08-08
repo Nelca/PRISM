@@ -1,12 +1,13 @@
-import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
 import { Card, Guide, Stat, Tag } from "../components/ui";
 import { Scatter } from "../components/charts/Scatter";
 import { CountermeasureSelector } from "./countermeasure-selector";
 import { BindingForm } from "./binding-form";
 
-export default function DecisionPage() {
-  const result = runDemoPipeline();
+export default async function DecisionPage() {
+  const result = await getOrCreateLatestResult(getDefaultTenantId());
   const { decisions } = result;
 
   if (decisions.length === 0) {

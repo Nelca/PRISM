@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { FactorContribution, PairwiseDecomposition } from "@core/types/divergence";
-import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
 import { Card, Guide, KV, Tag } from "../components/ui";
 import { tierLabel } from "../components/tag-utils";
@@ -39,7 +40,7 @@ function pairwiseToWaterfallSteps(pair: PairwiseDecomposition, labelA: string, l
 
 export default async function DecompositionPage({ searchParams }: { searchParams: Promise<{ issue?: string }> }) {
   const { issue: issueParam } = await searchParams;
-  const result = runDemoPipeline();
+  const result = await getOrCreateLatestResult(getDefaultTenantId());
   const { valuationRecordsByMaterialIssue, divergenceDecompositions, representativeRecordByMaterialIssue, m4ChangeLogByMaterialIssue } =
     result.valuation;
   const materialIssueIds = Object.keys(valuationRecordsByMaterialIssue);

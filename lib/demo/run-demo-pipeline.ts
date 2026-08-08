@@ -3,11 +3,14 @@
  * UIページ・出力API・GATE検証テストの3箇所から同じ結果を参照するための単一の入口。
  *
  * 深掘り評価(M3)〜開示検証(M7)は、架空企業site-042専用の固定値(company.ts)に加え、
- * UIから追加された拠点(site-store.ts)についても、深掘りに進んだ拠点1件ごとに
+ * 追加登録された拠点についても、深掘りに進んだ拠点1件ごとに
  * 同じ組み立てロジックを繰り返して実行する(user-site-defaults.tsの汎用ビルダーを使う)。
  *
- * interaction-store.tsに保持されたUI操作(M2深度トグル・M4代表値変更・M6対策選択/反映先・
- * M7開示アクション)を、このパイプラインの各段への入力として合成する。
+ * **入力はすべて引数で受け取る**(2026-08-08、永続化対応)。以前はプロセス内ストア
+ * (site-store.ts / interaction-store.ts)を直接読んでいたが、拠点も操作も
+ * DBのテーブルになったため、読み出しは呼び出し側(lib/pipeline/execute-run.ts)の責務にした。
+ * これによりこのファイルは副作用を持たない純粋な組み立て関数になり、テストからも
+ * 任意の入力で呼べる。
  */
 
 import { runAssessmentPipeline } from "@core/pipeline/assessment-pipeline";
@@ -16,6 +19,7 @@ import { runDecisionPipeline } from "@core/pipeline/decision-pipeline";
 import { runDisclosurePipeline } from "@core/pipeline/disclosure-pipeline";
 import { createIdSequence } from "@core/pipeline/ids";
 import { ALL_PLUGINS } from "@core/monetization/registry";
+import { createSeededRng } from "@core/monetization/rng";
 import { buildBridge1NatureAdjustedProfit } from "@core/financial-bridge/bridge1";
 import { buildBridge2SocialCostView } from "@core/financial-bridge/bridge2";
 import { computeInternalizationStatus } from "@core/financial-bridge/internalization-status";
@@ -45,7 +49,7 @@ import {
   SITE_ROWS,
 } from "./company";
 import type { CountermeasureCandidate } from "./company";
-import { listUserSiteEntries } from "./site-store";
+import type { UserSiteEntry } from "./site-entry";
 import {
   buildUserBaselineNpv,
   buildUserCountermeasureCandidates,
@@ -53,16 +57,8 @@ import {
   buildUserDisclosureClaim,
   DEFAULT_DEEP_DIVE_PARAMS,
 } from "./user-site-defaults";
-import {
-  getBindingMechanismState,
-  getDepthOverrides,
-  getDisclosureClaimOverrideText,
-  getIntentionalDecisions,
-  getM4ChangeLog,
-  getRepresentativeRecordId,
-  getSelectedCountermeasureKey,
-  listActionLog,
-} from "./interaction-store";
+import { emptyInteractionState } from "./interaction-state";
+import type { InteractionState } from "./interaction-state";
 
 const NOW = "2027-02-14T09:12:00Z";
 const DECISION_MAKER = "宮里(サステナビリティ推進室)";
@@ -75,47 +71,29 @@ const DECOMPOSITION_VERSIONS = {
   f8ThresholdVersion: "f8-v1",
 };
 
-/**
- * mulberry32による決定論的な疑似乱数生成器(uncertainty.test.tsのcreateSeededRngと同じ手法)。
- * M3のcombineUncertainty()はMath.random()をデフォルトで使い、rng注入口は
- * buildValuationRecords()の公開APIには現状ない(packages/core自体は変更しない)。
- * デモ用ページ・出力API・GATE検証テストが同じ画面遷移の中で毎回異なる乱数サンプルを
- * 見せると、同じシナリオのはずの数値がページごとに食い違って見えてしまう。
- * そのためデモ層に限定してMath.randomを一時的にシード固定の生成器に差し替える。
- */
-function createSeededRng(seed: number): () => number {
-  let state = seed;
-  return () => {
-    state |= 0;
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function withSeededRandom<T>(fn: () => T): T {
-  const original = Math.random;
-  Math.random = createSeededRng(42);
-  try {
-    return fn();
-  } finally {
-    Math.random = original;
-  }
-}
-
 /** MaterialIssue.id は "${siteId}-mi-${category}" の形式(build-material-issues.ts)。 */
 function siteIdFromMaterialIssueId(materialIssueId: string): string {
   return materialIssueId.replace(/-mi-\w+$/, "");
 }
 
-export function runDemoPipeline() {
-  return withSeededRandom(() => runDemoPipelineWithCurrentRandom());
+export interface RunPipelineInput {
+  /** 追加登録された拠点(架空企業site-042の固定データは company.ts が持つ)。 */
+  userSites: UserSiteEntry[];
+  /** 追記イベントを畳み込んだユーザー操作の現在値。 */
+  interactions: InteractionState;
+  /**
+   * モンテカルロの乱数シード。runと一緒に保存され、後から同じ結果を再現するために使う。
+   * 以前は Math.random をグローバルに差し替えていた(D-103)が、
+   * packages/core が rng を引数で受け取れるようになったため廃止した。
+   */
+  rngSeed: number;
 }
 
-function runDemoPipelineWithCurrentRandom() {
+export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInput()) {
   const idSequence = createIdSequence("ae");
-  const userSiteEntries = listUserSiteEntries();
+  const rng = createSeededRng(input.rngSeed);
+  const userSiteEntries = input.userSites;
+  const interactions = input.interactions;
   const deepDiveParamsBySiteId = new Map(userSiteEntries.map((entry) => [entry.row.id, entry.deepDive]));
 
   // --- M2:優先度算定の結果によらない手動昇格/降格を合成する ---
@@ -123,7 +101,7 @@ function runDemoPipelineWithCurrentRandom() {
     userSiteEntries.filter((entry) => entry.deepDive.forcePromote).map((entry) => `${entry.row.id}-mi-water`)
   );
   const manualDemotions = new Set<string>();
-  for (const [materialIssueId, mode] of getDepthOverrides()) {
+  for (const [materialIssueId, mode] of interactions.depthOverrides) {
     if (mode === "promote") manualOverrides.add(materialIssueId);
     else manualDemotions.add(materialIssueId);
   }
@@ -162,6 +140,7 @@ function runDemoPipelineWithCurrentRandom() {
     decompositionVersions: DECOMPOSITION_VERSIONS,
     idSequence,
     now: NOW,
+    rng,
   });
 
   const allValuationRecords = Object.values(valuation.valuationRecordsByMaterialIssue).flat();
@@ -172,11 +151,11 @@ function runDemoPipelineWithCurrentRandom() {
   for (const materialIssueId of Object.keys(valuation.valuationRecordsByMaterialIssue)) {
     const records = valuation.valuationRecordsByMaterialIssue[materialIssueId];
     const defaultRecord = records.find((r) => r.methodId === "replacement-cost") ?? records[0];
-    const overrideId = getRepresentativeRecordId(materialIssueId);
+    const overrideId = interactions.representativeRecordId.get(materialIssueId);
     const overrideRecord = overrideId ? records.find((r) => r.id === overrideId) : undefined;
     const representative = overrideRecord ?? defaultRecord;
     if (representative) representativeRecordByMaterialIssue[materialIssueId] = representative.id;
-    const changeLog = getM4ChangeLog(materialIssueId);
+    const changeLog = interactions.m4ChangeLog.get(materialIssueId);
     if (changeLog) m4ChangeLogByMaterialIssue[materialIssueId] = changeLog;
   }
 
@@ -244,7 +223,7 @@ function runDemoPipelineWithCurrentRandom() {
       ? buildCountermeasureCandidates(representative.id)
       : buildUserCountermeasureCandidates(siteId, representative.id, deepDiveParams);
 
-    const bindingState = getBindingMechanismState(siteId);
+    const bindingState = interactions.bindingMechanismState.get(siteId);
     const bindingMechanism: BindingMechanism = bindingState?.mechanism ?? { kind: "weak_reference" };
     const bindingHistory = bindingState?.history ?? [];
     const latestBindingChange = bindingHistory[bindingHistory.length - 1];
@@ -273,7 +252,7 @@ function runDemoPipelineWithCurrentRandom() {
       };
     });
 
-    const selectedKey = getSelectedCountermeasureKey(siteId) ?? candidates[0].key;
+    const selectedKey = interactions.selectedCountermeasureKey.get(siteId) ?? candidates[0].key;
     const selectedCandidate = candidates.find((c) => c.key === selectedKey) ?? candidates[0];
 
     const decision = runDecisionPipeline({
@@ -334,7 +313,7 @@ function runDemoPipelineWithCurrentRandom() {
 
   // M7①(記載を弱める)の上書きテキストを適用する。
   const claims: DisclosureClaim[] = baseClaims.map((claim) => {
-    const overrideText = getDisclosureClaimOverrideText(claim.id);
+    const overrideText = interactions.disclosureClaimOverrideText.get(claim.id);
     return overrideText ? { ...claim, rawText: overrideText } : claim;
   });
 
@@ -363,7 +342,7 @@ function runDemoPipelineWithCurrentRandom() {
   const gapFindingIdByClaimId = new Map(discoveryDisclosure.gapFindings.map((f) => [f.claimId, f.id]));
 
   const intentionalDecisionInputs: IntentionalDecisionInput[] = [];
-  for (const [claimId, stored] of getIntentionalDecisions()) {
+  for (const [claimId, stored] of interactions.intentionalDecisions) {
     const gapFindingId = gapFindingIdByClaimId.get(claimId);
     if (!gapFindingId) continue;
     intentionalDecisionInputs.push({ gapFindingId, reason: stored.reason, recordedBy: DECISION_MAKER, recordedAt: stored.recordedAt });
@@ -417,8 +396,19 @@ function runDemoPipelineWithCurrentRandom() {
     disclosureClaimSiteId: Object.fromEntries(claimSiteId),
     recalculationHash,
     assumptionEntries,
-    actionLog: listActionLog(),
+    actionLog: interactions.actionLog,
   };
 }
+
+/**
+ * 入力を渡さずに呼ばれた場合の既定値(架空企業1社分のみ・操作なし・固定シード)。
+ * GATE検証テストのように「追加拠点も操作もない状態」を対象とする呼び出し元のために残す。
+ */
+function defaultRunPipelineInput(): RunPipelineInput {
+  return { userSites: [], interactions: emptyInteractionState(), rngSeed: DEFAULT_RNG_SEED };
+}
+
+/** 既定のシード。runごとに変える必要はない(同じ入力からは同じ結果が出ることを優先する)。 */
+export const DEFAULT_RNG_SEED = 42;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

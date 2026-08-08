@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addUserSiteRow } from "@/lib/demo/site-store";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { addSiteEntry } from "@/lib/db/repositories/sites";
+import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 import { DEFAULT_DEEP_DIVE_PARAMS } from "@/lib/demo/user-site-defaults";
 import type { SiteType } from "@core/types/site";
 
@@ -56,19 +58,24 @@ export async function addSiteAction(_prevState: AddSiteFormState, formData: Form
     disclosureClaimText: String(formData.get("disclosureClaimText") ?? "").trim() || undefined,
   };
 
+  const tenantId = getDefaultTenantId();
+
   if (locationKind === "coordinates") {
     const latValue = Number(lat);
     const lngValue = Number(lng);
     if (lat === null || lng === null || Number.isNaN(latValue) || Number.isNaN(lngValue)) {
       return { error: "緯度・経度を数値で入力してください。" };
     }
-    addUserSiteRow({ name, siteType, industrySector, lat: latValue, lng: lngValue }, deepDive);
+    await addSiteEntry(tenantId, { name, siteType, industrySector, lat: latValue, lng: lngValue }, deepDive);
   } else {
     if (!address) {
       return { error: "住所を入力してください。" };
     }
-    addUserSiteRow({ name, siteType, industrySector, address }, deepDive);
+    await addSiteEntry(tenantId, { name, siteType, industrySector, address }, deepDive);
   }
+
+  // 入力が変わったので新しいrunを1回だけ作る。ページ側は再計算しない(計画B-2)。
+  await executeAndPersistRun(tenantId);
 
   revalidatePath("/");
   revalidatePath("/sites");

@@ -15,7 +15,7 @@ import type { BaselineNpvInput } from "@core/types/financial-bridge";
 import type { DeepDiveConfig } from "@core/pipeline/valuation-pipeline";
 import { DEEP_DIVE_CALIBRATION } from "./company";
 import type { CountermeasureCandidate } from "./company";
-import type { UserSiteDeepDiveParams } from "./site-store";
+import type { UserSiteDeepDiveParams } from "./site-entry";
 
 export const DEFAULT_DEEP_DIVE_PARAMS: UserSiteDeepDiveParams = {
   physicalQuantity: 10_000,

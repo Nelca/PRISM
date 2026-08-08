@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { getDefaultTenantId } from "@/lib/db/client";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { buildWaterfallSteps } from "@core/financial-bridge/bridge1";
 import { Num } from "../components/numeric";
 import { Card, Guide, KV, Stat, Tag } from "../components/ui";
 import { Waterfall } from "../components/charts/Waterfall";
 
-export default function FinancialBridgePage() {
-  const result = runDemoPipeline();
+export default async function FinancialBridgePage() {
+  const result = await getOrCreateLatestResult(getDefaultTenantId());
   const { decisions, disclosure } = result;
 
   if (decisions.length === 0) {
