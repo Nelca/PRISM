@@ -28,8 +28,15 @@ describe("M1統合テスト:CSV相当の行データからMaterialIssueまで通
     const interfaces = buildNatureInterfaces(resolution.site, layerLookups);
     expect(interfaces).toHaveLength(1);
 
+    // WDPAは契約未締結(pending_review)のため、この基準は判定に使えない(M8 D-4)。
+    // rawResultがtrueであっても充足扱いにせず、「評価していない」として記録する。
     const issues = buildMaterialIssues(resolution.site.id, { climate: interfaces });
-    expect(issues[0].criteriaMet.highBiodiversityImportance).toBe(true);
+    expect(issues[0].criteriaMet.highBiodiversityImportance).toBe(false);
+    expect(issues[0].unevaluatedCriteria).toContainEqual({
+      criterion: "highBiodiversityImportance",
+      reason: "license_pending",
+      dataSources: ["WDPA"],
+    });
   });
 
   it("住所のみの拠点はジオコーディングが成功すればLocateに進む", () => {
@@ -97,13 +104,49 @@ describe("M1統合テスト:CSV相当の行データからMaterialIssueまで通
     const issues = buildMaterialIssues(resolution.site.id, { water: interfaces });
 
     expect(issues).toHaveLength(1);
-    expect(issues[0].sensitivityScore).toBe(3);
+
+    // 要件定義書§2の具体例はsensitivityScore=3(KBA・水ストレス・依存影響)としているが、
+    // それはKBA(IBAT/WDPA)のライセンス契約が締結済みであることを前提にした値である。
+    // 契約前(pending_review)はM8 D-4により当該基準を評価対象から外すため、暫定スコアは2になる。
+    // 契約締結後にlicenseModeを変えれば、要件定義書どおりの3に戻る(下のケースで確認)。
+    expect(issues[0].sensitivityScore).toBe(2);
     expect(issues[0].criteriaMet).toEqual({
       highEcosystemIntegrity: false,
       rapidIntegrityDecline: false,
-      highBiodiversityImportance: true,
+      highBiodiversityImportance: false,
       waterStress: true,
       likelySignificantDependencyImpact: true,
     });
+    // 分母が5ではないこと(2/4であって2/5ではない)が記録されている
+    expect(issues[0].unevaluatedCriteria).toEqual([
+      { criterion: "rapidIntegrityDecline", reason: "no_data_source", dataSources: [] },
+      { criterion: "highBiodiversityImportance", reason: "license_pending", dataSources: ["IBAT", "WDPA"] },
+    ]);
+  });
+
+  it("KBAのライセンス契約が締結済み(embedded)なら、要件定義書§2の具体例どおりsensitivityScore=3になる", () => {
+    const rows: SiteRow[] = [
+      { id: "site-042", name: "化学工場", siteType: "own_site", industrySector: "chemicals", lat: 12.0, lng: 34.0 },
+    ];
+    const { sites } = buildSitesFromRows(rows);
+    const resolution = resolveSiteLocation(sites[0], () => null);
+
+    const layerLookups: LayerLookup[] = [
+      { layerType: "kba", dataSource: "IBAT", licenseMode: "embedded", lookup: () => true },
+      { layerType: "water_stress", dataSource: "Aqueduct", licenseMode: "reference_only", lookup: () => true },
+      { layerType: "dependency_impact", dataSource: "ENCORE", licenseMode: "reference_only", lookup: () => true },
+      { layerType: "protected_area", dataSource: "WDPA", licenseMode: "embedded", lookup: () => false },
+      { layerType: "ecosystem_integrity", dataSource: "FLII", licenseMode: "reference_only", lookup: () => false },
+    ];
+
+    const interfaces = buildNatureInterfaces(resolution.site, layerLookups);
+    const issues = buildMaterialIssues(resolution.site.id, { water: interfaces });
+
+    expect(issues[0].sensitivityScore).toBe(3);
+    expect(issues[0].criteriaMet.highBiodiversityImportance).toBe(true);
+    // データソースが存在しないrapidIntegrityDeclineだけが評価不能として残る(D-91)
+    expect(issues[0].unevaluatedCriteria).toEqual([
+      { criterion: "rapidIntegrityDecline", reason: "no_data_source", dataSources: [] },
+    ]);
   });
 });

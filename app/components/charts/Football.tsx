@@ -1,8 +1,10 @@
 /** モックのfootballChart()をReact SVGとして移植。手法ごとのlow/mid/highレンジバー。 */
 
+import type { TransferFitnessTier } from "@core/types/valuation";
+
 export interface FootballMethodInput {
   name: string;
-  tier: string;
+  tier: TransferFitnessTier;
   concept: "exchange" | "welfare";
   low: number;
   mid: number;
@@ -10,7 +12,16 @@ export interface FootballMethodInput {
 }
 
 const fmt = (n: number) => new Intl.NumberFormat("ja-JP").format(Math.round(n));
-const tierColor = (tier: string) => (tier === "A" ? "#2F5D50" : tier === "B" ? "#9B7233" : "#8B8F86");
+
+/**
+ * `not_applicable` は A/B/C と並ぶ第4の状態として独自の色を持つ(M3 D-4.2)。
+ * ティアCの色に寄せると「精度が低い」と誤読されるため、彩度を落とした青系にする。
+ */
+const tierColor = (tier: TransferFitnessTier) =>
+  tier === "A" ? "#2F5D50" : tier === "B" ? "#9B7233" : tier === "C" ? "#8B8F86" : "#5A6E86";
+
+const tierCaption = (tier: TransferFitnessTier) =>
+  tier === "not_applicable" ? "移転なし(適合度の判定対象外)" : `Tier ${tier}`;
 
 export function Football({ methods, threshold, thresholdLabel }: { methods: FootballMethodInput[]; threshold?: number; thresholdLabel?: string }) {
   if (methods.length === 0) return null;
@@ -48,7 +59,7 @@ export function Football({ methods, threshold, thresholdLabel }: { methods: Foot
               {m.name}
             </text>
             <text x={0} y={cy + 11} fontSize={10} fontFamily="var(--font-mono-ui)" fill="#8B95A3">
-              {(m.concept === "welfare" ? "厚生価値" : "交換価値") + " ・ Tier " + m.tier}
+              {(m.concept === "welfare" ? "厚生価値" : "交換価値") + " ・ " + tierCaption(m.tier)}
             </text>
             <line x1={x(m.low)} x2={x(m.high)} y1={cy} y2={cy} stroke={barColor} strokeWidth={3} strokeLinecap="round" opacity={0.35} />
             <line x1={x(m.low)} x2={x(m.low)} y1={cy - 7} y2={cy + 7} stroke={barColor} strokeWidth={2} />

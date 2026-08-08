@@ -5,6 +5,7 @@
 
 import type { LicenseMode } from "./common";
 import type { GapType } from "./disclosure";
+import type { CriterionUnavailabilityReason } from "./site";
 
 export type AssumptionSourceModule = "M1" | "M2" | "M3" | "M4" | "M6" | "M7";
 
@@ -15,6 +16,17 @@ export type AssumptionSourceModule = "M1" | "M2" | "M3" | "M4" | "M6" | "M7";
  */
 export type AssumptionEntryPayload =
   | { module: "M1"; kind: "exclusion"; reason: string }
+  /**
+   * 2026-08-08追加(GAP-08/GAP-13)。5基準のうち評価できなかったものを記録する。
+   * M8 D-4の「契約締結前は暫定スコアで評価していた、という事実が監査証跡に残る」に対応する。
+   */
+  | {
+      module: "M1";
+      kind: "criterion_unevaluated";
+      criterion: string;
+      reason: CriterionUnavailabilityReason;
+      dataSources: string[];
+    }
   | { module: "M2"; kind: "depth_decision"; promotedManually: boolean; exclusionReason?: string }
   | { module: "M3"; kind: "coefficient_calibration"; setVersion: string; pppSource: string; incomeElasticity: number }
   | { module: "M3"; kind: "reconciliation_check"; aggregationFunctionVersion: string; goldenTestPassed: boolean }

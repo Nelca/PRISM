@@ -3,6 +3,7 @@ import type { FactorContribution, PairwiseDecomposition } from "@core/types/dive
 import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
 import { Num } from "../components/numeric";
 import { Card, Guide, KV, Tag } from "../components/ui";
+import { tierLabel } from "../components/tag-utils";
 import { Football } from "../components/charts/Football";
 import { Waterfall, type WaterfallStepInput } from "../components/charts/Waterfall";
 import { RepresentativeSelector } from "./representative-selector";
@@ -59,7 +60,7 @@ export default async function DecompositionPage({ searchParams }: { searchParams
 
   const footballMethods = records.map((r) => ({
     name: METHOD_LABEL[r.methodId] ?? r.methodId,
-    tier: r.transferFitness.tier === "not_applicable" ? "A" : r.transferFitness.tier,
+    tier: r.transferFitness.tier,
     concept: r.valueConcept,
     low: r.quantileRange.p5,
     mid: r.quantileRange.p50,
@@ -190,7 +191,7 @@ export default async function DecompositionPage({ searchParams }: { searchParams
                     <td>
                       <b>{METHOD_LABEL[r.methodId] ?? r.methodId}</b>
                     </td>
-                    <td>{r.transferFitness.tier}</td>
+                    <td>{tierLabel(r.transferFitness.tier)}</td>
                     <td className="num">
                       <Num value={r.centralValue as unknown as number} unit="円" />
                     </td>

@@ -4,7 +4,7 @@ import type { ValuationRecord } from "@core/types/valuation";
 import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
 import { Num } from "../components/numeric";
 import { Card, Guide, KV, Stat, Tag } from "../components/ui";
-import { tierTagVariant } from "../components/tag-utils";
+import { tierLabel, tierTagVariant } from "../components/tag-utils";
 import { Football } from "../components/charts/Football";
 import { Tornado } from "../components/charts/Tornado";
 
@@ -37,7 +37,7 @@ export default async function ValuationPage({ searchParams }: { searchParams: Pr
 
   const footballMethods = records.map((r) => ({
     name: METHOD_LABEL[r.methodId] ?? r.methodId,
-    tier: r.transferFitness.tier === "not_applicable" ? "A" : r.transferFitness.tier,
+    tier: r.transferFitness.tier,
     concept: r.valueConcept,
     low: r.quantileRange.p5,
     mid: r.quantileRange.p50,
@@ -111,7 +111,7 @@ export default async function ValuationPage({ searchParams }: { searchParams: Pr
                   </Tag>
                 </td>
                 <td>
-                  <Tag variant={tierTagVariant(r.transferFitness.tier)}>{r.transferFitness.tier}</Tag>
+                  <Tag variant={tierTagVariant(r.transferFitness.tier)}>{tierLabel(r.transferFitness.tier)}</Tag>
                 </td>
                 <td className="num" style={{ fontWeight: 700 }}>
                   <Num value={r.centralValue as unknown as number} unit="円" />

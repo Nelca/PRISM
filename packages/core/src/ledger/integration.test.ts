@@ -198,8 +198,18 @@ describe("M8統合テスト", () => {
       highBiodiversityImportance: { dataSourceId: "wdpa", licenseMode: "pending_review" },
     });
 
-    expect(materialIssue.sensitivityScore).toBe(3); // M1側の通常算出(WDPA込み)
-    expect(gated.score).toBe(2); // M8側の暫定算出(WDPA分を除く)
+    // 2026-08-08(GAP-08)以降、ゲーティングはM1のMaterialIssue組み立て時点で適用される。
+    // したがってM1の算出時点で既に暫定スコア(WDPA/IBAT分を除いた2)になっている。
+    expect(materialIssue.sensitivityScore).toBe(2);
+    expect(materialIssue.unevaluatedCriteria).toContainEqual({
+      criterion: "highBiodiversityImportance",
+      reason: "license_pending",
+      dataSources: ["IBAT"],
+    });
+
+    // M8側のcomputeGatedSensitivityScoreを重ねて適用しても結果は変わらない(冪等)。
+    // 二重にゲーティングしてスコアがさらに下がる、という事故が起きないことの確認。
+    expect(gated.score).toBe(2);
     expect(gated.pendingCriteria).toEqual(["highBiodiversityImportance"]);
   });
 

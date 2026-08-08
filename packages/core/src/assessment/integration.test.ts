@@ -25,7 +25,9 @@ describe("M2統合テスト:M1のMaterialIssueとM3のスクリーニング結�
   // 拠点ごとに水ストレス・KBA該当有無を変え、感応度スコアに差をつける
   const layerLookupsBySite: Record<string, LayerLookup[]> = {
     "site-A": [
-      { layerType: "kba", dataSource: "IBAT", licenseMode: "pending_review", lookup: () => true },
+      // 本テストの関心はM2の優先度算定であり、ライセンス保留の挙動(GAP-08、site/criteria.tsのテスト)
+      // ではないため、契約締結済み(embedded)として感応度に差が出る状態にしている。
+      { layerType: "kba", dataSource: "IBAT", licenseMode: "embedded", lookup: () => true },
       { layerType: "water_stress", dataSource: "Aqueduct", licenseMode: "reference_only", lookup: () => true },
     ],
     "site-B": [{ layerType: "water_stress", dataSource: "Aqueduct", licenseMode: "reference_only", lookup: () => true }],

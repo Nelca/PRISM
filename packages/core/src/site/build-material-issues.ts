@@ -8,9 +8,8 @@
 
 import type { ImpactCategory } from "../types/common";
 import { computeSensitivityScore } from "../types/site";
-import type { MaterialIssue, NatureInterface } from "../types/site";
-import { evaluateCriteriaMet } from "./criteria";
-import type { CriterionKey } from "./criteria";
+import type { CriterionKey, MaterialIssue, NatureInterface, UnevaluatedCriterion } from "../types/site";
+import { assessCriteria } from "./criteria";
 
 export function buildMaterialIssues(
   siteId: string,
@@ -20,14 +19,16 @@ export function buildMaterialIssues(
   const issues: MaterialIssue[] = [];
 
   for (const [category, interfaces] of Object.entries(interfacesByCategory) as [ImpactCategory, NatureInterface[]][]) {
-    const criteriaMet = evaluateCriteriaMet(interfaces, resolveCriterion);
+    const { criteriaMet, unevaluatedCriteria } = assessCriteria(interfaces, resolveCriterion);
 
     issues.push({
       id: `${siteId}-mi-${category}`,
       siteId,
       impactCategory: category,
+      // 評価不能な基準は criteriaMet 上で false のままなので、充足数カウントに入らない(M8 D-4)。
       sensitivityScore: computeSensitivityScore(criteriaMet),
       criteriaMet,
+      unevaluatedCriteria,
       excluded: false,
       assumptionEntryIds: [],
     });
@@ -44,6 +45,10 @@ const UNEVALUATED_CRITERIA: MaterialIssue["criteriaMet"] = {
   likelySignificantDependencyImpact: false,
 };
 
+const ALL_CRITERIA_NOT_LOCATED: UnevaluatedCriterion[] = (
+  Object.keys(UNEVALUATED_CRITERIA) as CriterionKey[]
+).map((criterion) => ({ criterion, reason: "site_not_located" as const, dataSources: [] }));
+
 /**
  * M1 D-3:座標・住所ともに解決できずLocateを実行できなかった場合、MaterialIssueを生成しない
  * のではなく、excluded=true・exclusionReason付きの監査可能なレコードとして残す
@@ -57,6 +62,7 @@ export function buildExcludedMaterialIssue(siteId: string, category: ImpactCateg
     impactCategory: category,
     sensitivityScore: 0,
     criteriaMet: UNEVALUATED_CRITERIA,
+    unevaluatedCriteria: ALL_CRITERIA_NOT_LOCATED,
     excluded: true,
     exclusionReason,
     assumptionEntryIds: [],

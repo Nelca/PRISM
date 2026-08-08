@@ -16,6 +16,7 @@ import type { PairwiseDecomposition, RepresentativeValueSelection } from "../typ
 import type { BindingMechanismChangeEntry } from "../types/decision";
 import type { GapFinding, IntentionalDecisionRecord } from "../types/disclosure";
 import type { SiteLocationResolution } from "../site/location";
+import type { UnevaluatedCriterion } from "../types/site";
 
 export function buildAssumptionEntry(
   id: string,
@@ -37,6 +38,22 @@ export function deriveM1ExclusionPayload(
     return null;
   }
   return { module: "M1", kind: "exclusion", reason: resolution.exclusionReason ?? "理由不明" };
+}
+
+/**
+ * GAP-08/GAP-13:評価できなかった基準を1件ずつ台帳に転記する。
+ * ライセンス保留(M8 D-4)・データソース不在(D-91)・Locate未実行(M1 D-3)を区別して残す。
+ */
+export function deriveM1UnevaluatedCriterionPayloads(
+  unevaluated: UnevaluatedCriterion[]
+): Extract<AssumptionEntryPayload, { module: "M1"; kind: "criterion_unevaluated" }>[] {
+  return unevaluated.map((entry) => ({
+    module: "M1",
+    kind: "criterion_unevaluated",
+    criterion: entry.criterion,
+    reason: entry.reason,
+    dataSources: entry.dataSources,
+  }));
 }
 
 // --- M2 ---

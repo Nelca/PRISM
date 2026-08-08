@@ -63,10 +63,19 @@ describe("runAssessmentPipeline", () => {
     expect(siteBIssue.assumptionEntryIds).toHaveLength(1);
 
     // M1のAssumptionEntry(site-Bの除外)が実際に生成されている
-    const m1Entry = result.assumptionEntries.find((e) => e.sourceModule === "M1")!;
+    const m1Entry = result.assumptionEntries.find((e) => e.payload.kind === "exclusion")!;
     expect(m1Entry).toBeDefined();
     expect(m1Entry.payload).toEqual({ module: "M1", kind: "exclusion", reason: expect.stringContaining("ジオコーディング") });
     expect(siteBIssue.assumptionEntryIds).toEqual([m1Entry.id]);
+
+    // GAP-08/GAP-13:NatureInterfaceを1件も渡していないsite-Aは、5基準すべてが
+    // 「データソース不在で評価していない」として記録される(falseと評価不能を区別する)
+    expect(siteAIssue.unevaluatedCriteria).toHaveLength(5);
+    expect(siteAIssue.unevaluatedCriteria.every((c) => c.reason === "no_data_source")).toBe(true);
+    expect(siteAIssue.assumptionEntryIds).toHaveLength(5);
+    const unevaluatedEntries = result.assumptionEntries.filter((e) => e.payload.kind === "criterion_unevaluated");
+    expect(unevaluatedEntries).toHaveLength(5);
+    expect(unevaluatedEntries.every((e) => e.relatedRecordId === siteAIssue.id)).toBe(true);
 
     // M2のAssumptionEntry(DepthDecisionごと)が実際に生成され、IDが反映されている
     expect(result.depthDecisions).toHaveLength(1); // site-Bは評価対象外(excludedのため優先度算定に含まれない)

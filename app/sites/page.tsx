@@ -1,6 +1,6 @@
 import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
-import { Num } from "../components/numeric";
 import { Card, Guide, Tag } from "../components/ui";
+import { sensitivityFraction, unevaluatedCriteriaNote } from "../components/criteria-labels";
 import { AddSiteForm } from "./add-site-form";
 
 const CATEGORY_LABEL: Record<string, string> = { water: "取水量・水ストレス" };
@@ -70,7 +70,11 @@ export default function SitesPage() {
           </table>
         </Card>
 
-        <Card title="感応度スコア上位拠点" padBody={false} foot="感応度 = TNFD LEAP L3の5基準の充足数(0〜5)">
+        <Card
+          title="感応度スコア上位拠点"
+          padBody={false}
+          foot="感応度 = TNFD LEAP L3の5基準の充足数。分母は実際に評価できた基準の数であり、常に5とは限らない"
+        >
           <table className="data-table">
             <thead>
               <tr>
@@ -93,8 +97,15 @@ export default function SitesPage() {
                     </td>
                     <td>{issue.excluded ? "—" : CATEGORY_LABEL[issue.impactCategory] ?? issue.impactCategory}</td>
                     <td className="num" style={issue.sensitivityScore >= 3 ? { color: "var(--brick)", fontWeight: 600 } : undefined}>
-                      <Num value={issue.sensitivityScore} />
-                      /5
+                      {sensitivityFraction(issue)}
+                      {unevaluatedCriteriaNote(issue) && (
+                        <>
+                          <br />
+                          <span style={{ color: "var(--ink-faint)", fontSize: 10, fontWeight: 400 }} title={unevaluatedCriteriaNote(issue)!}>
+                            未評価{issue.unevaluatedCriteria.length}件
+                          </span>
+                        </>
+                      )}
                     </td>
                     <td>
                       {issue.excluded ? (

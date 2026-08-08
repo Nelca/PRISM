@@ -1,6 +1,7 @@
 import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
 import { Num } from "../components/numeric";
 import { Card, Guide, Tag } from "../components/ui";
+import { sensitivityFraction, unevaluatedCriteriaNote } from "../components/criteria-labels";
 import { DepthToggle } from "./depth-toggle";
 
 export default function AssessmentPage() {
@@ -54,8 +55,16 @@ export default function AssessmentPage() {
                     )}
                   </td>
                   <td className="num">
-                    <Num value={score.sensitivity} />
-                    /5
+                    {/* 分母は常に5ではなく、実際に評価できた基準の数(GAP-08 / GAP-13)。 */}
+                    {issue ? sensitivityFraction(issue) : <Num value={score.sensitivity} />}
+                    {issue && unevaluatedCriteriaNote(issue) && (
+                      <>
+                        <br />
+                        <span style={{ color: "var(--ink-faint)", fontSize: 10, fontWeight: 400 }} title={unevaluatedCriteriaNote(issue)!}>
+                          未評価{issue.unevaluatedCriteria.length}件
+                        </span>
+                      </>
+                    )}
                   </td>
                   <td className="num">
                     <Num value={score.financialExposure} unit="円" />

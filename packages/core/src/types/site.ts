@@ -59,8 +59,37 @@ export interface CriteriaMet {
   likelySignificantDependencyImpact: boolean;
 }
 
+export type CriterionKey = keyof CriteriaMet;
+
 export function computeSensitivityScore(criteria: CriteriaMet): number {
   return Object.values(criteria).filter(Boolean).length;
+}
+
+/**
+ * 基準を評価できなかった理由。
+ *
+ * - `license_pending`: 判定に必要なデータソースが `licenseMode: "pending_review"`(契約未締結)。
+ *   M8 D-4により、真偽によらず感応度スコアの充足数カウントに含めない
+ * - `no_data_source`: 対応するNatureInterfaceが1件も渡されていない。MVPの`rapidIntegrityDecline`
+ *   (急速な劣化=トレンド)が該当する(D-91:推定で埋めず既定falseのまま)
+ * - `site_not_located`: 座標・住所ともに解決できずLocate自体を実行していない(M1 D-3)
+ */
+export type CriterionUnavailabilityReason = "license_pending" | "no_data_source" | "site_not_located";
+
+/**
+ * 「falseだった」と「評価していない」を区別するための記録。
+ * これがないと、感応度スコアの分母が常に5であるかのように読めてしまう。
+ */
+export interface UnevaluatedCriterion {
+  criterion: CriterionKey;
+  reason: CriterionUnavailabilityReason;
+  /** `license_pending` の場合に保留の原因となったデータソース名。それ以外は空配列。 */
+  dataSources: string[];
+}
+
+/** 評価に用いた基準の数(= 5 − 評価不能だった基準の数)。感応度スコアの分母。 */
+export function evaluatedCriteriaCount(criteria: CriteriaMet, unevaluated: UnevaluatedCriterion[]): number {
+  return Object.keys(criteria).length - unevaluated.length;
 }
 
 export interface MaterialIssue {
@@ -70,6 +99,12 @@ export interface MaterialIssue {
   /** 0〜5。computeSensitivityScore(criteriaMet) と必ず一致させる。 */
   sensitivityScore: number;
   criteriaMet: CriteriaMet;
+  /**
+   * 評価できなかった基準(2026-08-08追加、GAP-08/GAP-13)。
+   * `sensitivityScore` の分母は 5 ではなく `evaluatedCriteriaCount()` である。
+   * 空配列は「5基準すべてを評価した」ことを意味する。Optionalにしない(D-15)。
+   */
+  unevaluatedCriteria: UnevaluatedCriterion[];
   excluded: boolean;
   /** excluded === true の場合は必須(M2の除外理由記録と同じ原則)。 */
   exclusionReason?: string;

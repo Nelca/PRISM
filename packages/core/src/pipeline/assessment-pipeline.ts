@@ -24,7 +24,12 @@ import { computePriorityScores } from "../assessment/priority-score";
 import type { PriorityScoreInput } from "../assessment/priority-score";
 import { computeDepthDecisions } from "../assessment/depth-decision";
 import type { ComputeDepthDecisionsOptions } from "../assessment/depth-decision";
-import { buildAssumptionEntry, deriveM1ExclusionPayload, deriveM2DepthDecisionPayload } from "../ledger/assumption-entry";
+import {
+  buildAssumptionEntry,
+  deriveM1ExclusionPayload,
+  deriveM1UnevaluatedCriterionPayloads,
+  deriveM2DepthDecisionPayload,
+} from "../ledger/assumption-entry";
 import type { ImpactCategory } from "../types/common";
 import type { MaterialIssue, NatureInterface, Site } from "../types/site";
 import type { PriorityScore, DepthDecision } from "../types/assessment";
@@ -74,7 +79,16 @@ export function runAssessmentPipeline(options: AssessmentPipelineOptions): Asses
     }
 
     const interfacesByCategory = options.interfacesByCategoryForSite(resolution.site);
-    materialIssues.push(...buildMaterialIssues(resolution.site.id, interfacesByCategory));
+    for (const issue of buildMaterialIssues(resolution.site.id, interfacesByCategory)) {
+      // GAP-08/GAP-13:評価できなかった基準(ライセンス保留・データソース不在)を台帳に残す。
+      // 「falseだった」のか「評価していない」のかを後から区別できるようにするため。
+      const entryIds = deriveM1UnevaluatedCriterionPayloads(issue.unevaluatedCriteria).map((payload) => {
+        const entry = buildAssumptionEntry(options.idSequence(), options.now, "M1", issue.id, payload);
+        assumptionEntries.push(entry);
+        return entry.id;
+      });
+      materialIssues.push({ ...issue, assumptionEntryIds: entryIds });
+    }
   }
 
   const evaluableIssues = materialIssues.filter((issue) => !issue.excluded);

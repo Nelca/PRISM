@@ -64,9 +64,15 @@ export interface CicesReference {
   specifiedLevel: SpecifiedLevel;
 }
 
+/**
+ * 適合度ティア。"not_applicable" は「便益移転という行為自体が発生していない」ことを表し、
+ * A/B/C(移転はしたが精度が異なる)とは理由が異なる。表示・集計で A や C に読み替えないこと(M3 D-4.2)。
+ */
+export type TransferFitnessTier = "A" | "B" | "C" | "not_applicable";
+
 /** 便益移転の適合度(M3 D-4・D-5)。層iiが構造的に適用できない場合は"not_applicable"。 */
 export interface TransferFitness {
-  tier: "A" | "B" | "C" | "not_applicable";
+  tier: TransferFitnessTier;
   /** tierが A/B/C の場合のみ埋まる。 */
   dimensions?: {
     ecologicalFit: number;
