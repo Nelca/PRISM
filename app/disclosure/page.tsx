@@ -1,5 +1,7 @@
 import { getDefaultTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { buildDisclosureView } from "@core/disclosure/build-disclosure-view";
+import { INTERNAL_REVIEW_TEMPLATE } from "@core/disclosure/templates/internal-review-template";
 import { Card, Guide, Tag } from "../components/ui";
 import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
 
@@ -20,6 +22,18 @@ const EXCLUSION_KIND_LABEL: Record<string, string> = {
 export default async function DisclosurePage() {
   const result = await getOrCreateLatestResult(getDefaultTenantId());
   const claimsById = new Map(result.disclosureClaims.map((claim) => [claim.id, claim]));
+
+  // 出力3層目:自社のレコードから開示文の下書きを組み立てる(GAP-19)
+  const { view: disclosureView, unfilledRequirements } = buildDisclosureView(
+    `dv-${result.recalculationHash.hash}`,
+    INTERNAL_REVIEW_TEMPLATE,
+    {
+      materialIssues: result.assessment.materialIssues,
+      valuationRecords: Object.values(result.valuation.valuationRecordsByMaterialIssue).flat(),
+      decisionRecords: result.decisions.map((entry) => entry.decision.decisionRecord),
+    },
+    new Date().toISOString()
+  );
 
   return (
     <div className="screen">
@@ -103,6 +117,53 @@ export default async function DisclosurePage() {
           </Card>
         );
       })}
+
+      {/*
+        構想書8.1の出力3層目(DisclosureView)。自社のレコードから開示文の下書きを組み立てる。
+        検証(上のギャップ検出)とは逆向きの機能で、PDFもAIも使わない。
+        基準への項目マッピングは未確定のため、SSBJ準拠とは称さない(GAP-19)。
+      */}
+      <Card
+        title="開示文の下書き"
+        subtitle="登録済みのレコードから組み立て"
+        headExtra={<Tag variant="neutral">基準へのマッピング前</Tag>}
+        foot="固定の文章テンプレートに数値を機械的に埋め込んでいます。AIによる文章生成は行っていません"
+      >
+        {disclosureView.generatedText ? (
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              fontFamily: "var(--font-body)",
+              fontSize: 13,
+              lineHeight: 1.9,
+              margin: 0,
+            }}
+          >
+            {disclosureView.generatedText}
+          </pre>
+        ) : (
+          <p style={{ color: "var(--ink-faint)" }}>下書きを組み立てる材料がまだありません。</p>
+        )}
+
+        {unfilledRequirements.length > 0 && (
+          <>
+            <hr className="rule" />
+            <div className="section-label">材料が足りず記載できていない項目</div>
+            <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+              {unfilledRequirements.map((requirement) => (
+                <li key={requirement} style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>
+                  {requirement}
+                </li>
+              ))}
+            </ul>
+            <p className="tooltip-note">空欄を文章で埋めることはしません。材料が揃った時点で自動的に記載されます。</p>
+          </>
+        )}
+
+        <p className="tooltip-note" style={{ marginTop: 10 }}>
+          SSBJ等の基準のどの開示項目に何を載せるかは未確定です(基準本文の取得待ち)。この下書きは社内確認用です。
+        </p>
+      </Card>
 
       <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>

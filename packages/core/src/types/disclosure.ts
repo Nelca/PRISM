@@ -94,7 +94,12 @@ export interface GapFinding {
  * 生成ロジックの実装はスコープ外のままとするが、構造だけは今のうちに用意する
  * (build-plan §4.1「後から入れると全レコードの作り直しになるものは薄くしない」と同じ理由)。
  */
-export type DisclosureStandard = "ssbj" | "tcfd" | "tnfd";
+/**
+ * `internal_review` は2026-08-09追加。基準本文が未取得で項目マッピングを確定できないため
+ * (`docs/data/acquisition-runbook.md` A-15)、**SSBJ準拠を騙らずに**自社レコードから
+ * 下書きを組み立てるための区分。基準へのマッピングが確定した時点で ssbj/tcfd/tnfd を使う。
+ */
+export type DisclosureStandard = "ssbj" | "tcfd" | "tnfd" | "internal_review";
 
 export interface DisclosureView {
   id: string;
