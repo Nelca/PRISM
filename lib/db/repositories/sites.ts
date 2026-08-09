@@ -27,6 +27,37 @@ export async function listSiteEntries(tenantId: string): Promise<UserSiteEntry[]
   return rows.map(toEntry);
 }
 
+/**
+ * 取り込んだ拠点で置き換える(CSV取込のやり直しを想定)。
+ * `site` は追記のみの対象外(取込のやり直しがあるため、0001_append_only_role.sqlで
+ * UPDATE/DELETEを許可している唯一のテーブル)。
+ *
+ * **過去のrun・台帳・判定件数は消えない。**それらは追記のみで、拠点を入れ替えても
+ * 「その時点で何を根拠に何を判定したか」の記録は残る。
+ */
+export async function replaceSiteEntries(tenantId: string, entries: UserSiteEntry[]): Promise<void> {
+  const db = getDb();
+  await db.transaction(async (tx) => {
+    await tx.delete(site).where(eq(site.tenantId, tenantId));
+    if (entries.length === 0) {
+      return;
+    }
+    await tx.insert(site).values(
+      entries.map((entry) => ({
+        tenantId,
+        id: entry.row.id,
+        name: entry.row.name,
+        siteType: entry.row.siteType,
+        industrySector: entry.row.industrySector,
+        lat: entry.row.lat ?? null,
+        lng: entry.row.lng ?? null,
+        address: entry.row.address ?? null,
+        deepDiveParams: entry.deepDive,
+      }))
+    );
+  });
+}
+
 export async function addSiteEntry(
   tenantId: string,
   row: Omit<SiteRow, "id">,

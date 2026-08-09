@@ -7,6 +7,7 @@ const NAV = [
   {
     group: "対象の把握",
     items: [
+      { href: "/intake", label: "データの取込", sub: "3ファイルの検証と登録" },
       { href: "/sites", label: "対象定義とLocate", sub: "拠点・サプライヤーの登録" },
       { href: "/assessment", label: "評価の優先順位", sub: "評価が必要な課題を絞り込む" },
     ],
