@@ -86,6 +86,13 @@ export const pipelineRun = pgTable(
     hashInputs: jsonb("hash_inputs").notNull(),
     /** 読み出しの正。runDemoPipeline() の戻り値そのもの。 */
     result: jsonb("result").notNull(),
+    /**
+     * `result` の構造の版(RESULT_SCHEMA_VERSION)。
+     * ページは保存済みrunをそのまま読むため、結果の構造を変えるコード変更をすると
+     * 古い形のrunを新しいコードが読んで壊れる。読み出し時にこの版を突き合わせ、
+     * 食い違っていれば再実行する。
+     */
+    resultSchemaVersion: integer("result_schema_version").notNull().default(1),
   },
   (t) => [index("pipeline_run_latest").on(t.tenantId, t.executedAt)]
 );

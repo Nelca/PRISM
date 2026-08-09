@@ -118,6 +118,23 @@ export const PRIOR_YEAR_METHOD_BY_MATERIAL_ISSUE: Record<string, string> = {
   "site-042-mi-water": "replacement-cost",
 };
 
+/**
+ * 企業提供の財務データ(M5)。PRISMは検証しない(M5 D-1・M6 D-4と同じ原則)。
+ *
+ * 実データでは財務・経理部門から受領する項目(`docs/data/acquisition-runbook.md` D-4)で、
+ * 受け入れテンプレートにまだ欄がない。ここでは架空企業のデモ値として固定する。
+ * **報告営業利益に通常NPVを流用しない**(以前のデモ実装は別概念の値を代入していた)。
+ */
+export const FLAGSHIP_FINANCIALS = {
+  reportedOperatingProfit: exchangeAmount(1_200_000_000),
+  /** 既に炭素税・水利用料等として実際に支払っている額。 */
+  currentlyInternalizedCost: exchangeAmount(2_000_000),
+  /** 既存の減損テスト前提(閾値)。 */
+  existingImpairmentThreshold: exchangeAmount(50_000_000),
+  /** 信用指標の算出に使う財務データ。 */
+  creditMetrics: { netDebt: 2_400_000_000, ebitda: 1_500_000_000, interestExpense: 130_000_000 },
+};
+
 /** 深掘り深度でのM3実行に使う設定(本社工場・水カテゴリのみ)。 */
 export const DEEP_DIVE_PHYSICAL_QUANTITY_ID = "pq-site042-water-2027";
 

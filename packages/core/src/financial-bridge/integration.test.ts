@@ -98,14 +98,19 @@ describe("M5統合テスト:M3のValuationRecordから2ブリッジ・自然債�
 
     const comparisonTargets = computeComparisonTargets({
       reportedOperatingProfit: exchangeAmount(1_000_000_000),
+      natureAdjustedOperatingProfit: bridge1.natureAdjustedOperatingProfit,
       natureDebt,
       existingImpairmentThreshold: exchangeAmount(10_000_000),
-      leverage: { before: 2.1, after: 2.2 },
-      interestCoverage: { before: 8.2, after: 8.0 },
+      financials: { netDebt: 2_100_000_000, ebitda: 1_000_000_000, interestExpense: 120_000_000 },
     });
 
     expect(comparisonTargets.operatingProfitRatio).toBeGreaterThan(0);
     expect(comparisonTargets.nonGaapLabel.label).toBe("非GAAP指標");
+
+    // 比率の「変化後」はPRISMが算出する(企業入力の転記ではない、D-5.2 / GAP-10)
+    const [leverage, coverage] = comparisonTargets.ratingCostOfCapitalImpact.ratios;
+    expect(leverage.after!).toBeGreaterThan(leverage.before!); // 自然債務を上乗せするため悪化する
+    expect(coverage.after!).toBeLessThan(coverage.before!); // 自然調整後利益は報告利益より小さい
   });
 
   it("厚生価値ValuationRecordからブリッジ2(社会的費用ビュー)を組み立て、開示専用ラベルが常時付く", () => {

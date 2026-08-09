@@ -19,8 +19,9 @@ import { getLatestRun, persistRun } from "./repositories/runs";
 import { appendInteractionEvent, listInteractionEvents, loadInteractionState } from "./repositories/interactions";
 import { addSiteEntry, listSiteEntries } from "./repositories/sites";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
-import { DEFAULT_RNG_SEED, runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
+import { DEFAULT_RNG_SEED, RESULT_SCHEMA_VERSION, runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
 import { emptyInteractionState } from "@/lib/demo/interaction-state";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 
 const TENANT = "persistence-test";
 
@@ -77,6 +78,41 @@ describe("run の永続化", () => {
     const first = runDemoPipeline({ userSites: [], interactions: emptyInteractionState(), rngSeed: 42 });
     const second = runDemoPipeline({ userSites: [], interactions: emptyInteractionState(), rngSeed: 42 });
     expect(second.valuation.valuationRecordsByMaterialIssue).toEqual(first.valuation.valuationRecordsByMaterialIssue);
+  });
+});
+
+describe("結果構造の版(RESULT_SCHEMA_VERSION)", () => {
+  it("保存時に現在の版が記録される", async () => {
+    const result = runDemoPipeline({ userSites: [], interactions: emptyInteractionState(), rngSeed: DEFAULT_RNG_SEED });
+    await persistRun({ tenantId: TENANT, rngSeed: DEFAULT_RNG_SEED, result });
+
+    expect((await getLatestRun(TENANT))!.resultSchemaVersion).toBe(RESULT_SCHEMA_VERSION);
+  });
+
+  it("版が古いrunは読み出し時に再実行され、新しい版のrunが積まれる", async () => {
+    // 古い版のrunを直接作る(結果の構造を変えるコード変更をデプロイした直後の状態)
+    const staleRunId = `run-stale-${Date.now()}`;
+    await getDb()
+      .insert(pipelineRun)
+      .values({
+        id: staleRunId,
+        tenantId: TENANT,
+        rngSeed: DEFAULT_RNG_SEED,
+        recalculationHash: "m8:stale",
+        hashInputs: {},
+        result: { companyName: "古い形の結果" },
+        resultSchemaVersion: RESULT_SCHEMA_VERSION - 1,
+      });
+
+    const result = await getOrCreateLatestResult(TENANT);
+
+    // 古い結果をそのまま返さない(ページが壊れる原因になる)
+    expect(result.companyName).not.toBe("古い形の結果");
+    const latest = await getLatestRun(TENANT);
+    expect(latest!.resultSchemaVersion).toBe(RESULT_SCHEMA_VERSION);
+    // 古いrunは削除せず残る(追記のみ、M8 D-5)
+    const all = await getDb().select({ id: pipelineRun.id }).from(pipelineRun).where(eq(pipelineRun.tenantId, TENANT));
+    expect(all.map((r) => r.id)).toContain(staleRunId);
   });
 });
 

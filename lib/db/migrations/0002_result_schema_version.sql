@@ -1,0 +1,1 @@
+ALTER TABLE "pipeline_run" ADD COLUMN "result_schema_version" integer DEFAULT 1 NOT NULL;

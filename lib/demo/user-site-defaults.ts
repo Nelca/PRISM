@@ -158,3 +158,22 @@ export function buildUserDisclosureClaim(site: Site, params: UserSiteDeepDivePar
     extractionConfidence: "high",
   };
 }
+
+/**
+ * 追加登録された拠点の財務データ(M5)。企業提供の値がまだ入力できないため、
+ * 拠点ごとの深掘りパラメータから機械的に導いた**デモ用の仮値**である。
+ * 実データの入口はT-15(財務パラメータ入力UI)で作る。
+ */
+export function buildUserFinancials(params: UserSiteDeepDiveParams) {
+  const operatingProfit = Math.max(params.baselineNpvValue * 2, 1);
+  return {
+    reportedOperatingProfit: exchangeAmount(operatingProfit),
+    currentlyInternalizedCost: exchangeAmount(Math.round(params.unitReplacementCost * params.physicalQuantity * 0.05)),
+    existingImpairmentThreshold: exchangeAmount(Math.round(operatingProfit * 0.05)),
+    creditMetrics: {
+      netDebt: Math.round(operatingProfit * 2),
+      ebitda: Math.round(operatingProfit * 1.25),
+      interestExpense: Math.round(operatingProfit * 0.1),
+    },
+  };
+}

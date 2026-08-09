@@ -17,6 +17,7 @@ import {
   valuationRecord,
 } from "../schema";
 import { extractRunRows } from "../serialize";
+import { RESULT_SCHEMA_VERSION } from "@/lib/demo/run-demo-pipeline";
 import type { DemoPipelineResult } from "@/lib/demo/run-demo-pipeline";
 
 export interface PersistRunInput {
@@ -37,6 +38,7 @@ export async function persistRun(input: PersistRunInput): Promise<string> {
       recalculationHash: input.result.recalculationHash.hash,
       hashInputs: input.result.recalculationHash.inputs,
       result: input.result,
+      resultSchemaVersion: RESULT_SCHEMA_VERSION,
     });
 
     // 索引側。run本体と同じトランザクションで書くため、両者が食い違うことはない。
@@ -56,6 +58,8 @@ export interface StoredRun {
   id: string;
   executedAt: string;
   rngSeed: number;
+  /** 保存時点の結果構造の版。現在のRESULT_SCHEMA_VERSIONと違えば読み手が再実行する。 */
+  resultSchemaVersion: number;
   result: DemoPipelineResult;
 }
 
@@ -75,6 +79,7 @@ export async function getLatestRun(tenantId: string): Promise<StoredRun | null> 
     id: row.id,
     executedAt: row.executedAt.toISOString(),
     rngSeed: row.rngSeed,
+    resultSchemaVersion: row.resultSchemaVersion,
     result: row.result as DemoPipelineResult,
   };
 }

@@ -20,11 +20,7 @@ import { runDisclosurePipeline } from "@core/pipeline/disclosure-pipeline";
 import { createIdSequence } from "@core/pipeline/ids";
 import { ALL_PLUGINS } from "@core/monetization/registry";
 import { createSeededRng } from "@core/monetization/rng";
-import { buildBridge1NatureAdjustedProfit } from "@core/financial-bridge/bridge1";
-import { buildBridge2SocialCostView } from "@core/financial-bridge/bridge2";
-import { computeInternalizationStatus } from "@core/financial-bridge/internalization-status";
-import { computeNatureDebt } from "@core/financial-bridge/nature-debt";
-import { computeComparisonTargets } from "@core/financial-bridge/comparison-targets";
+import { runFinancialBridgePipeline } from "@core/pipeline/financial-bridge-pipeline";
 import { computeRecalculationHash } from "@core/ledger/recalculation-hash";
 import { exchangeAmount } from "@core/types/common";
 import type { ExchangeValuationRecord, WelfareValuationRecord } from "@core/types/valuation";
@@ -44,6 +40,7 @@ import {
   demoGeocode,
   DISCLOSURE_CLAIM,
   excludedCategoriesForSite,
+  FLAGSHIP_FINANCIALS,
   interfacesByCategoryForSite,
   PRIOR_YEAR_METHOD_BY_MATERIAL_ISSUE,
   screeningValuationForMaterialIssue,
@@ -56,6 +53,7 @@ import {
   buildUserCountermeasureCandidates,
   buildUserDeepDiveConfig,
   buildUserDisclosureClaim,
+  buildUserFinancials,
   DEFAULT_DEEP_DIVE_PARAMS,
 } from "./user-site-defaults";
 import { emptyInteractionState } from "./interaction-state";
@@ -214,29 +212,34 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       ? exchangeAmount(BASELINE_NPV.value + 25_000_000)
       : exchangeAmount(deepDiveParams.approvalThresholdValue);
 
-    const internalizationStatus = computeInternalizationStatus(representative.centralValue, exchangeAmount(2_000_000));
-    const financialBridge = {
-      bridge1: buildBridge1NatureAdjustedProfit(exchangeAmount(baselineNpv.value), representative.centralValue, exchangeAmount(0)),
-      bridge2: lime3 ? buildBridge2SocialCostView(lime3.centralValue, 0.15) : null,
-      internalizationStatus,
-      natureDebt: computeNatureDebt(
-        internalizationStatus.uninternalizedCost,
-        [
-          { scenario: "ngfs_net_zero_2050" as const, probability: 1 / 3, period: 5 },
-          { scenario: "ngfs_current_policies" as const, probability: 1 / 3, period: 5 },
-          { scenario: "gx_ets_official" as const, probability: 1 / 3, period: 5 },
-        ],
-        baselineNpv.discountRate
-      ),
-    };
-
-    const comparisonTargets = computeComparisonTargets({
-      reportedOperatingProfit: exchangeAmount(baselineNpv.value),
-      natureDebt: financialBridge.natureDebt,
-      existingImpairmentThreshold: exchangeAmount(50_000_000),
-      leverage: { before: 1.8, after: 1.9 },
-      interestCoverage: { before: 9.5, after: 9.1 },
+    // --- M5:財務接続(パイプライン層経由。以前はデモ層が各関数を直接呼んでいた、GAP-10)---
+    const companyFinancials = isFlagshipSite ? FLAGSHIP_FINANCIALS : buildUserFinancials(deepDiveParams);
+    const financialBridgeResult = runFinancialBridgePipeline({
+      exchangeRecord: representative,
+      ...(lime3 ? { welfareRecord: lime3 } : {}),
+      // 以前は通常NPVを報告営業利益として渡していた(別概念の値の代入)。企業提供の
+      // 報告営業利益を使う。実データの入口はT-15(財務パラメータ入力UI)で作る。
+      reportedOperatingProfit: companyFinancials.reportedOperatingProfit,
+      currentlyInternalizedCost: companyFinancials.currentlyInternalizedCost,
+      existingImpairmentThreshold: companyFinancials.existingImpairmentThreshold,
+      financials: companyFinancials.creditMetrics,
+      // 3シナリオ均等割り(M5 D-4.3の中立的な初期値。PRISMは特定シナリオを推奨しない)
+      internalizationProbabilities: [
+        { scenario: "ngfs_net_zero_2050", probability: 1 / 3, period: 5 },
+        { scenario: "ngfs_current_policies", probability: 1 / 3, period: 5 },
+        { scenario: "gx_ets_official", probability: 1 / 3, period: 5 },
+      ],
+      discountRate: baselineNpv.discountRate,
+      socialCostInternalizationRate: 0.15,
     });
+
+    const financialBridge = {
+      bridge1: financialBridgeResult.bridge1,
+      bridge2: financialBridgeResult.bridge2,
+      internalizationStatus: financialBridgeResult.internalizationStatus,
+      natureDebt: financialBridgeResult.natureDebt,
+    };
+    const comparisonTargets = financialBridgeResult.comparisonTargets;
 
     // --- M6:対策案4種を並行して計算し、比較テーブル/散布図に使う ---
     const candidates: CountermeasureCandidate[] = isFlagshipSite
@@ -432,5 +435,17 @@ function defaultRunPipelineInput(): RunPipelineInput {
 
 /** 既定のシード。runごとに変える必要はない(同じ入力からは同じ結果が出ることを優先する)。 */
 export const DEFAULT_RNG_SEED = 42;
+
+/**
+ * 保存済みrunの`result`(jsonb)の構造の版。
+ *
+ * ページは再計算せず保存済みrunを読む(計画B-2)。そのため**結果の構造を変える
+ * コード変更をすると、古い形のまま保存されたrunを新しいコードが読んで壊れる。**
+ * この版を上げると、読み出し時に自動で再実行される(lib/pipeline/execute-run.ts)。
+ *
+ * **結果オブジェクトの形を変えたら必ず上げること。**値の計算方法だけを変えた場合は
+ * 上げなくても壊れないが、過去のrunと比較したいなら上げる方が安全。
+ */
+export const RESULT_SCHEMA_VERSION = 2;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

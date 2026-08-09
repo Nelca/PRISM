@@ -78,6 +78,17 @@ export interface NatureDebt {
   nonGaapLabel: NonGaapLabel;
 }
 
+/**
+ * 信用格付機関が一般的に参照する財務指標の変化(M5 D-5.2)。
+ * 変化後の値は自然債務・自然調整後利益から**単純な算術で導出する**(企業に入力させない)。
+ * 分母が0で比率が定義できない場合はnull(推定で埋めない)。
+ */
+export interface CreditRatioChange {
+  label: string;
+  before: number | null;
+  after: number | null;
+}
+
 export interface ComparisonTargets {
   /** 期待損失 ÷ 報告営業利益。 */
   operatingProfitRatio: number;
@@ -87,7 +98,10 @@ export interface ComparisonTargets {
   };
   /** 定量モデルは持たない(M5 D-5.1、構想書11.2「未実証」)。 */
   ratingCostOfCapitalImpact: {
+    /** 全顧客・全ケース共通の固定テンプレート文言。AIで生成しない(D-5.2)。 */
     qualitativeNote: string;
+    /** 注記文に埋め込んだ数値そのもの。画面が表として組み直せるように構造でも持つ。 */
+    ratios: CreditRatioChange[];
   };
   /** M5のすべての出力に必須(D-6)。2026-08-02のレビューで欠落を発見し追加。 */
   nonGaapLabel: NonGaapLabel;
