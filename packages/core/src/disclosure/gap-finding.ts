@@ -8,41 +8,69 @@
 
 import { periodsEqual } from "./evidence-match";
 import type { EvidenceCandidate } from "./evidence-match";
+import { detectSelectiveDisclosure } from "./selective-disclosure";
+import type { ExclusionRecord } from "./selective-disclosure";
 import type { DisclosureClaim, EvidenceMatch, GapFinding, GapType, RecommendedAction } from "../types/disclosure";
 
 export function determineGapType(
   claim: DisclosureClaim,
-  candidates: EvidenceCandidate[]
-): { gapType: GapType | null; matchedRecordIds: string[] } {
+  candidates: EvidenceCandidate[],
+  /** G6の判定に使う「評価していないもの」の記録。渡されない場合G6は判定しない。 */
+  exclusions: ExclusionRecord[] = []
+): { gapType: GapType | null; matchedRecordIds: string[]; undisclosedExclusions: ExclusionRecord[] } {
   const { category, scopeMentioned, periodMentioned } = claim.extractedMetadata;
+
+  const { undisclosedExclusions } = detectSelectiveDisclosure(category, scopeMentioned, exclusions);
 
   const categoryMatches = candidates.filter((c) => category === null || c.category === category);
   if (categoryMatches.length === 0) {
-    return { gapType: "G1_no_evidence", matchedRecordIds: [] };
+    return { gapType: "G1_no_evidence", matchedRecordIds: [], undisclosedExclusions };
   }
 
   if (categoryMatches.every((c) => c.transferFitnessTier === "C")) {
-    return { gapType: "G2_weak_evidence", matchedRecordIds: categoryMatches.map((c) => c.recordId) };
+    return {
+      gapType: "G2_weak_evidence",
+      matchedRecordIds: categoryMatches.map((c) => c.recordId),
+      undisclosedExclusions,
+    };
   }
 
   const scopeMatches = categoryMatches.filter((c) => scopeMentioned === null || c.scope === scopeMentioned);
   if (scopeMatches.length === 0) {
-    return { gapType: "G3_scope_mismatch", matchedRecordIds: [] };
+    return { gapType: "G3_scope_mismatch", matchedRecordIds: [], undisclosedExclusions };
   }
 
   const periodMatches = scopeMatches.filter((c) => periodMentioned === null || periodsEqual(c.period, periodMentioned));
   if (periodMatches.length === 0) {
-    return { gapType: "G4_period_mismatch", matchedRecordIds: [] };
+    return { gapType: "G4_period_mismatch", matchedRecordIds: [], undisclosedExclusions };
   }
 
   // categoryMatches全体では混在(全件tier Cではない)だったとしても、scope・period絞り込みの結果
   // 実際に主張を裏付ける根拠がtier Cのみになるケースがある(例:強い根拠が範囲外・弱い根拠のみ範囲内)。
   // その場合、絞り込み後の実際の根拠集合で改めてtier Cを判定し、根拠充足と誤判定しない。
   if (periodMatches.every((c) => c.transferFitnessTier === "C")) {
-    return { gapType: "G2_weak_evidence", matchedRecordIds: periodMatches.map((c) => c.recordId) };
+    return {
+      gapType: "G2_weak_evidence",
+      matchedRecordIds: periodMatches.map((c) => c.recordId),
+      undisclosedExclusions,
+    };
   }
 
-  return { gapType: null, matchedRecordIds: periodMatches.map((c) => c.recordId) };
+  /**
+   * G6は最後に判定する。根拠の有無・強度・範囲・期間(G1〜G4)の方が根本的な問題であり、
+   * 「最初に該当したものを採用する」という既存の優先順位(M7 D-3)をそのまま延長する。
+   * G1〜G4のいずれかが立っている場合でも、未開示の除外があれば出力には載せる
+   * (gapTypeとしては採用しないが、事実は捨てない)。
+   */
+  if (undisclosedExclusions.length > 0) {
+    return {
+      gapType: "G6_selective_disclosure",
+      matchedRecordIds: periodMatches.map((c) => c.recordId),
+      undisclosedExclusions,
+    };
+  }
+
+  return { gapType: null, matchedRecordIds: periodMatches.map((c) => c.recordId), undisclosedExclusions };
 }
 
 /**
@@ -61,8 +89,13 @@ export function buildRecommendedActions(gapType: GapType | null): RecommendedAct
   ];
 }
 
-export function buildGapFinding(id: string, claim: DisclosureClaim, candidates: EvidenceCandidate[]): GapFinding {
-  const { gapType, matchedRecordIds } = determineGapType(claim, candidates);
+export function buildGapFinding(
+  id: string,
+  claim: DisclosureClaim,
+  candidates: EvidenceCandidate[],
+  exclusions: ExclusionRecord[] = []
+): GapFinding {
+  const { gapType, matchedRecordIds, undisclosedExclusions } = determineGapType(claim, candidates, exclusions);
 
   const evidenceMatch: EvidenceMatch = {
     claimId: claim.id,
@@ -76,5 +109,7 @@ export function buildGapFinding(id: string, claim: DisclosureClaim, candidates: 
     gapType,
     evidenceMatch,
     recommendedActions: buildRecommendedActions(gapType),
+    // gapTypeがG6でなくても、未開示の除外があれば事実として残す(捨てない)
+    ...(undisclosedExclusions.length > 0 ? { undisclosedExclusions } : {}),
   };
 }

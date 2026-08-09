@@ -14,6 +14,7 @@
 import { buildGapFinding } from "../disclosure/gap-finding";
 import { buildIntentionalDecisionRecord } from "../disclosure/intentional-decision";
 import type { EvidenceCandidate } from "../disclosure/evidence-match";
+import type { ExclusionRecord } from "../disclosure/selective-disclosure";
 import { buildAssumptionEntry, deriveM7GapFindingPayload, deriveM7IntentionalDecisionPayload } from "../ledger/assumption-entry";
 import type { DisclosureClaim, GapFinding, IntentionalDecisionRecord } from "../types/disclosure";
 import type { AssumptionEntry } from "../types/ledger";
@@ -28,6 +29,12 @@ export interface IntentionalDecisionInput {
 export interface DisclosurePipelineOptions {
   claims: DisclosureClaim[];
   candidatesForClaim: (claim: DisclosureClaim) => EvidenceCandidate[];
+  /**
+   * G6(選択的開示)の判定に使う「評価していないもの」の記録。
+   * M1のMaterialIssue除外・M2の深掘り除外・評価不能だった基準から呼び出し側が組み立てる。
+   * 渡さない場合、G6は判定されない(既存の呼び出しは無変更で動く)。
+   */
+  exclusions?: ExclusionRecord[];
   /** ③(意図的判断として記録する)を選んだgapFindingについてのみ指定する。 */
   intentionalDecisions?: IntentionalDecisionInput[];
   idSequence: () => string;
@@ -45,7 +52,12 @@ export function runDisclosurePipeline(options: DisclosurePipelineOptions): Discl
   const gapFindings: GapFinding[] = [];
 
   for (const claim of options.claims) {
-    const finding = buildGapFinding(options.idSequence(), claim, options.candidatesForClaim(claim));
+    const finding = buildGapFinding(
+      options.idSequence(),
+      claim,
+      options.candidatesForClaim(claim),
+      options.exclusions ?? []
+    );
     gapFindings.push(finding);
 
     const payload = deriveM7GapFindingPayload(finding);

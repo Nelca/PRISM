@@ -8,6 +8,13 @@ const GAP_LABEL: Record<string, string> = {
   G2_weak_evidence: "根拠がやや弱い",
   G3_scope_mismatch: "対象範囲が一致しない",
   G4_period_mismatch: "対象期間が一致しない",
+  G6_selective_disclosure: "触れていない対象がある",
+};
+
+const EXCLUSION_KIND_LABEL: Record<string, string> = {
+  not_assessed: "評価対象に入っていない",
+  not_deep_dived: "詳細評価をしていない",
+  criteria_unevaluated: "一部の基準を評価できていない",
 };
 
 export default async function DisclosurePage() {
@@ -52,6 +59,39 @@ export default async function DisclosurePage() {
                 </tr>
               </tbody>
             </table>
+
+            {/*
+              G6:開示が触れている範囲に含まれるのに評価していない対象。
+              「開示文が言及しているか」までは判定しない(自然言語理解が必要になり、
+              段階3・4にLLMを使わない制約に反するため)。事実の提示にとどめる。
+            */}
+            {finding.undisclosedExclusions && finding.undisclosedExclusions.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div className="section-label">この記載の範囲に含まれるが、評価していない対象</div>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>対象</th>
+                      <th>状態</th>
+                      <th>理由</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {finding.undisclosedExclusions.map((exclusion) => (
+                      <tr key={`${exclusion.siteId}-${exclusion.kind}`}>
+                        <td>{exclusion.scope}</td>
+                        <td>{EXCLUSION_KIND_LABEL[exclusion.kind] ?? exclusion.kind}</td>
+                        <td style={{ fontSize: 12 }}>{exclusion.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="tooltip-note">
+                  記載内容がこれらに触れているかどうかは判定していません。触れる必要があるかは利用者の判断です。
+                  触れないと判断した場合は「判断の理由を記録する」を選んでください。
+                </p>
+              </div>
+            )}
 
             {finding.recommendedActions.length > 0 && claim && (
               <div className="grid-3">

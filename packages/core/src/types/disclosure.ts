@@ -38,7 +38,18 @@ export interface EvidenceMatch {
   matchMethod: "category_period_scope_exact_match";
 }
 
-export type GapType = "G1_no_evidence" | "G2_weak_evidence" | "G3_scope_mismatch" | "G4_period_mismatch";
+/**
+ * G1〜G4はMVP範囲(M7 D-3)。
+ * G6(選択的開示)は2026-08-09に追加した。M2の除外理由記録が唯一の情報源であり
+ * (build-plan §5.5)、その記録はM1・M2で全件揃っているため実装できるようになった。
+ * G5(定義不一致)・G7(相殺依存)・G8(約束の裏付け欠如)は情報源が未整備のため未実装。
+ */
+export type GapType =
+  | "G1_no_evidence"
+  | "G2_weak_evidence"
+  | "G3_scope_mismatch"
+  | "G4_period_mismatch"
+  | "G6_selective_disclosure";
 
 export type RecommendedAction =
   | { kind: "weaken_claim" } // ①主張を弱める
@@ -60,6 +71,18 @@ export interface GapFinding {
   gapType: GapType | null;
   evidenceMatch: EvidenceMatch;
   recommendedActions: RecommendedAction[];
+  /**
+   * G6:開示が触れている範囲に含まれるのに評価していない対象(2026-08-09追加)。
+   * gapTypeがG6でなくても、事実として存在すればここに載る。
+   * 型は `disclosure/selective-disclosure.ts` の `ExclusionRecord`。
+   */
+  undisclosedExclusions?: {
+    siteId: string;
+    category: ImpactCategory;
+    scope: string;
+    kind: "not_assessed" | "not_deep_dived" | "criteria_unevaluated";
+    reason: string;
+  }[];
 }
 
 /**
