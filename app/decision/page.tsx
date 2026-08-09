@@ -1,4 +1,5 @@
 import { getDefaultTenantId } from "@/lib/db/client";
+import { listDecisionCounts } from "@/lib/db/repositories/decision-counts";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
 import { Card, Guide, Stat, Tag } from "../components/ui";
@@ -7,8 +8,11 @@ import { CountermeasureSelector } from "./countermeasure-selector";
 import { BindingForm } from "./binding-form";
 
 export default async function DecisionPage() {
-  const result = await getOrCreateLatestResult(getDefaultTenantId());
+  const tenantId = getDefaultTenantId();
+  const result = await getOrCreateLatestResult(tenantId);
   const { decisions } = result;
+  // 従量課金の根拠(M6 D-8・D-30)。件数だけでなく明細も出す(構想書6.4)。
+  const decisionCounts = await listDecisionCounts(tenantId);
 
   if (decisions.length === 0) {
     return (
@@ -130,7 +134,7 @@ export default async function DecisionPage() {
                   <div className="section-label">反映先の変更履歴</div>
                   {record.bindingMechanismHistory.map((h, i) => (
                     <p key={i} style={{ fontSize: 12, color: "var(--ink-soft)" }}>
-                      {h.changedAt.slice(0, 10)}: {h.previousMechanism.kind} → 変更(理由:{h.reason})
+                      {h.changedAt.slice(0, 10)}: {h.previousMechanism.kind} → {h.newMechanism.kind}(理由:{h.reason})
                     </p>
                   ))}
                 </div>
@@ -139,6 +143,48 @@ export default async function DecisionPage() {
           </div>
         );
       })}
+
+      {/*
+        M6 D-8 / D-30:従量課金は「判定超過」1本のみで、結論の向きを問わず一律。
+        構想書6.4が「課金の発生根拠が顧客にとって説明可能である」ことを設計要件としているため、
+        件数だけでなく、どの判定がいつ数えられたかの明細も出す。
+      */}
+      <Card
+        title="判定件数"
+        subtitle="従量課金の根拠"
+        padBody={false}
+        foot="判定が確定した時点で1件。結論の向き(またぐ/またがない)は課金に影響しません。未確定(pending)は数えません"
+      >
+        <div style={{ padding: "12px 18px" }}>
+          <Stat label="確定した判定" value={`${decisionCounts.length}件`} />
+        </div>
+        {decisionCounts.length > 0 && (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>判定ID</th>
+                <th>拠点</th>
+                <th>判定</th>
+                <th>計上日時</th>
+              </tr>
+            </thead>
+            <tbody>
+              {decisionCounts.map((entry) => (
+                <tr key={entry.decisionRecordId}>
+                  <td className="num" style={{ fontSize: 11 }}>
+                    {entry.decisionRecordId}
+                  </td>
+                  <td>{entry.siteId ?? "—"}</td>
+                  <td>{entry.verdict === "crosses" ? "基準をまたぐ" : "基準をまたがない"}</td>
+                  <td className="num" style={{ fontSize: 11 }}>
+                    {entry.countedAt.slice(0, 16).replace("T", " ")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
 
       <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>

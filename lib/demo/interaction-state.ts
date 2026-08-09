@@ -6,12 +6,17 @@
  * 別のMap(m4ChangeLog)に持っていた。追記型にしたことで、現在値も履歴も同じイベント列から出る。
  */
 
-import type { BindingMechanism, CountermeasureType } from "@core/types/decision";
+import type { BindingMechanism, BindingMechanismChangeEntry, CountermeasureType } from "@core/types/decision";
 import type { ValueConcept } from "@core/types/common";
 
 export interface BindingMechanismState {
   mechanism: BindingMechanism;
-  history: { previousMechanism: BindingMechanism; reason: string; changedAt: string }[];
+  /**
+   * M6 §9の`BindingMechanismChangeEntry`そのもの。
+   * 以前は`newMechanism`を欠いた別形で持っており、DecisionRecordに載せると
+   * 型が合っていなかった(2026-08-09に修正)。
+   */
+  history: BindingMechanismChangeEntry[];
 }
 
 export interface ActionLogEntry {
@@ -126,6 +131,7 @@ export function projectInteractionState(events: InteractionEvent[]): Interaction
               ...previous.history,
               {
                 previousMechanism: previous.mechanism,
+                newMechanism,
                 reason: event.payload.reason as string,
                 changedAt: event.createdAt,
               },

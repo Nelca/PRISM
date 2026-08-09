@@ -7,8 +7,10 @@
 
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "../client";
+import { buildDecisionCountRows } from "./decision-counts";
 import {
   assumptionEntry,
+  decisionCountEntry,
   decisionRecord,
   divergenceDecomposition,
   gapFinding,
@@ -49,6 +51,17 @@ export async function persistRun(input: PersistRunInput): Promise<string> {
     if (extracts.decisionRecords.length > 0) await tx.insert(decisionRecord).values(extracts.decisionRecords);
     if (extracts.gapFindings.length > 0) await tx.insert(gapFinding).values(extracts.gapFindings);
     if (extracts.assumptionEntries.length > 0) await tx.insert(assumptionEntry).values(extracts.assumptionEntries);
+
+    // 判定件数のカウント(M6 D-8)。run本体と同じトランザクションで積む。
+    // 既に積んだ DecisionRecord は onConflictDoNothing で無視される(再実行で二重課金しない)。
+    const countRows = buildDecisionCountRows(
+      input.tenantId,
+      runId,
+      input.result.decisions.map((entry) => ({ decisionRecord: entry.decision.decisionRecord, siteId: entry.siteId }))
+    );
+    if (countRows.length > 0) {
+      await tx.insert(decisionCountEntry).values(countRows).onConflictDoNothing();
+    }
   });
 
   return runId;

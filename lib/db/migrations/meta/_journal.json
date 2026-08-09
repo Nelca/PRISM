@@ -15,6 +15,13 @@
       "when": 1786234684597,
       "tag": "0001_long_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786235125839,
+      "tag": "0002_youthful_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

@@ -198,6 +198,29 @@ export const assumptionEntry = pgTable(
   (t) => [primaryKey({ columns: [t.runId, t.id] }), index("assumption_entry_related").on(t.tenantId, t.relatedRecordId)]
 );
 
+/**
+ * 判定件数のカウンタ(M6 D-8 / design-rationale-log D-30・D-42)。従量課金の唯一の根拠。
+ *
+ * - verdict が確定(does_not_cross / crosses)した時点で1件。**向きを問わず一律**
+ * - `pending` の間はカウントしない(D-45)
+ * - **DecisionRecord 1件につき1行。**主キーで重複を防ぐ。runは操作のたびに作り直されるため、
+ *   run単位で数えると同じ判定が何度も課金対象になってしまう(§D-117)
+ */
+export const decisionCountEntry = pgTable(
+  "decision_count_entry",
+  {
+    tenantId: text("tenant_id").notNull(),
+    decisionRecordId: text("decision_record_id").notNull(),
+    /** 初めて確定したときのrun。後から別のrunで再確定しても更新しない(追記のみ)。 */
+    runId: text("run_id").notNull(),
+    countedAt: timestamp("counted_at", { withTimezone: true }).notNull().defaultNow(),
+    /** does_not_cross | crosses。課金には影響しないが、根拠として残す。 */
+    verdict: text("verdict").notNull(),
+    siteId: text("site_id"),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.decisionRecordId] })]
+);
+
 /** M8 D-3:旧版を削除せず保持し続ける。 */
 export const versionedParameterSet = pgTable(
   "versioned_parameter_set",
@@ -227,4 +250,5 @@ export const APPEND_ONLY_TABLES = [
   "gap_finding",
   "assumption_entry",
   "versioned_parameter_set",
+  "decision_count_entry",
 ] as const;
