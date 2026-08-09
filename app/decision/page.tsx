@@ -6,6 +6,8 @@ import { Card, Guide, Stat, Tag } from "../components/ui";
 import { Scatter } from "../components/charts/Scatter";
 import { CountermeasureSelector } from "./countermeasure-selector";
 import { BindingForm } from "./binding-form";
+import { DecisionParametersForm } from "./parameters-form";
+import { loadInteractionState } from "@/lib/db/repositories/interactions";
 
 export default async function DecisionPage() {
   const tenantId = getDefaultTenantId();
@@ -13,6 +15,8 @@ export default async function DecisionPage() {
   const { decisions } = result;
   // 従量課金の根拠(M6 D-8・D-30)。件数だけでなく明細も出す(構想書6.4)。
   const decisionCounts = await listDecisionCounts(tenantId);
+  // 入力済みの投資判断の前提(フォームの初期値に使う)
+  const { decisionParameters } = await loadInteractionState(tenantId);
 
   if (decisions.length === 0) {
     return (
@@ -107,10 +111,31 @@ export default async function DecisionPage() {
             <Card
               title="判定結果"
               subtitle={`対象:${countermeasureCandidates.find((c) => c.key === selectedCountermeasureKey)?.label}`}
-              headExtra={<Tag variant={record.verdict === "crosses" ? "warn" : "ok"}>{record.verdict === "crosses" ? "承認基準をまたぐ" : record.verdict === "pending" ? "承認基準未設定" : "承認基準をまたがない"}</Tag>}
+              headExtra={
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <Tag variant={record.verdict === "crosses" ? "warn" : record.verdict === "pending" ? "neutral" : "ok"}>
+                    {record.verdict === "crosses"
+                      ? "承認基準をまたぐ"
+                      : record.verdict === "pending"
+                        ? "判定は保留中"
+                        : "承認基準をまたがない"}
+                  </Tag>
+                  <DecisionParametersForm siteId={siteId} current={decisionParameters.get(siteId)} />
+                </div>
+              }
             >
+              {/*
+                M6 D-10(段階的開示):承認閾値が未入力でも、自然調整後NPVのレンジと
+                自然関連コストは通常どおり表示する。★判定だけを保留にする。
+              */}
+              {record.verdict === "pending" && (
+                <p className="tooltip-note" style={{ marginBottom: 10 }}>
+                  承認閾値を入力すると判定が確定します。閾値が分かるまで、判定は保留のままです(仮の閾値は置きません)。
+                  保留の間はこの判定を件数に計上しません。
+                </p>
+              )}
               <div className="grid-3">
-                <Stat label="承認基準" value={threshold !== null ? <Num value={threshold} unit="円" /> : "未設定"} />
+                <Stat label="承認基準" value={threshold !== null ? <Num value={threshold} unit="円" /> : "未入力"} />
                 <Stat
                   label="自然調整後NPVの幅"
                   value={

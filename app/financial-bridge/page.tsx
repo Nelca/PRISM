@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { getDefaultTenantId } from "@/lib/db/client";
+import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { CompanyFinancialsForm } from "./financials-form";
 import { buildWaterfallSteps } from "@core/financial-bridge/bridge1";
 import { Num } from "../components/numeric";
 import { Card, Guide, KV, Stat, Tag } from "../components/ui";
 import { Waterfall } from "../components/charts/Waterfall";
 
 export default async function FinancialBridgePage() {
-  const result = await getOrCreateLatestResult(getDefaultTenantId());
+  const tenantId = getDefaultTenantId();
+  const result = await getOrCreateLatestResult(tenantId);
   const { decisions, disclosure } = result;
+  // 入力済みの企業財務データ(未入力ならデモの既定値で計算されている)
+  const { companyFinancials } = await loadInteractionState(tenantId);
 
   if (decisions.length === 0) {
     return (
@@ -101,7 +106,12 @@ export default async function FinancialBridgePage() {
             <Card
               title="自然調整後利益"
               subtitle="報告財務からの調整"
-              headExtra={<span className="nongaap">非GAAP指標 ・ 管理会計上の参考値</span>}
+              headExtra={
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span className="nongaap">非GAAP指標 ・ 管理会計上の参考値</span>
+                  <CompanyFinancialsForm current={companyFinancials} />
+                </div>
+              }
               foot={`調整幅:報告営業利益比 ${(
                 (((financialBridge.bridge1.natureAdjustedOperatingProfit as unknown as number) - operatingProfit) / operatingProfit) *
                 100

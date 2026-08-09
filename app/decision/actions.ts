@@ -19,6 +19,81 @@ const BINDING_LABELS: Record<BindingMechanism["kind"], string> = {
   procurement_contract_clause: "調達契約の更新条件に組み込む",
 };
 
+export interface DecisionParametersFormState {
+  error?: string;
+  saved?: boolean;
+}
+
+/**
+ * 決定単位の入力(M6 D-4・D-10)。通常NPV・割引率・期間・承認閾値。
+ *
+ * **承認閾値は空欄のまま保存できる。**その場合★判定は `pending` のままで、
+ * 判定件数にも計上されない(D-45)。業界標準値で仮置きしない —— 仮の判定を
+ * 実際の判断材料として誤用されるリスクがあるため(M6 D-10のC案却下理由)。
+ */
+export async function saveDecisionParametersAction(
+  _prevState: DecisionParametersFormState,
+  formData: FormData
+): Promise<DecisionParametersFormState> {
+  const siteId = String(formData.get("siteId") ?? "");
+  if (!siteId) {
+    return { error: "対象拠点を指定してください。" };
+  }
+
+  const required: { name: string; label: string }[] = [
+    { name: "baselineNpvValue", label: "通常NPV" },
+    { name: "discountRate", label: "割引率" },
+    { name: "horizon", label: "評価期間" },
+  ];
+
+  const values: Record<string, number> = {};
+  for (const field of required) {
+    const raw = String(formData.get(field.name) ?? "").trim();
+    if (raw === "") {
+      return { error: `${field.label}を入力してください。` };
+    }
+    const value = Number(raw);
+    if (Number.isNaN(value)) {
+      return { error: `${field.label}は数値で入力してください。` };
+    }
+    values[field.name] = value;
+  }
+
+  // 承認閾値だけは空欄を許す(段階的開示。未入力は "pending" として扱う)
+  const thresholdRaw = String(formData.get("approvalThresholdValue") ?? "").trim();
+  let approvalThresholdValue: number | null = null;
+  if (thresholdRaw !== "") {
+    const parsed = Number(thresholdRaw);
+    if (Number.isNaN(parsed)) {
+      return { error: "承認閾値は数値で入力してください(未定の場合は空欄のままにしてください)。" };
+    }
+    approvalThresholdValue = parsed;
+  }
+
+  const tenantId = getDefaultTenantId();
+  await appendInteractionEvent(tenantId, {
+    actor: ACTOR,
+    kind: "decision_parameters",
+    subjectId: siteId,
+    payload: {
+      parameters: {
+        baselineNpvValue: values.baselineNpvValue,
+        discountRate: values.discountRate,
+        horizon: values.horizon,
+        approvalThresholdValue,
+      },
+      logMessage:
+        approvalThresholdValue === null
+          ? `${siteId}の投資判断の前提を更新(承認閾値は未入力のため判定は保留)`
+          : `${siteId}の投資判断の前提と承認閾値を更新`,
+    },
+  });
+  await executeAndPersistRun(tenantId);
+
+  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  return { saved: true };
+}
+
 export interface SelectCountermeasureFormState {
   error?: string;
 }

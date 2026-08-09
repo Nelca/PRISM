@@ -32,7 +32,11 @@ export type InteractionKind =
   | "countermeasure_selection"
   | "binding_mechanism_change"
   | "disclosure_claim_override"
-  | "intentional_decision";
+  | "intentional_decision"
+  /** 企業単位の財務データ(M5)。財務・経理部門が入力する。 */
+  | "company_financials"
+  /** 決定単位の入力(M6 D-4・D-10)。経営企画・経理が入力する。 */
+  | "decision_parameters";
 
 export interface InteractionEvent {
   id: string;
@@ -54,8 +58,33 @@ export interface RepresentativeSelectionState {
   reason: string;
 }
 
+/** 企業提供の財務データ(M5)。PRISMは検証しない(M5 D-1・M6 D-4)。 */
+export interface CompanyFinancialsInput {
+  reportedOperatingProfit: number;
+  currentlyInternalizedCost: number;
+  existingImpairmentThreshold: number;
+  netDebt: number;
+  ebitda: number;
+  interestExpense: number;
+}
+
+/**
+ * 決定単位の入力(M6 D-4・D-10)。
+ * `approvalThresholdValue` が未入力(null)の場合、★判定は `pending` のままになる。
+ * **未入力を0や業界標準値で埋めない**(D-15・M6 D-10のC案却下理由)。
+ */
+export interface DecisionParametersInput {
+  baselineNpvValue: number;
+  discountRate: number;
+  horizon: number;
+  approvalThresholdValue: number | null;
+}
+
 export interface InteractionState {
   depthOverrides: Map<string, "promote" | "demote">;
+  /** 未入力の間はundefined。デモの既定値で埋めない。 */
+  companyFinancials?: CompanyFinancialsInput;
+  decisionParameters: Map<string, DecisionParametersInput>;
   representativeRecordId: Map<string, string>;
   representativeSelection: Map<string, RepresentativeSelectionState>;
   m4ChangeLog: Map<string, { from: string; to: string; reason: string }>;
@@ -70,6 +99,7 @@ export interface InteractionState {
 export function emptyInteractionState(): InteractionState {
   return {
     depthOverrides: new Map(),
+    decisionParameters: new Map(),
     representativeRecordId: new Map(),
     representativeSelection: new Map(),
     m4ChangeLog: new Map(),
@@ -142,6 +172,14 @@ export function projectInteractionState(events: InteractionEvent[]): Interaction
       }
       case "disclosure_claim_override": {
         state.disclosureClaimOverrideText.set(event.subjectId, event.payload.text as string);
+        break;
+      }
+      case "company_financials": {
+        state.companyFinancials = event.payload.financials as CompanyFinancialsInput;
+        break;
+      }
+      case "decision_parameters": {
+        state.decisionParameters.set(event.subjectId, event.payload.parameters as DecisionParametersInput);
         break;
       }
       case "intentional_decision": {
