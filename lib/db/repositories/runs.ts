@@ -5,7 +5,7 @@
  * ページは常に最新 run の `result` を読むだけで、再計算しない(計画B-2)。
  */
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../client";
 import { buildDecisionCountRows } from "./decision-counts";
 import {
@@ -82,6 +82,27 @@ export async function getLatestRun(tenantId: string): Promise<StoredRun | null> 
     .from(pipelineRun)
     .where(eq(pipelineRun.tenantId, tenantId))
     .orderBy(desc(pipelineRun.executedAt))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    executedAt: row.executedAt.toISOString(),
+    rngSeed: row.rngSeed,
+    resultSchemaVersion: row.resultSchemaVersion,
+    result: row.result as DemoPipelineResult,
+  };
+}
+
+/** 指定したrunを読む(旧版パラメータでの再計算の比較元)。 */
+export async function getRunById(tenantId: string, runId: string): Promise<StoredRun | null> {
+  const rows = await getDb()
+    .select()
+    .from(pipelineRun)
+    .where(and(eq(pipelineRun.tenantId, tenantId), eq(pipelineRun.id, runId)))
     .limit(1);
 
   const row = rows[0];

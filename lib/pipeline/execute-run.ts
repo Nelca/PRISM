@@ -12,6 +12,7 @@ import type { DemoPipelineResult } from "@/lib/demo/run-demo-pipeline";
 import { listSiteEntries } from "@/lib/db/repositories/sites";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { getLatestRun, persistRun } from "@/lib/db/repositories/runs";
+import { observedVersionsFromHashInputs, recordObservedVersions } from "@/lib/db/repositories/parameter-versions";
 
 /** 入力を読み直してパイプラインを実行し、新しいrunとして永続化する。 */
 export async function executeAndPersistRun(tenantId: string): Promise<DemoPipelineResult> {
@@ -19,6 +20,15 @@ export async function executeAndPersistRun(tenantId: string): Promise<DemoPipeli
 
   const result = runDemoPipeline({ userSites, interactions, rngSeed: DEFAULT_RNG_SEED });
   await persistRun({ tenantId, rngSeed: DEFAULT_RNG_SEED, result });
+
+  // 実際に使われた版を台帳に取り込む(M8「後から手で入力する設計にしない」)。
+  // 変更理由は付けない(自動検出では分からないため。画面が未記録として人間に促す)。
+  await recordObservedVersions(
+    tenantId,
+    new Date().toISOString(),
+    observedVersionsFromHashInputs(result.recalculationHash.inputs)
+  );
+
   return result;
 }
 
@@ -36,6 +46,14 @@ export async function executeAndPersistRun(tenantId: string): Promise<DemoPipeli
 export async function getOrCreateLatestResult(tenantId: string): Promise<DemoPipelineResult> {
   const latest = await getLatestRun(tenantId);
   if (latest && latest.resultSchemaVersion === RESULT_SCHEMA_VERSION) {
+    // 保存済みrunを返す場合も、そのrunが使った版が台帳にあることを保証する。
+    // 版管理を後から導入したため、既存runの分が台帳に載っていないことがある。
+    // 追記は冪等(同じsetId・versionは無視される)なので、読み出しのたびに呼んでよい。
+    await recordObservedVersions(
+      tenantId,
+      latest.executedAt,
+      observedVersionsFromHashInputs(latest.result.recalculationHash.inputs)
+    );
     return latest.result;
   }
   return executeAndPersistRun(tenantId);
