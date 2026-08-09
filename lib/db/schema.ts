@@ -217,6 +217,12 @@ export const decisionCountEntry = pgTable(
     /** does_not_cross | crosses。課金には影響しないが、根拠として残す。 */
     verdict: text("verdict").notNull(),
     siteId: text("site_id"),
+    /**
+     * 初めて確定した時点の再計算ハッシュ(2026-08-09追加)。
+     * 前提が変わったかどうかを、この値との比較で判定する(再判定アラート、GAP-20)。
+     * 判定件数と同じ行に置くのは、**課金対象になった時点の前提**が比較の基準だから。
+     */
+    recalculationHash: text("recalculation_hash"),
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.decisionRecordId] })]
 );

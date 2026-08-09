@@ -1,5 +1,6 @@
 import { getDefaultTenantId } from "@/lib/db/client";
-import { listDecisionCounts } from "@/lib/db/repositories/decision-counts";
+import { listConfirmedDecisionSnapshots, listDecisionCounts } from "@/lib/db/repositories/decision-counts";
+import { detectReassessmentAlerts } from "@core/decision/reassessment";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
 import { Card, Guide, Stat, Tag } from "../components/ui";
@@ -17,6 +18,20 @@ export default async function DecisionPage() {
   const decisionCounts = await listDecisionCounts(tenantId);
   // 入力済みの投資判断の前提(フォームの初期値に使う)
   const { decisionParameters } = await loadInteractionState(tenantId);
+
+  /**
+   * 前提が変わった判定の洗い直し(GAP-20)。
+   * 課金対象として確定した時点のスナップショットと、現在の判定を突き合わせる。
+   * **システムが過去の判定を書き換えることはしない。**見直しが必要だと伝えるだけ。
+   */
+  const reassessmentAlerts = detectReassessmentAlerts(
+    await listConfirmedDecisionSnapshots(tenantId),
+    decisions.map((entry) => ({
+      decisionRecordId: entry.decision.decisionRecord.id,
+      verdict: entry.decision.decisionRecord.verdict,
+      recalculationHash: entry.decision.decisionRecord.recalculationHash,
+    }))
+  );
 
   if (decisions.length === 0) {
     return (
@@ -168,6 +183,41 @@ export default async function DecisionPage() {
           </div>
         );
       })}
+
+      {/*
+        GAP-20:前提が変わった判定の洗い直し。構想書9.3のM8節が定める
+        「過去に『効かない』と判定した案件の再判定アラート」の、実績を待たずに実装できる部分。
+      */}
+      {reassessmentAlerts.length > 0 && (
+        <Card
+          title="前提が変わった判定"
+          subtitle={`${reassessmentAlerts.length}件`}
+          padBody={false}
+          foot="過去の判定は書き換えていません。見直しが必要かどうかは利用者の判断です"
+        >
+          <table className="data-table">
+            <tbody>
+              {reassessmentAlerts.map((alert) => (
+                <tr key={alert.decisionRecordId}>
+                  <td>
+                    <Tag variant={alert.level === "verdict_changed" ? "warn" : "neutral"}>
+                      {alert.level === "verdict_changed"
+                        ? "判定が変わった"
+                        : alert.level === "verdict_resolved"
+                          ? "判定が確定した"
+                          : "前提が変わった"}
+                    </Tag>
+                  </td>
+                  <td className="num" style={{ fontSize: 11 }}>
+                    {alert.decisionRecordId}
+                  </td>
+                  <td style={{ fontSize: 12.5 }}>{alert.message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
 
       {/*
         M6 D-8 / D-30:従量課金は「判定超過」1本のみで、結論の向きを問わず一律。

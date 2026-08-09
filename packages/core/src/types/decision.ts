@@ -18,6 +18,12 @@ export interface ApprovalThreshold {
 export type CountermeasureType = "reduction" | "transfer" | "avoidance" | "acceptance";
 
 /**
+ * ★判定(M6 D-2)。`pending` は承認閾値が未入力の状態(D-10)。
+ * 2026-08-09に名前付きの型として切り出した(再判定アラートが同じ集合を参照するため)。
+ */
+export type DecisionVerdict = "does_not_cross" | "crosses" | "pending";
+
+/**
  * 対応手段。MVPでは reduction / transfer のみ計算ロジックを実装するが、
  * 型は4値を保持する(M6 D-5、後から追加すると過去レコードの作り直しになるため)。
  */
@@ -68,7 +74,7 @@ export interface DecisionRecord {
   };
 
   /** ★判定。approvalThresholdが"pending"の間はverdictも"pending"(M6 D-2・D-10)。 */
-  verdict: "does_not_cross" | "crosses" | "pending";
+  verdict: DecisionVerdict;
   deepDiveRecommendation?: {
     /** M3のトルネード図を流用する(M6 D-3)。 */
     dominantAssumption: string;

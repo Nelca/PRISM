@@ -11,6 +11,7 @@
 
 import { asc, eq, sql } from "drizzle-orm";
 import { shouldCountDecision } from "@core/decision/decision-count";
+import type { DecisionSnapshot } from "@core/decision/reassessment";
 import type { DecisionRecord } from "@core/types/decision";
 import { getDb } from "../client";
 import { decisionCountEntry } from "../schema";
@@ -38,6 +39,27 @@ export function buildDecisionCountRows(
       runId,
       verdict: entry.decisionRecord.verdict,
       siteId: entry.siteId ?? null,
+      // 確定した時点の前提。再判定アラート(GAP-20)がこの値と現在を比較する
+      recalculationHash: entry.decisionRecord.recalculationHash,
+    }));
+}
+
+/**
+ * 課金対象として確定した時点のスナップショット。
+ * 「前提が変わったか」の比較基準になる(D-122)。
+ */
+export async function listConfirmedDecisionSnapshots(tenantId: string): Promise<DecisionSnapshot[]> {
+  const rows = await getDb()
+    .select()
+    .from(decisionCountEntry)
+    .where(eq(decisionCountEntry.tenantId, tenantId));
+
+  return rows
+    .filter((row): row is typeof row & { recalculationHash: string } => row.recalculationHash !== null)
+    .map((row) => ({
+      decisionRecordId: row.decisionRecordId,
+      verdict: row.verdict as DecisionSnapshot["verdict"],
+      recalculationHash: row.recalculationHash,
     }));
 }
 
