@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { FactorContribution, PairwiseDecomposition } from "@core/types/divergence";
+import { decomposeQuantileRange } from "@core/divergence/quantile-decomposition";
+import type { UncertaintyFactor } from "@core/divergence/quantile-decomposition";
 import { getDefaultTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
@@ -13,6 +15,12 @@ const METHOD_LABEL: Record<string, string> = {
   "replacement-cost": "代替費用法(浄水コスト)",
   "lime3-water": "LIME3(水消費統合指標)",
   "ifvi-water-consumption": "IFVI 水ストレス係数",
+};
+
+/** 幅を決める要因(M4 U-3)。中心値の要因とは別の集合。 */
+const UNCERTAINTY_FACTOR_LABEL: Record<UncertaintyFactor, string> = {
+  parameterUncertainty: "推計値そのもののばらつき(層i)",
+  transferError: "他地域の研究値を当てはめる誤差(層ii・適合度ティア)",
 };
 
 const FACTOR_LABEL: Record<FactorContribution["factor"], string> = {
@@ -71,6 +79,14 @@ export default async function DecompositionPage({ searchParams }: { searchParams
   const allRatios = (decomposition?.groups ?? []).flatMap((g) => g.pairwiseDecompositions.map((p) => p.ratio)).filter((r): r is number => r !== null);
   const maxRatio = allRatios.length > 0 ? Math.max(...allRatios) : null;
 
+  /**
+   * M4 U-3:レンジの幅の分解。中心値の分解と同じペア(最初の比較対象)について、
+   * 「なぜ幅が違うのか」を層i・層iiに分ける。
+   */
+  const widthPairRecords = records.filter((r) => r.valueConcept === "welfare");
+  const quantileDecomposition =
+    widthPairRecords.length >= 2 ? decomposeQuantileRange(widthPairRecords[0], widthPairRecords[1]) : null;
+
   const exchangeGroup = decomposition?.groups.find((g) => g.valueConcept === "exchange");
   const welfareGroup = decomposition?.groups.find((g) => g.valueConcept === "welfare");
   const primaryPair = exchangeGroup?.pairwiseDecompositions[0];
@@ -119,6 +135,57 @@ export default async function DecompositionPage({ searchParams }: { searchParams
       >
         <Football methods={footballMethods} />
       </Card>
+
+      {/*
+        M4 U-3:レンジの幅の分解。中心値の3要因(上のウォーターフォール)は幅を変えないため、
+        「なぜ幅が違うのか」は別の要因集合(層i・層ii)で説明する。
+      */}
+      {quantileDecomposition && (
+        <Card
+          title="幅が違う理由"
+          subtitle={`${METHOD_LABEL[quantileDecomposition.methodIdA] ?? quantileDecomposition.methodIdA} / ${
+            METHOD_LABEL[quantileDecomposition.methodIdB] ?? quantileDecomposition.methodIdB
+          }`}
+          padBody={false}
+          foot="中心値の差の要因(上)と幅の差の要因は別です。地域差の調整や対象範囲の違いは、幅ではなく水準を動かします"
+        >
+          {quantileDecomposition.mode === "not_decomposed" ? (
+            <div style={{ padding: "12px 18px", color: "var(--ink-faint)", fontSize: 12.5 }}>
+              {quantileDecomposition.notDecomposedReason}
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>要因</th>
+                  <th>幅への効き</th>
+                  <th>寄与</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quantileDecomposition.contributions.map((contribution) => (
+                  <tr key={contribution.factor}>
+                    <td>{UNCERTAINTY_FACTOR_LABEL[contribution.factor]}</td>
+                    <td className="num">×{contribution.multiplier.toFixed(2)}</td>
+                    <td className="num">
+                      {contribution.shareRatio === null ? "—" : `${(contribution.shareRatio * 100).toFixed(0)}%`}
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td>
+                    <b>幅の比</b>
+                  </td>
+                  <td className="num">
+                    <b>×{quantileDecomposition.widthRatio!.toFixed(2)}</b>
+                  </td>
+                  <td className="num">残差 0</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </Card>
+      )}
 
       {primaryPair && (
         <Card title="差が生じる理由" subtitle="中心値の差を要因に分解">

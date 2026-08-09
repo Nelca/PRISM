@@ -8,12 +8,15 @@
  * 変更なしでk=2・k=3の分解に拡張できる(design note参照)。
  */
 
-import type { DecompositionFactor } from "../types/divergence";
-
 const EFFICIENCY_AXIOM_TOLERANCE = 1e-9;
 
-export interface RawFactorContribution {
-  factor: DecompositionFactor;
+/**
+ * 要因の集合は呼び出し側が決める(2026-08-09に汎用化)。
+ * 中心値の分解は `DecompositionFactor`(エンドポイント被覆/割引率/地理較正)を使い、
+ * 分位点の幅の分解は別の要因集合(層i/層ii)を使う。**同じ按分ロジックを共有する。**
+ */
+export interface RawFactorContribution<F extends string = string> {
+  factor: F;
   /** c_i(対数空間でのShapley寄与)。 */
   logContribution: number;
 }
@@ -37,19 +40,19 @@ function permutations<T>(items: T[]): T[][] {
  * 効率性公理(F-7)を内部で検証し、逸脱時は結果を返さずエラーを投げる
  * (「誤った分解を出すより出さない」という要件定義書の方針)。
  */
-export function computeShapleyContributions(
-  effectiveFactors: DecompositionFactor[],
-  v: (subset: Set<DecompositionFactor>) => number
-): RawFactorContribution[] {
+export function computeShapleyContributions<F extends string>(
+  effectiveFactors: F[],
+  v: (subset: Set<F>) => number
+): RawFactorContribution<F>[] {
   if (effectiveFactors.length === 0) {
     return [];
   }
 
   const perms = permutations(effectiveFactors);
-  const sums = new Map<DecompositionFactor, number>(effectiveFactors.map((factor) => [factor, 0]));
+  const sums = new Map<F, number>(effectiveFactors.map((factor) => [factor, 0]));
 
   for (const perm of perms) {
-    const included = new Set<DecompositionFactor>();
+    const included = new Set<F>();
     let previousValue = v(included);
     for (const factor of perm) {
       included.add(factor);
