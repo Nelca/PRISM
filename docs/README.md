@@ -49,7 +49,8 @@ docs/
   data/                          外部データの調査結果(フェーズ0の成果物)
     aop-mapping-v1.md                初版済 — AoP正規化対応表(IFVI/LIME3確認済、CE Delft未着手)
     method-recalculability.md        初版済 — 手法別の再計算可能性
-    cices-v51-notes.md               部分済 — CICES階層構造(5階層・コード体系を確認。Abiotic拡張は未確認。V5.2の存在を発見)
+    cices-v51-notes.md               済 — CICES階層構造(公式スプレッドシートで確認。4層・コード体系・水の所在・V5.2との差分と追随判断)
+    external/                        外部から入手した一次資料の原本(CICES公式スプレッドシート等)
     licensing.md                     初版済 — ライセンス条件(WDPA/ENCORE/ESVD/CE Delft/IFVIの料金・条項を確認済み、契約締結は未)
     calibration-parameters-v1.md     初版済 — 地理較正パラメータの実値と出典(World Bank PPP/所得/デフレータ、η、相対価格上昇率)
     carbon-price-scenarios.md        初版済 — NGFS(未取得)・GX-ETS(二次資料一致)の確認状況

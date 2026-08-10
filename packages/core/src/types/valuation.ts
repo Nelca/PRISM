@@ -58,10 +58,20 @@ export interface MethodConfig {
   };
 }
 
-/** CICES参照(依存側:どの生態系サービスが対象か)。 */
+/**
+ * CICES参照(依存側:どの生態系サービスが対象か)。
+ *
+ * **版を必ず持つ(2026-08-09追加)。**公式スプレッドシートの突き合わせにより、
+ * V5.2 が V5.1 のコードを大きく組み替えていることが判明した。同じコード文字列が
+ * 版によって別のサービスを指す(例:`4.2.1.1` は V5.1 で「飲用の表流水」、
+ * V5.2 では「鉱物性物質」)。**版のないコードは解釈が定まらない。**
+ * 詳細: `docs/data/cices-v51-notes.md` §4
+ */
 export interface CicesReference {
   cicesCode: string;
   specifiedLevel: SpecifiedLevel;
+  /** 例 "V5.1" / "V5.2"。省略不可(D-15:版なしのコードを受け入れない)。 */
+  cicesVersion: string;
 }
 
 /**
