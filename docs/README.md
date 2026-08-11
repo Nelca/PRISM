@@ -25,6 +25,7 @@ docs/
   concept-v2.md                  構想書v2。設計の最上位文書
   demo-guide.md                  ダミーデータでのローカルデモ手順書(セットアップ〜画面の見どころ)
   data-intake-guide.md           実データ受け入れガイド(3ファイルの記入方法・記入者・投入方法)
+  mobile-continuation-guide.md   Claude Codeを使えない間の作業継続ガイド(iPhoneアプリ等・コード実行不可の環境向け)
 
   requirements/                  モジュール単位の要件定義
     m1-target-definition.md          済(対象定義とLocate)
