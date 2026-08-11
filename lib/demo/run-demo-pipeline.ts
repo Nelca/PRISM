@@ -18,7 +18,7 @@ import { runValuationPipeline } from "@core/pipeline/valuation-pipeline";
 import { runDecisionPipeline } from "@core/pipeline/decision-pipeline";
 import { runDisclosurePipeline } from "@core/pipeline/disclosure-pipeline";
 import { createIdSequence } from "@core/pipeline/ids";
-import { ALL_PLUGINS } from "@core/monetization/registry";
+import { getPluginsForCategory } from "@core/monetization/registry";
 import { createSeededRng } from "@core/monetization/rng";
 import { runFinancialBridgePipeline } from "@core/pipeline/financial-bridge-pipeline";
 import { computeRecalculationHash } from "@core/ledger/recalculation-hash";
@@ -44,6 +44,7 @@ import {
   FLAGSHIP_FINANCIALS,
   interfacesByCategoryForSite,
   PRIOR_YEAR_METHOD_BY_MATERIAL_ISSUE,
+  resolveCriterionForDemo,
   screeningValuationForMaterialIssue,
   SITE_ROWS,
 } from "./company";
@@ -121,6 +122,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     geocode: demoGeocode,
     interfacesByCategoryForSite,
     excludedCategoriesForSite,
+    resolveCriterion: resolveCriterionForDemo,
     screeningValuationForMaterialIssue: (issue) => screeningValuationForMaterialIssue(issue.siteId),
     promotionOptions: { manualOverrides, manualDemotions },
     idSequence,
@@ -139,8 +141,11 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
           input: DEEP_DIVE_INPUT,
           config: DEEP_DIVE_CONFIG,
           calibration: DEEP_DIVE_CALIBRATION,
-          plugins: ALL_PLUGINS,
-          calibrationSetVersion: "ifvi-water-consumption-v1",
+          // waterカテゴリのみに絞る(GAP-14で気候プラグインが追加されたため、ALL_PLUGINSを渡すと
+          // waterのMethodConfigに気候用の係数が無くevaluate()がエラーになる)。
+          plugins: getPluginsForCategory("water"),
+          // v1(pppValue=1.0恒等)→v2(pppValue=94.46実値)。パラメータ実値が変わったため版を上げる。
+          calibrationSetVersion: "ifvi-water-consumption-v2",
           reconciliationFunctionVersion: "ifvi-reconciliation-v1",
           fitnessTierThresholdVersion: "fitness-tier-v1",
         };
@@ -379,7 +384,11 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       const params = deepDiveParamsBySiteId.get(d.siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
       return buildUserDisclosureClaim(site, params);
     });
-  const baseClaims: DisclosureClaim[] = [DISCLOSURE_CLAIM, ...userClaims];
+  // 実際にアップロードされたPDFからAIが抽出したclaim(GAP-05)。特定拠点のvaluation recordとの
+  // 紐づけは持たないため、candidatesForClaimは常に空を返し、段階3はG1(証拠なし)と判定する
+  // (推測でsiteを割り当てない。D-15)。
+  const extractedClaims: DisclosureClaim[] = [...interactions.extractedDisclosureClaimsBySourceDocument.values()].flat();
+  const baseClaims: DisclosureClaim[] = [DISCLOSURE_CLAIM, ...userClaims, ...extractedClaims];
   const claimSiteId = new Map<string, string>([[DISCLOSURE_CLAIM.id, "site-042"]]);
   userClaims.forEach((claim, i) => claimSiteId.set(claim.id, decisions.filter((d) => d.siteId !== "site-042")[i].siteId));
 
@@ -482,9 +491,11 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     m3_methodPluginVersions: {
       "replacement-cost": "1.0.0",
       "lime3-water": "3.0.0",
-      "ifvi-water-consumption": "2026-03-final",
+      // 手法(2026-03-final)は不変。係数データを仮値からIFVI Table D1(日本)実値に差し替えたため、
+      // GAP-20の再判定アラートが発火するようデータ版を明示的に区別する。
+      "ifvi-water-consumption": "2026-03-final:jp-table-d1-v1",
     },
-    m3_geoCalibrationVersion: "ifvi-water-consumption-v1",
+    m3_geoCalibrationVersion: "ifvi-water-consumption-v2",
     m3_fitnessTierThresholdVersion: "fitness-tier-v1",
     m4_decompositionAlgorithmVersion: DECOMPOSITION_VERSIONS.algorithmVersion,
     m4_cicesMatchLevel: DECOMPOSITION_VERSIONS.cicesMatchLevel,

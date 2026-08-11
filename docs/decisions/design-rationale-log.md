@@ -987,6 +987,10 @@ build-plan §4.3「後から変えられないものが固まったか」の確�
 
 **根拠:** 存在しないデータソースをlayerType一つから2つの基準に無理に按分すると、片方(rapidIntegrityDecline)が実質的にでっち上げの推定になる。「基準を満たしていると判定できない」という状態を、判定不能な`null`ではなく構造的な`false`として扱う点は、TNFDの基準自体が「満たしていることの立証責任は肯定側にある」screening的な性質を持つことと整合する。
 
+**調査による補足(2026-08-10、`docs/data/ecosystem-integrity-trend-notes.md`):** 「データソースが存在しない」という前提を`docs/data/acquisition-runbook.md` §3.9(A-11)に基づき5候補で確認したところ、時系列・商用利用(CC BY 4.0)・拠点座標照会の3条件を満たす候補が1件見つかった(Sun, Hughes, He, Yu 2026, *Scientific Data*の"Ecological Integrity Index")。**前提の一部(「データが存在しない」)は訂正が必要。**この決定(D-90)自体が誤りだったわけではなく、「データが無い」という当時の調査範囲の限界(棚卸しのみで個別調査未実施だった)が今回の調査で補われた。
+
+**実装による追記(2026-08-10、E-8):** 人間の判断により実装が決定され、同日中に完了した。`resolveCriterion`(本決定が定めた注入点)をそのまま使い、`ecosystem_integrity` layerTypeの`dataSource`文字列で`rapidIntegrityDecline`へ振り分ける実装になっており、**D-90が予見した拡張パターンそのものが機能した。**閾値(IUCN Red List Criterion A2、10年30%減を借用)は別途の判断として`ecosystem-integrity-trend.ts`に切り出し、データ自体(ラスタの値)とは独立に管理している。詳細は`docs/data/ecosystem-integrity-trend-notes.md` §8。
+
 ---
 
 ### D-91 MaterialIssueのカテゴリ振り分けはM1では行わない。呼び出し側が明示的に渡す

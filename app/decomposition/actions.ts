@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 
@@ -32,7 +32,7 @@ export async function changeRepresentativeRecordAction(
     return { error: "変更理由を入力してください。" };
   }
 
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
 
   // 選択と変更理由を1つのイベントとして追記する。現在値と履歴が同じ1つの真実から出る(計画B-1)。
   await appendInteractionEvent(tenantId, {

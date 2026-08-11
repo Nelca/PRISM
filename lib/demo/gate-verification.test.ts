@@ -13,7 +13,7 @@ describe("GATE検証(ダミーデータ):M1〜M8が最後まで通る", () => {
   const result = runDemoPipeline();
 
   it("M1:全拠点が処理され、住所解決に失敗した拠点は監査可能な形で除外される", () => {
-    expect(result.assessment.sites).toHaveLength(3);
+    expect(result.assessment.sites).toHaveLength(4);
     expect(result.assessment.ingestionErrors).toHaveLength(0);
 
     const excluded = result.assessment.materialIssues.find((i) => i.siteId === "site-099")!;

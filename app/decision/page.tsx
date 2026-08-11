@@ -1,4 +1,4 @@
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { listConfirmedDecisionSnapshots, listDecisionCounts } from "@/lib/db/repositories/decision-counts";
 import { detectReassessmentAlerts } from "@core/decision/reassessment";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
@@ -11,7 +11,7 @@ import { DecisionParametersForm } from "./parameters-form";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 
 export default async function DecisionPage() {
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   const result = await getOrCreateLatestResult(tenantId);
   const { decisions } = result;
   // 従量課金の根拠(M6 D-8・D-30)。件数だけでなく明細も出す(構想書6.4)。

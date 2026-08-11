@@ -1,10 +1,10 @@
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Card, Guide } from "../components/ui";
 import { ImportForm } from "./import-form";
 
 export default async function IntakePage() {
-  const result = await getOrCreateLatestResult(getDefaultTenantId());
+  const result = await getOrCreateLatestResult(await getTenantId());
   const { sites, ingestionErrors } = result.assessment;
 
   return (

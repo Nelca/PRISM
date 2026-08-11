@@ -625,6 +625,10 @@ hr.rule {
   padding: 30px 0 4px;
 }
 
+.footer-note.footer-note--attribution {
+  padding: 8px 0 0;
+}
+
 /* Modal ------------------------------------------------------------------*/
 .modal-overlay {
   position: fixed;

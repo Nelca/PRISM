@@ -1,15 +1,16 @@
 import Link from "next/link";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { listParameterVersionsWithStatus } from "@/lib/db/repositories/parameter-versions";
 import { getRunById, listRuns } from "@/lib/db/repositories/runs";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { recalculateWithPriorParameters } from "@core/ledger/recalculate-with-prior-parameters";
 import { Mono, Num } from "../components/numeric";
 import { Card, Tag } from "../components/ui";
+import { DataSourceAttribution } from "../components/attribution";
 
 export default async function LedgerPage({ searchParams }: { searchParams: Promise<{ compareWith?: string }> }) {
   const { compareWith } = await searchParams;
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   const result = await getOrCreateLatestResult(tenantId);
 
   // --- M8 D-3:版レジストリと、旧版パラメータでの再計算(GAP-07)---
@@ -295,6 +296,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
         )}
       </Card>
 
+      <DataSourceAttribution sources={["World Bank"]} />
       <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>
   );

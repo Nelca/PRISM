@@ -7,6 +7,7 @@
 
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { headers } from "next/headers";
 import * as schema from "./schema";
 
 let pool: Pool | undefined;
@@ -39,6 +40,17 @@ export function getDefaultTenantId(): string {
     throw new Error("PRISM_DEFAULT_TENANT_ID が設定されていません(.env.example を参照)。");
   }
   return tenantId;
+}
+
+/**
+ * サブドメインからテナントIDを解決する(GAP-15)。middleware.tsがHostヘッダーの
+ * サブドメインを `x-tenant-id` に設定する。サブドメインが無い場合(ルートドメイン・
+ * ローカル開発でサブドメインを使っていない場合)は既定テナントにフォールバックする。
+ */
+export async function getTenantId(): Promise<string> {
+  const requestHeaders = await headers();
+  const tenantId = requestHeaders.get("x-tenant-id");
+  return tenantId ?? getDefaultTenantId();
 }
 
 export async function closeDb(): Promise<void> {

@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Card, Stat, Tag } from "./components/ui";
 import { Num } from "./components/numeric";
 
 export default async function Home() {
-  const result = await getOrCreateLatestResult(getDefaultTenantId());
+  const result = await getOrCreateLatestResult(await getTenantId());
 
   const promoted = result.assessment.depthDecisions.filter((d) => d.depth === "deep_dive").length;
   const gapsFound = result.disclosure.gapFindings.filter((f) => f.gapType !== null).length;

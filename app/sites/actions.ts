@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { addSiteEntry } from "@/lib/db/repositories/sites";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 import { DEFAULT_DEEP_DIVE_PARAMS } from "@/lib/demo/user-site-defaults";
@@ -58,7 +58,7 @@ export async function addSiteAction(_prevState: AddSiteFormState, formData: Form
     disclosureClaimText: String(formData.get("disclosureClaimText") ?? "").trim() || undefined,
   };
 
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
 
   if (locationKind === "coordinates") {
     const latValue = Number(lat);

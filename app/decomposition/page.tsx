@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { FactorContribution, PairwiseDecomposition } from "@core/types/divergence";
 import { decomposeQuantileRange } from "@core/divergence/quantile-decomposition";
 import type { UncertaintyFactor } from "@core/divergence/quantile-decomposition";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
 import { Card, Guide, KV, Tag } from "../components/ui";
@@ -10,6 +10,7 @@ import { tierLabel } from "../components/tag-utils";
 import { Football } from "../components/charts/Football";
 import { Waterfall, type WaterfallStepInput } from "../components/charts/Waterfall";
 import { RepresentativeSelector } from "./representative-selector";
+import { DataSourceAttribution } from "../components/attribution";
 
 const METHOD_LABEL: Record<string, string> = {
   "replacement-cost": "代替費用法(浄水コスト)",
@@ -48,7 +49,7 @@ function pairwiseToWaterfallSteps(pair: PairwiseDecomposition, labelA: string, l
 
 export default async function DecompositionPage({ searchParams }: { searchParams: Promise<{ issue?: string }> }) {
   const { issue: issueParam } = await searchParams;
-  const result = await getOrCreateLatestResult(getDefaultTenantId());
+  const result = await getOrCreateLatestResult(await getTenantId());
   const { valuationRecordsByMaterialIssue, divergenceDecompositions, representativeRecordByMaterialIssue, m4ChangeLogByMaterialIssue } =
     result.valuation;
   const materialIssueIds = Object.keys(valuationRecordsByMaterialIssue);
@@ -326,6 +327,7 @@ export default async function DecompositionPage({ searchParams }: { searchParams
         </Card>
       )}
 
+      <DataSourceAttribution sources={["World Bank"]} />
       <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>
   );

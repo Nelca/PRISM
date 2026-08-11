@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildValuationRecords } from "../monetization/build-valuation-records";
-import { ALL_PLUGINS } from "../monetization/registry";
+import { getPluginsForCategory } from "../monetization/registry";
 import { buildGapFinding } from "./gap-finding";
 import type { EvidenceCandidate } from "./evidence-match";
 import type { DisclosureClaim } from "../types/disclosure";
@@ -50,7 +50,7 @@ function buildWaterRecords() {
     input,
     config,
     calibration,
-    plugins: ALL_PLUGINS,
+    plugins: getPluginsForCategory("water"),
     versions: TEST_VALUATION_VERSIONS,
   });
   return groups.flatMap((g) => g.records);

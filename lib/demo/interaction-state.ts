@@ -8,6 +8,7 @@
 
 import type { BindingMechanism, BindingMechanismChangeEntry, CountermeasureType } from "@core/types/decision";
 import type { ValueConcept } from "@core/types/common";
+import type { DisclosureClaim } from "@core/types/disclosure";
 
 export interface BindingMechanismState {
   mechanism: BindingMechanism;
@@ -32,6 +33,8 @@ export type InteractionKind =
   | "countermeasure_selection"
   | "binding_mechanism_change"
   | "disclosure_claim_override"
+  /** M7段階1・2:PDFからAIが抽出したDisclosureClaim群(GAP-05)。subjectIdはsourceDocument名。 */
+  | "disclosure_pdf_extracted"
   | "intentional_decision"
   /** 企業単位の財務データ(M5)。財務・経理部門が入力する。 */
   | "company_financials"
@@ -91,6 +94,11 @@ export interface InteractionState {
   selectedCountermeasureKey: Map<string, CountermeasureType>;
   bindingMechanismState: Map<string, BindingMechanismState>;
   disclosureClaimOverrideText: Map<string, string>;
+  /**
+   * sourceDocument(subjectId)ごとの最新の抽出結果(GAP-05)。同じ文書を再アップロードした場合、
+   * その文書分だけ最新の抽出結果に置き換える(上書き。追記型イベント自体は履歴として残る)。
+   */
+  extractedDisclosureClaimsBySourceDocument: Map<string, DisclosureClaim[]>;
   intentionalDecisions: Map<string, { reason: string; recordedAt: string }>;
   /** 画面に出す操作ログ。新しい順。別テーブルを持たず、同じイベント列の射影として作る。 */
   actionLog: ActionLogEntry[];
@@ -106,6 +114,7 @@ export function emptyInteractionState(): InteractionState {
     selectedCountermeasureKey: new Map(),
     bindingMechanismState: new Map(),
     disclosureClaimOverrideText: new Map(),
+    extractedDisclosureClaimsBySourceDocument: new Map(),
     intentionalDecisions: new Map(),
     actionLog: [],
   };
@@ -172,6 +181,13 @@ export function projectInteractionState(events: InteractionEvent[]): Interaction
       }
       case "disclosure_claim_override": {
         state.disclosureClaimOverrideText.set(event.subjectId, event.payload.text as string);
+        break;
+      }
+      case "disclosure_pdf_extracted": {
+        state.extractedDisclosureClaimsBySourceDocument.set(
+          event.subjectId,
+          event.payload.claims as DisclosureClaim[]
+        );
         break;
       }
       case "company_financials": {

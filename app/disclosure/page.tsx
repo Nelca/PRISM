@@ -1,9 +1,10 @@
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { buildDisclosureView } from "@core/disclosure/build-disclosure-view";
 import { INTERNAL_REVIEW_TEMPLATE } from "@core/disclosure/templates/internal-review-template";
 import { Card, Guide, Tag } from "../components/ui";
 import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
+import { PdfIntakeForm } from "./pdf-intake-form";
 
 const GAP_LABEL: Record<string, string> = {
   G1_no_evidence: "根拠なし",
@@ -20,7 +21,7 @@ const EXCLUSION_KIND_LABEL: Record<string, string> = {
 };
 
 export default async function DisclosurePage() {
-  const result = await getOrCreateLatestResult(getDefaultTenantId());
+  const result = await getOrCreateLatestResult(await getTenantId());
   const claimsById = new Map(result.disclosureClaims.map((claim) => [claim.id, claim]));
 
   // 出力3層目:自社のレコードから開示文の下書きを組み立てる(GAP-19)
@@ -47,6 +48,13 @@ export default async function DisclosurePage() {
         </div>
       </div>
 
+      <Card
+        title="PDFから主張を抽出する"
+        subtitle="M7段階1・2:AIによる抽出のみ。根拠の十分性判定はAIを使わない既存の処理が行う"
+      >
+        <PdfIntakeForm />
+      </Card>
+
       {result.disclosure.gapFindings.map((finding) => {
         const claim = claimsById.get(finding.claimId);
         const siteId = result.disclosureClaimSiteId[finding.claimId];
@@ -56,7 +64,10 @@ export default async function DisclosurePage() {
             title={claim?.rawText}
             subtitle={claim ? `${claim.sourceDocument} ${claim.sourcePageOrSection}` : undefined}
             headExtra={
-              finding.gapType ? <Tag variant="warn">{GAP_LABEL[finding.gapType] ?? finding.gapType}</Tag> : <Tag variant="ok">根拠充足</Tag>
+              <>
+                {finding.gapType ? <Tag variant="warn">{GAP_LABEL[finding.gapType] ?? finding.gapType}</Tag> : <Tag variant="ok">根拠充足</Tag>}
+                {claim?.extractionConfidence === "low" && <Tag variant="warn">AI抽出確信度低・要レビュー</Tag>}
+              </>
             }
           >
             <table className="data-table" style={{ marginBottom: finding.recommendedActions.length > 0 ? 14 : 0 }}>

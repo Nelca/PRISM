@@ -7,7 +7,7 @@
  * 3手法のみが実装されているため、新規拠点もwaterカテゴリで評価する。
  */
 
-import { ALL_PLUGINS } from "@core/monetization/registry";
+import { getPluginsForCategory } from "@core/monetization/registry";
 import { exchangeAmount } from "@core/types/common";
 import type { Site } from "@core/types/site";
 import type { DisclosureClaim } from "@core/types/disclosure";
@@ -42,12 +42,13 @@ export function buildUserDeepDiveConfig(siteId: string, params: UserSiteDeepDive
     config: {
       depth: "deep_dive",
       unitReplacementCost: params.unitReplacementCost,
+      // IFVI Table D1(日本、Global Perspective、USD(2024)/m3)。company.tsのDEEP_DIVE_CONFIGと同じ出典。
       externalValueFactors: {
         "lime3-water": 28_500,
-        "ifvi-vfnutrition": 1.35,
-        "ifvi-vfdisease": 1.05,
-        "ifvi-vfes": 1.62,
-        "ifvi-vfaccess": 0.34,
+        "ifvi-vfnutrition": 0.0,
+        "ifvi-vfdisease": 0.0,
+        "ifvi-vfes": 2.97,
+        "ifvi-vfaccess": 0.0,
       },
       vfesFitnessDimensions: {
         ecologicalFit: 0.75,
@@ -58,8 +59,10 @@ export function buildUserDeepDiveConfig(siteId: string, params: UserSiteDeepDive
       },
     },
     calibration: DEEP_DIVE_CALIBRATION,
-    plugins: ALL_PLUGINS,
-    calibrationSetVersion: "ifvi-water-consumption-v1",
+    // waterカテゴリのみに絞る(GAP-14で気候プラグインが追加されたため、ALL_PLUGINSを渡すと
+    // waterのMethodConfigに気候用の係数が無くevaluate()がエラーになる)。
+    plugins: getPluginsForCategory("water"),
+    calibrationSetVersion: "ifvi-water-consumption-v2", // pppValue差し替え(1.0恒等→94.46実値)に対応
     reconciliationFunctionVersion: "ifvi-reconciliation-v1",
     fitnessTierThresholdVersion: "fitness-tier-v1",
   };

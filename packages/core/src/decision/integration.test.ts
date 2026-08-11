@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildValuationRecords } from "../monetization/build-valuation-records";
-import { ALL_PLUGINS } from "../monetization/registry";
+import { getPluginsForCategory } from "../monetization/registry";
 import { buildDecisionRecord } from "./build-decision-record";
 import { exchangeAmount } from "../types/common";
 import type { Countermeasure } from "../types/decision";
@@ -53,7 +53,7 @@ describe("M6統合テスト:M3が生成する交換価値ValuationRecordからDe
       input,
       config,
       calibration,
-      plugins: ALL_PLUGINS,
+      plugins: getPluginsForCategory("water"),
       versions: TEST_VALUATION_VERSIONS,
     });
     const records = groups.flatMap((g) => g.records).filter((r): r is ExchangeValuationRecord => r.valueConcept === "exchange");

@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
+import { extractPdfText } from "@/lib/pdf/extract-pdf-text";
+import { extractDisclosureClaims } from "@/lib/ai/extract-disclosure-claims";
 
 const REVALIDATE_PATHS = ["/", "/sites", "/assessment", "/disclosure", "/ledger"];
 
@@ -11,6 +13,67 @@ const ACTOR = "宮里";
 
 export interface DisclosureActionFormState {
   error?: string;
+}
+
+export interface PdfIntakeFormState {
+  error?: string;
+  extractedCount?: number;
+  lowConfidenceCount?: number;
+  failedPages?: number[];
+}
+
+/**
+ * M7段階1・2:過去の統合報告書PDFからDisclosureClaimを抽出する(GAP-05)。
+ * AIの役割は抽出に限定される(段階3・4はこの結果を既存のルールベース処理でそのまま評価する)。
+ */
+export async function extractDisclosurePdfAction(
+  _prevState: PdfIntakeFormState,
+  formData: FormData
+): Promise<PdfIntakeFormState> {
+  const file = formData.get("disclosurePdf");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "PDFファイルが選択されていません。" };
+  }
+
+  const data = new Uint8Array(await file.arrayBuffer());
+  const extraction = await extractPdfText(data);
+
+  if (extraction.combinedText.trim().length === 0) {
+    return {
+      error:
+        "PDFからテキストを抽出できませんでした(スキャン画像等でテキスト層が無い可能性があります)。" +
+        (extraction.failedPages.length > 0
+          ? `抽出できなかったページ: ${extraction.failedPages.join(", ")}`
+          : ""),
+    };
+  }
+
+  let claims;
+  try {
+    claims = await extractDisclosureClaims(file.name, `claim-pdf-${Date.now()}`, extraction.combinedText);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "AIによる抽出に失敗しました。" };
+  }
+
+  const tenantId = await getTenantId();
+  await appendInteractionEvent(tenantId, {
+    actor: ACTOR,
+    kind: "disclosure_pdf_extracted",
+    subjectId: file.name,
+    payload: {
+      claims,
+      logMessage: `PDF「${file.name}」からAIが${claims.length}件の主張を抽出`,
+    },
+  });
+  await executeAndPersistRun(tenantId);
+
+  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+
+  return {
+    extractedCount: claims.length,
+    lowConfidenceCount: claims.filter((c) => c.extractionConfidence === "low").length,
+    failedPages: extraction.failedPages.length > 0 ? extraction.failedPages : undefined,
+  };
 }
 
 /** ①主張を弱める(M7 D-4)。 */
@@ -24,7 +87,7 @@ export async function weakenClaimAction(
     return { error: "修正後の記載内容を入力してください。" };
   }
 
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   await appendInteractionEvent(tenantId, {
     actor: ACTOR,
     kind: "disclosure_claim_override",
@@ -47,7 +110,7 @@ export async function acquireEvidenceAction(
     return { error: "対象拠点を指定してください。" };
   }
 
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   await appendInteractionEvent(tenantId, {
     actor: ACTOR,
     kind: "depth_override",
@@ -74,7 +137,7 @@ export async function recordIntentionalDecisionAction(
     return { error: "判断の理由を入力してください。" };
   }
 
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   await appendInteractionEvent(tenantId, {
     actor: ACTOR,
     kind: "intentional_decision",

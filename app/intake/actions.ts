@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { replaceSiteEntries } from "@/lib/db/repositories/sites";
 import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
@@ -67,7 +67,7 @@ export async function importCompanyDatasetAction(
   }
 
   const { entries, unmappedFields } = toSiteEntries(dataset);
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
 
   await replaceSiteEntries(tenantId, entries);
   await appendInteractionEvent(tenantId, {

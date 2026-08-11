@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildValuationRecords } from "./build-valuation-records";
-import { ALL_PLUGINS, getPluginsForCategory } from "./registry";
+import { getPluginsForCategory } from "./registry";
 import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput } from "../types/valuation";
 import { TEST_VALUATION_VERSIONS } from "../divergence/test-helpers";
 
@@ -56,7 +56,7 @@ describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRe
       input,
       config,
       calibration,
-      plugins: ALL_PLUGINS,
+      plugins: getPluginsForCategory("water"),
       versions: TEST_VALUATION_VERSIONS,
     });
 
@@ -93,7 +93,7 @@ describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRe
       input,
       config,
       calibration,
-      plugins: ALL_PLUGINS,
+      plugins: getPluginsForCategory("water"),
       versions: TEST_VALUATION_VERSIONS,
     });
 
@@ -112,7 +112,7 @@ describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRe
       input,
       config,
       calibration,
-      plugins: ALL_PLUGINS,
+      plugins: getPluginsForCategory("water"),
       versions: TEST_VALUATION_VERSIONS,
     });
 
@@ -133,7 +133,7 @@ describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRe
       input,
       config,
       calibration,
-      plugins: ALL_PLUGINS,
+      plugins: getPluginsForCategory("water"),
       versions: TEST_VALUATION_VERSIONS,
     });
 

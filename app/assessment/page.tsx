@@ -1,12 +1,13 @@
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
 import { Card, Guide, Tag } from "../components/ui";
 import { sensitivityFraction, unevaluatedCriteriaNote } from "../components/criteria-labels";
+import { DataSourceAttribution } from "../components/attribution";
 import { DepthToggle } from "./depth-toggle";
 
 export default async function AssessmentPage() {
-  const result = await getOrCreateLatestResult(getDefaultTenantId());
+  const result = await getOrCreateLatestResult(await getTenantId());
   const { priorityScores, depthDecisions, materialIssues } = result.assessment;
 
   const depthById = new Map(depthDecisions.map((d) => [d.materialIssueId, d]));
@@ -93,6 +94,7 @@ export default async function AssessmentPage() {
         </table>
       </Card>
 
+      <DataSourceAttribution sources={["WRI Aqueduct 4.0", "ENCORE"]} />
       <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>
   );

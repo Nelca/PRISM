@@ -30,6 +30,7 @@ import {
   deriveM1UnevaluatedCriterionPayloads,
   deriveM2DepthDecisionPayload,
 } from "../ledger/assumption-entry";
+import type { CriterionKey } from "../site/criteria";
 import type { ImpactCategory } from "../types/common";
 import type { MaterialIssue, NatureInterface, Site } from "../types/site";
 import type { PriorityScore, DepthDecision } from "../types/assessment";
@@ -43,6 +44,12 @@ export interface AssessmentPipelineOptions {
   interfacesByCategoryForSite: (site: Site) => Partial<Record<ImpactCategory, NatureInterface[]>>;
   /** 座標解決に失敗した拠点について、どのカテゴリの除外レコードを残すか。 */
   excludedCategoriesForSite: (site: Site) => ImpactCategory[];
+  /**
+   * NatureInterface→CriteriaMetの対応(D-90)。省略時はcriteria.tsの既定(defaultResolveCriterion)。
+   * `ecosystem_integrity`のような1つのlayerTypeから複数の基準(highEcosystemIntegrity・
+   * rapidIntegrityDecline)を導出するデータソースを持つ呼び出し側は、ここでカスタム実装を渡す。
+   */
+  resolveCriterion?: (iface: NatureInterface) => CriterionKey | null;
   /** M2 D-1のスクリーニング評価結果(M3スクリーニング深度)を注入する。 */
   screeningValuationForMaterialIssue: (materialIssue: MaterialIssue) => ExchangeValuationRecord;
   promotionOptions?: ComputeDepthDecisionsOptions;
@@ -79,7 +86,7 @@ export function runAssessmentPipeline(options: AssessmentPipelineOptions): Asses
     }
 
     const interfacesByCategory = options.interfacesByCategoryForSite(resolution.site);
-    for (const issue of buildMaterialIssues(resolution.site.id, interfacesByCategory)) {
+    for (const issue of buildMaterialIssues(resolution.site.id, interfacesByCategory, options.resolveCriterion)) {
       // GAP-08/GAP-13:評価できなかった基準(ライセンス保留・データソース不在)を台帳に残す。
       // 「falseだった」のか「評価していない」のかを後から区別できるようにするため。
       const entryIds = deriveM1UnevaluatedCriterionPayloads(issue.unevaluatedCriteria).map((payload) => {

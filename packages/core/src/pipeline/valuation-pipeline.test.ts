@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { runValuationPipeline } from "./valuation-pipeline";
 import { createIdSequence } from "./ids";
-import { ALL_PLUGINS } from "../monetization/registry";
+import { getPluginsForCategory } from "../monetization/registry";
 import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput } from "../types/valuation";
 import type { DeepDiveConfig } from "./valuation-pipeline";
 
@@ -53,7 +53,7 @@ describe("runValuationPipeline", () => {
     input,
     config,
     calibration,
-    plugins: ALL_PLUGINS,
+    plugins: getPluginsForCategory("water"),
     calibrationSetVersion: "ifvi-water-consumption-v1",
     reconciliationFunctionVersion: "ifvi-reconciliation-v1",
     fitnessTierThresholdVersion: "fitness-tier-v1",

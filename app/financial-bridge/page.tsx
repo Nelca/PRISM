@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { CompanyFinancialsForm } from "./financials-form";
@@ -9,7 +9,7 @@ import { Card, Guide, KV, Stat, Tag } from "../components/ui";
 import { Waterfall } from "../components/charts/Waterfall";
 
 export default async function FinancialBridgePage() {
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   const result = await getOrCreateLatestResult(tenantId);
   const { decisions, disclosure } = result;
   // 入力済みの企業財務データ(未入力ならデモの既定値で計算されている)

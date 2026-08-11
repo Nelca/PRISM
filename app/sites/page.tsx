@@ -1,13 +1,14 @@
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Card, Guide, Tag } from "../components/ui";
 import { sensitivityFraction, unevaluatedCriteriaNote } from "../components/criteria-labels";
+import { DataSourceAttribution } from "../components/attribution";
 import { AddSiteForm } from "./add-site-form";
 
 const CATEGORY_LABEL: Record<string, string> = { water: "取水量・水ストレス" };
 
 export default async function SitesPage() {
-  const result = await getOrCreateLatestResult(getDefaultTenantId());
+  const result = await getOrCreateLatestResult(await getTenantId());
   const { sites, ingestionErrors, materialIssues, depthDecisions } = result.assessment;
 
   const depthByIssueId = new Map(depthDecisions.map((d) => [d.materialIssueId, d]));
@@ -125,6 +126,7 @@ export default async function SitesPage() {
         </Card>
       </div>
 
+      <DataSourceAttribution sources={["WRI Aqueduct 4.0", "ENCORE"]} />
       <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>
   );

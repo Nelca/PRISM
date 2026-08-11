@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildValuationRecords } from "../monetization/build-valuation-records";
-import { ALL_PLUGINS } from "../monetization/registry";
+import { getPluginsForCategory } from "../monetization/registry";
 import { buildBridge1NatureAdjustedProfit, buildWaterfallSteps } from "./bridge1";
 import { buildBridge2SocialCostView } from "./bridge2";
 import { computeInternalizationStatus } from "./internalization-status";
@@ -61,7 +61,7 @@ describe("M5統合テスト:M3のValuationRecordから2ブリッジ・自然債�
       input,
       config,
       calibration,
-      plugins: ALL_PLUGINS,
+      plugins: getPluginsForCategory("water"),
       versions: TEST_VALUATION_VERSIONS,
     });
     const records = groups.flatMap((g) => g.records);

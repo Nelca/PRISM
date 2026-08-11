@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 
@@ -28,7 +28,7 @@ export async function setDepthOverrideAction(
   }
 
   const label = mode === "promote" ? "詳細評価" : mode === "demote" ? "概算評価" : "自動判定";
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
 
   await appendInteractionEvent(tenantId, {
     actor: ACTOR,

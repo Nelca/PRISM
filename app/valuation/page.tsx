@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { computeTornadoChart } from "@core/monetization/tornado";
 import type { ValuationRecord } from "@core/types/valuation";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { Num } from "../components/numeric";
 import { Card, Guide, KV, Stat, Tag } from "../components/ui";
 import { tierLabel, tierTagVariant } from "../components/tag-utils";
 import { Football } from "../components/charts/Football";
 import { Tornado } from "../components/charts/Tornado";
+import { DataSourceAttribution } from "../components/attribution";
 
 const METHOD_LABEL: Record<string, string> = {
   "replacement-cost": "代替費用法(浄水コスト)",
@@ -17,7 +18,7 @@ const METHOD_LABEL: Record<string, string> = {
 
 export default async function ValuationPage({ searchParams }: { searchParams: Promise<{ issue?: string }> }) {
   const { issue: issueParam } = await searchParams;
-  const result = await getOrCreateLatestResult(getDefaultTenantId());
+  const result = await getOrCreateLatestResult(await getTenantId());
   const { valuationRecordsByMaterialIssue } = result.valuation;
   const materialIssueIds = Object.keys(valuationRecordsByMaterialIssue);
 
@@ -146,6 +147,7 @@ export default async function ValuationPage({ searchParams }: { searchParams: Pr
         )}
       </Card>
 
+      <DataSourceAttribution sources={["World Bank"]} />
       <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
     </div>
   );

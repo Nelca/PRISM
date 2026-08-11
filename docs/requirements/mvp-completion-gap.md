@@ -3,7 +3,11 @@
 **対象:** M1〜M8の実装済みコード全体 + 統合層(`packages/core/src/pipeline/`・`lib/`・`app/`)
 **参照元:** `docs/concept-v2.md`、`docs/roadmap/build-plan.md` §1 / §5 / §6 / §7 / §10、`docs/requirements/m1〜m8`
 **status:** ドラフト(GAP-01〜GAP-21を提示。着手順・スコープはユーザー判断待ち)
-**最終更新:** 2026-08-08
+**最終更新:** 2026-08-08(本文)/ **2026-08-11 追記:下記の多くが後続コミットで解消済み。各GAP冒頭の状態タグを参照**
+
+**2026-08-10 現状確認(コード監査による):** 本文提示から2日で、着手順(§6)第1〜3波の大半が実装済みになっている。**GAP-01・02・03・06・08・09・10・12・13・16・17・18は解消済み。**GAP-07・15は部分解消(下記参照)。GAP-04(契約待ちの一部)・GAP-05(AI提供者決定待ち)・GAP-11(NGFS未取得)・GAP-14(スコープ判断待ち)は、外部データ・契約・人間の判断が前提のままのため、コードでは解消できない。詳細な検証結果は各GAPの節に追記した。
+
+**2026-08-11 追記:** E-1(気候カテゴリを追加)・E-3(AnthropicClaude APIを使う)・GAP-15残作業(サブドメイン方式)の3点の人間判断が確定したことを受けて、**GAP-05・GAP-14・GAP-15(部分解消→解消)を実装した。**GAP-05はDPA締結・顧客同意取得という運用開始前の人間作業を残す(詳細は各節)。GAP-11(NGFS)は依然未取得のまま。
 
 ---
 
@@ -23,10 +27,10 @@
 | M3 貨幣化 | 地理較正5項・適合度ティア・モンテカルロ1万回・3プラグイン・集計整合性検証・トルネード図。**充足** |
 | M4 乖離分解 | 価値概念分割・対数空間Shapley・F-0〜F-9・効率性公理の数値検証・読み下し文・グループ内N≤5の強制。**充足** |
 | M6 意思決定 | 自然調整後NPV・★判定3ケース・拘束方式4種の判別可能ユニオン・変更履歴。**充足** |
-| M1/M2 | 5基準判定・MaterialIssue組み立て・優先度算定・深度昇格・除外理由記録。**ロジックは充足**(データソース側にGAP-13) |
-| M5 | 2ブリッジの型レベル分離・非GAAPラベル必須化・未内部化コスト/内部化率・自然債務。**ロジックは充足**(GAP-10/11) |
-| M7 | 段階3・4のルールベース判定(G1〜G4・推奨アクション3種・意図的判断記録)。**規定スコープ内では充足**(GAP-05) |
-| M8 | AssumptionEntryの自動生成(payload導出10種)・版レジストリ・ライセンスゲート関数。**構造は充足**(GAP-06/07/08で未配線) |
+| M1/M2 | 5基準判定・MaterialIssue組み立て・優先度算定・深度昇格・除外理由記録。**充足**(GAP-13は2026-08-10解消) |
+| M5 | 2ブリッジの型レベル分離・非GAAPラベル必須化・未内部化コスト/内部化率・自然債務。**充足**(GAP-10は解消。GAP-11はNGFS未取得のため一部保留) |
+| M7 | 段階3・4のルールベース判定(G1〜G4・推奨アクション3種・意図的判断記録)。**規定スコープ内では充足**(GAP-05は未着手) |
+| M8 | AssumptionEntryの自動生成(payload導出10種)・版レジストリ・ライセンスゲート関数。**充足**(GAP-06/08は解消。GAP-07は係数値自体の永続化のみ既知の制約として残る) |
 | 除外事項ガード | X1〜X7の違反は監査済み(D-104)。厚生価値/交換価値の合算は型レベルで不能 |
 
 ### 0.3 不足しているものの分類
@@ -42,7 +46,11 @@
 
 ## 1. S1 — 実データ通しをブロックするもの
 
-### GAP-01 永続化層が存在しない
+### GAP-01 永続化層が存在しない 【2026-08-10 解消済み】
+
+**解消の確認:** `d4ac836 feat: 永続化基盤(Docker + Postgres + Drizzle)を導入する (GAP-01/15/16)` で対応済み。`lib/db/client.ts`が`drizzle-orm/node-postgres`経由の実Postgres接続を持ち、`lib/db/schema.ts`に`pipeline_run`・`assumption_entry`・`versioned_parameter_set`等の追記専用テーブル(`APPEND_ONLY_TABLES`でUPDATE/DELETE権限をDBロールから剥奪)が定義されている。`lib/pipeline/execute-run.ts`の`executeAndPersistRun`/`getOrCreateLatestResult`が実際の読み書き経路になっており、ページはDBから最新runを読むだけ(再計算しない)。モンテカルロのシード(`DEFAULT_RNG_SEED`)も`pipeline_run.rng_seed`列に永続化される。**サーバーを再起動してもデータが残ることを確認済み(D-111・D-112)。**
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:** 全状態が Node プロセス内メモリ(`lib/demo/site-store.ts`・`lib/demo/interaction-store.ts`)。サーバー再起動で消える。各ページは毎リクエスト `runDemoPipeline()` をゼロから再実行しており、M3のモンテカルロ乱数はデモ層でシード固定して辻褄を合わせている(D-103)。
 
@@ -58,7 +66,11 @@
 
 ---
 
-### GAP-02 実データを投入する経路がUIにない
+### GAP-02 実データを投入する経路がUIにない 【2026-08-10 解消済み】
+
+**解消の確認:** `387ff7e feat: 実データ取込UIを実装する (GAP-02)` で対応済み。`app/intake/page.tsx`・`app/intake/import-form.tsx`・`app/intake/actions.ts`が3ファイル(拠点一覧CSV・NatureInterface調査結果CSV・エンゲージメント設定JSON)のアップロードUIを提供し、`loadCompanyDataset`(`lib/intake/`)を呼び出して`executeAndPersistRun`に接続している(D-119、部分取込をしない設計)。`app/sites/add-site-form.tsx`(1件ずつの手入力)は選択肢として残っている。
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:** `lib/intake/`(CSVパーサ・拠点一覧テンプレート・NatureInterface調査結果テンプレート・エンゲージメント設定JSON・統合ローダー)は実装済みでテストも通っているが、**`app/` からは一度も呼ばれていない**(`grep` で参照ゼロ)。UIから拠点を追加する経路は `app/sites/add-site-form.tsx` の1件ずつの手入力フォームのみ。
 
@@ -73,7 +85,11 @@
 
 ---
 
-### GAP-03 財務パラメータの入力インターフェースが存在しない
+### GAP-03 財務パラメータの入力インターフェースが存在しない 【2026-08-10 解消済み】
+
+**解消の確認:** `aa8453b feat: 財務パラメータ入力UIを実装し、pendingを実際に通す (GAP-03)` で対応済み。`app/financial-bridge/financials-form.tsx`(報告営業利益・Net Debt/EBITDA・内部化済みコスト・減損閾値等)、`app/decision/parameters-form.tsx`(通常NPV・割引率・期間・承認閾値、未定なら空欄可)が実装され、`approvalThreshold`/`verdict`の`pending`状態が実際に画面を通ることをD-120が記録している。
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:** 以下がすべて `lib/demo/company.ts` / `run-demo-pipeline.ts` のハードコード値である。
 
@@ -116,7 +132,22 @@
 
 ---
 
-### GAP-05 M7の段階1・2(PDF抽出・主張タイプ分類)が存在しない
+### GAP-05 M7の段階1・2(PDF抽出・主張タイプ分類)が存在しない 【2026-08-11 実装完了(運用開始前の人間作業が残る)】
+
+**解消の確認:** E-3(AIプロバイダの判断)が「Anthropic Claude APIを事業体名義のAPIキーで使う」で確定したことを受けて実装した。
+- `packages/core/src/disclosure/claim-extraction.ts`:AIの構造化出力(`RawExtractedClaim`)を`DisclosureClaim[]`に変換する純粋関数。判定を一切行わない(単体テストあり、APIキー不要で検証可能)
+- `lib/pdf/extract-pdf-text.ts`:`unpdf`(pdf.jsベースの純JS実装)でページ単位に抽出。抽出失敗ページは空文字で埋めず`failedPages`に明示する(M7 D-6)
+- `lib/ai/extract-disclosure-claims.ts`:Claude API(`claude-opus-5`、`output_config.format`で構造化出力を強制)を呼び、`extractedMetadata`の4フィールドを必ず埋めるかnullにする(M7 D-1)。システムプロンプトに「抽出のみ、判定はしない」制約を明記
+- `app/disclosure/actions.ts`の`extractDisclosurePdfAction`・`app/disclosure/pdf-intake-form.tsx`:`/disclosure`画面にPDFアップロードUIを追加
+- 抽出結果は新規`InteractionKind: "disclosure_pdf_extracted"`として追記型イベントに保存し、`run-demo-pipeline.ts`が既存の`DisclosureClaim[]`と結合する。**段階3・4(`gap-finding.ts`・`disclosure-pipeline.ts`)は1行も変更していない**(完了条件どおり)
+- `extractionConfidence: "low"`の主張は`/disclosure`画面のカードに「AI抽出確信度低・要レビュー」バッジを表示する(GAP-05項3の簡易版。専用レビューワークフローではなく既存カードへのバッジ表示にとどめている)
+
+**運用開始前に残る人間の作業(この実装では完了しない):**
+1. Anthropic社とのデータ処理契約(DPA)の確認・締結(顧客の未公表開示PDFを外部APIに送信するため)
+2. 顧客への同意取得(開示PDFを外部AIプロバイダに送信することの契約上の明示。B-6)
+3. `ANTHROPIC_API_KEY`を事業体名義のAPIキーで発行し、環境変数として設定する(コードにはハードコードしていない)
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:** M7は段階3・4(ルールベース判定)のみ実装。`DisclosureClaim` は `lib/demo/company.ts` に手書きされた固定オブジェクトから供給されている。PDF処理の依存関係はリポジトリに一切ない(`package.json` の依存は next / react のみ)。
 
@@ -137,7 +168,11 @@
 
 ## 2. S2 — 完了条件未達・仕様と実装の乖離
 
-### GAP-06 レコード単位の再計算ハッシュが未実装(placeholder のまま)
+### GAP-06 レコード単位の再計算ハッシュが未実装(placeholder のまま) 【2026-08-10 解消済み】
+
+**解消の確認:** `e63b900 feat: レコード単位の再計算ハッシュを実装する (GAP-06)` で対応済み。`build-valuation-records.ts`・`build-divergence-decomposition.ts`・`build-decision-record.ts`はいずれも`computeRecordHash("vr"|"dd"|"dr", {...})`(実ハッシュ関数)を呼び、methodId・methodVersion・calibration・versions等、実際に計算に入った版情報からハッシュを確定させている(D-113がハッシュ入力の定義を記録)。placeholder文字列は残っていない。
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:** `ValuationRecord` / `DivergenceDecomposition` / `DecisionRecord` の `recalculationHash` はすべて `placeholder:...` を返している(`build-valuation-records.ts:76`、`build-divergence-decomposition.ts:75`、`build-decision-record.ts:69`)。パイプライン層でも上書きされていない。実ハッシュは `computeRecalculationHash()` によるパイプライン全体の1本のみで、これはデモ層でしか呼ばれていない。
 
@@ -180,7 +215,11 @@
 
 ---
 
-### GAP-08 ライセンスゲーティングがパイプラインに配線されていない
+### GAP-08 ライセンスゲーティングがパイプラインに配線されていない 【2026-08-10 解消済み】
+
+**解消の確認:** `1f0e815 fix: 適合度ティア表示とライセンスゲーティングを仕様どおりに修正 (GAP-17/08/13)` で対応済み。`packages/core/src/site/criteria.ts`の`assessCriteria()`が`isLicenseBlocked()`(`types/ledger.ts`)で候補を絞り込み、全候補が`pending_review`の基準は`license_pending`として感応度スコアから除外する(D-110)。`lib/demo/company.ts`のsite-042・site-060のKBA(`licenseMode: "pending_review"`)は今もそのまま宣言されているが、**正しく除外されることを`/sites`画面の実際の表示(「生物多様性の重要性が高い(データ利用契約の確認待ち:IBAT Alliance)」)で確認済み。**
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:** M8 D-4のゲーティング関数は実装済みだが、`assessment-pipeline.ts` からも `criteria.ts` からも呼ばれていない(`grep` で参照ゼロ)。結果として、デモデータで `licenseMode: "pending_review"`(IBAT Alliance契約前)と宣言されているKBAレイヤが、**そのまま `highBiodiversityImportance = true` として感応度スコアに算入されている**(`lib/demo/company.ts:42`)。
 
@@ -195,7 +234,11 @@
 
 ---
 
-### GAP-09 M4の代表値選択と「前年度手法での再計算値の並記」が未実装
+### GAP-09 M4の代表値選択と「前年度手法での再計算値の並記」が未実装 【2026-08-10 解消済み】
+
+**解消の確認:** `a91b4b8 feat: 代表値選択と、手法変更時の前年度手法での再計算値を実装する (GAP-09)` で対応済み。`recalculatedWithPriorMethod`(`types/divergence.ts`)が`representative-value.ts`で計算され、`app/decomposition/page.tsx`で選択した代表値と並記・差分表示される(D-114)。手法変更時は理由入力が必須。
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:** `DivergenceDecomposition.representativeValueSelection` はコア実装で一度も埋められない(常に undefined)。代表値はデモ層の `interaction-store` が独自に保持し、変更理由も `m4ChangeLogByMaterialIssue` としてデモ層にだけ存在する。`recalculatedWithPriorMethod`(前年度手法での再計算値)は**リポジトリ全体で参照ゼロ**。
 
@@ -213,7 +256,11 @@
 
 ---
 
-### GAP-10 M5がパイプライン層に存在せず、比較先の一部が入力任せになっている
+### GAP-10 M5がパイプライン層に存在せず、比較先の一部が入力任せになっている 【2026-08-10 解消済み】
+
+**解消の確認:** `b091319 feat: M5パイプラインと比較先の算出・表示、レッドフラグのデータ由来化 (GAP-10/18)` で対応済み。`packages/core/src/pipeline/financial-bridge-pipeline.ts`が新設され、`computeComparisonTargets()`の`after`(変化後の比率)が企業財務入力+自然債務から算術で導出されるようになった(D-115)。`app/financial-bridge/page.tsx`に比較先3種が表示される。
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:**
 - `packages/core/src/pipeline/` にM5のパイプラインがない(assessment / valuation / decision / disclosure の4本のみ)。M5はデモ層 `run-demo-pipeline.ts` から直接呼ばれている
@@ -249,7 +296,11 @@
 
 ---
 
-### GAP-12 判定件数カウンタが永続化されていない(課金接続不能)
+### GAP-12 判定件数カウンタが永続化されていない(課金接続不能) 【2026-08-10 解消済み】
+
+**解消の確認:** `721b09d feat: 判定件数カウンタを実装する (GAP-12)` で対応済み。`lib/db/schema.ts`の`decision_count_entry`(主キー`(tenant_id, decision_record_id)`で再計算時の重複加算を防止)に、`shouldCountDecision()`でフィルタした結果が`lib/db/repositories/runs.ts`のトランザクション内で永続化される(D-117)。`pending`のままの案件は加算されない。
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:** `shouldCountDecision(verdict)` は「カウント対象かどうか」の判定を返すだけで、リポジトリ内に呼び出し元がない。実際のカウンタは存在しない。
 
@@ -261,21 +312,30 @@
 
 ---
 
-### GAP-13 `rapidIntegrityDecline` にデータソースがなく、感応度スコアの上限が実質4になっている
+### GAP-13 `rapidIntegrityDecline` にデータソースがなく、感応度スコアの上限が実質4になっている 【2026-08-10 解消】
 
-**現状:** `criteria.ts` は `rapidIntegrityDecline`(急速な劣化=トレンド)に対応する `layerType` がないため、既定で常に false を返す(D-91、推定で埋めない原則に従った判断)。結果としてTNFD LEAP L3の5基準のうち1つが**構造的に永久にfalse**であり、`sensitivityScore` の実質的な上限は4である。
+**現状(解消済み):** `criteria.ts` は `rapidIntegrityDecline`(急速な劣化=トレンド)に対応する `layerType` がないため、既定で常に false を返していた(D-91、推定で埋めない原則に従った判断)。結果としてTNFD LEAP L3の5基準のうち1つが**構造的に永久にfalse**であり、`sensitivityScore` の実質的な上限は4だった。
 
-**なぜ必要か:** M1 D-2は感応度スコアを「5基準の充足数(0〜5)」と定義しており、その値がそのままM2の優先度算定に渡る。1基準が構造的に欠けていることは、優先度算定の相対順位に影響する。実装は正しい(推定で埋めていない)が、**この事実が利用者・監査人に見えていない**。
+**なぜ必要だったか:** M1 D-2は感応度スコアを「5基準の充足数(0〜5)」と定義しており、その値がそのままM2の優先度算定に渡る。1基準が構造的に欠けていることは、優先度算定の相対順位に影響する。実装は正しかった(推定で埋めていない)が、**この事実が利用者・監査人に見えていなかった**。
 
-**作るもの:**
-1. 短期:MaterialIssue に「評価不能な基準」を明示的に保持し、画面・出力に「5基準中4基準で評価しています(急速な劣化の判定に使えるデータソースがありません)」と表示する。GAP-08のライセンス保留表示と同じ機構に相乗りできる
-2. 中期:生態系完全性のトレンドデータ源(例:Aqueduct/ENCORE以外の時系列レイヤ)を調査し、`docs/data/` に可否を記録する。**見つからない場合は見つからないと記録する**
+**作ったもの:**
+1. **短期:完了(2026-08-08、D-110)。**`MaterialIssue.unevaluatedCriteria`が「評価不能な基準」を明示的に保持し、`app/sites/page.tsx`・`app/assessment/page.tsx`に「◯/N」表示と「未評価N件」の注記が実装済み。GAP-08のライセンス保留表示と同じ機構に相乗り済み
+2. **中期:調査完了(2026-08-10、`docs/data/ecosystem-integrity-trend-notes.md`)。**候補5件を調査した結果、Sun, Hughes, He, Yu (2026, *Scientific Data*)の"Ecological Integrity Index"(CC BY 4.0・年次2015-2023・1kmラスタ・Zenodo公開)が時系列・商用利用・拠点座標照会の3条件を満たす唯一の候補として見つかり、D-90の前提(「使えるデータ源が無い」)を一部訂正した
+3. **実装:完了(2026-08-10、E-8)。**`packages/core/src/site/ecosystem-integrity-trend.ts`(IUCN Red List Criterion A2、10年30%減の閾値を借用したboolean化)、`assessment-pipeline.ts`への`resolveCriterion`注入点追加、`lib/demo/company.ts`への3拠点分の実データ(2015年・2023年のラスタ値、`rasterio`でオフライン抽出)反映。3拠点とも実際の低下率は約1.4〜1.5%で閾値未満(false)という、実データに基づく誠実な結果になった。詳細は`docs/data/ecosystem-integrity-trend-notes.md` §8
 
-**完了条件:** 感応度スコアの分母が何基準だったかが、レコードと画面の両方から判別できる。
+**完了条件:** 感応度スコアの分母が何基準だったかが、レコードと画面の両方から判別できる(**達成**)。`rapidIntegrityDecline`が実データで評価され、`unevaluatedCriteria`から外れることを`/sites`ページの実際のレンダリングで確認済み(**達成**)。
+
+**残る制約(2026-08-10、動的座標対応の追加実装後):** ~~ユーザーが追加する拠点にはこの実データが無い~~ → 解消(0.5度グリッドを座標から動的に引く方式に変更、`ecosystem-integrity-trend-notes.md` §8.6)。空間精度は1km→約55kmに低下している。データセット自体の継続更新保証もない(詳細は`ecosystem-integrity-trend-notes.md` §8.5)。
 
 ---
 
-### GAP-14 M2の対象3カテゴリに対し、M3プラグインが水のみ
+### GAP-14 M2の対象3カテゴリに対し、M3プラグインが水のみ 【2026-08-11 解消済み】
+
+**解消の確認:** [HUMAN判断]「気候カテゴリを追加する」で確定。`packages/core/src/monetization/plugins/ghg-carbon-price-conversion.ts`を実装し`registry.ts`の`ALL_PLUGINS`に追加した。X4(GHGインベントリ算定エンジンは作らない)は踏み越えていない — このプラグインはGHG排出量(tCO2e)を算定せず、企業が既に算定した値(`PhysicalQuantityInput.physicalQuantity`)を受け取り、既存資産(炭素の社会的費用・GX-ETS調整基準取引価格)との掛け算のみを行う。2本の内訳値(厚生価値・交換価値)を返し、型レベルで加算不可なため`reconciliation`は不要。
+
+**実装時に発見・修正した既存の潜在バグ:** `ALL_PLUGINS`を直接渡していた9箇所(水カテゴリの深掘り評価・統合テスト)は、気候プラグイン追加により`evaluate()`が気候用係数の欠如でエラーを投げるようになった。全箇所を`getPluginsForCategory("water")`に修正し、カテゴリ別フィルタを徹底した。全394→397件のテストが通過することを確認済み。
+
+**以下は当初の記述(履歴として残す):**
 
 **現状:** `ImpactCategory` は `climate | water | pollution` の3値。M2は3カテゴリを扱う設計。しかしM3の全プラグイン(replacement-cost / lime3-water / ifvi-water-consumption)が `supportedCategories: ["water"]`。気候・汚染のMaterialIssueは貨幣化されない。
 
@@ -291,15 +351,31 @@
 
 ## 3. S3 — 運用・監査で問題になるもの
 
-### GAP-15 認証・テナント分離がない
+### GAP-15 認証・テナント分離がない 【2026-08-11 解消済み(サブドメイン方式)】
+
+**解消の確認:** [HUMAN判断]「サブドメインのみでOK。ログイン機構は実装コスト・検証のしやすさの観点で見送る」で確定。`proxy.ts`(Next.js 16の`middleware`後継、Host ヘッダーからサブドメインを抽出し`x-tenant-id`ヘッダーに設定)と`lib/db/client.ts`の`getTenantId()`(サブドメインが無い場合は`getDefaultTenantId()`にフォールバック)を実装した。`app/`配下の全ページ・server action・18ファイル33箇所の呼び出しを`getDefaultTenantId()`から`await getTenantId()`に置き換え済み(`app/api/pipeline-result/route.ts`は「テナントをまたぐ参照は行わない。既定テナントの最新runのみ返す」という既存の設計意図があるため対象外、`getDefaultTenantId()`のまま)。ローカル開発では`acme.localhost:3000`のようにアクセスすると動作確認できる(`PRISM_BASE_DOMAIN`環境変数、未設定時は`localhost`)。
+
+**以下は当初の記述(履歴として残す):**
+
+**現状(部分解消の確認、2026-08-10時点):** `d4ac836`(GAP-01/15/16のDB導入コミット)で、`lib/db/repositories/*`の全クエリが`tenantId`でスコープされ、テーブルは`(tenant_id, ...)`複合主キーを持つ(D-111・D-112)。**データモデル上のテナント分離は実装済み。**しかし`lib/db/client.ts`の`getDefaultTenantId()`は環境変数`PRISM_DEFAULT_TENANT_ID`から単一の値を読むだけで(コメントに「認証がないハーネスのための単一値であり、本番のテナント解決ではない」と明記)、**実際のユーザー認証・ログイン・「どのリクエストがどのテナントか」を解決する仕組みはまだ無い**(`middleware.ts`不在、`app/`にログイン画面なし)。build-plan §6「パイロット3〜5社を分離できれば十分」を満たすには、テナント解決方式(サブドメイン・APIキー・簡易ログイン等)の選択がまだ必要。**これは新たな人間の判断事項(下記E-9として追加を検討)。**
+
+**以下は当初の記述(履歴として残す):**
 
 build-plan §6は「最小。パイロット3〜5社を分離できれば十分」と規定。D-102でDB不在を理由に見送られたが、**GAP-01でDBを入れる時点で見送りの前提が消える。**同時に実装する。顧客Aの拠点データ・DecisionRecord・開示ギャップが顧客Bから見えないこと(M7 D-5が記録する内容の性質上、必須)。
 
-### GAP-16 出力APIが無認証で全データを返す
+### GAP-16 出力APIが無認証で全データを返す 【2026-08-10 解消済み】
+
+**解消の確認:** `app/api/pipeline-result/route.ts`は`x-api-key`ヘッダーが`PRISM_API_KEY`と一致する場合のみ結果を返す。`PRISM_API_KEY`未設定時は503(fail-closed)、不一致時は401を返す。無認証の全開放という当初の懸念は解消済み。
+
+**以下は当初の記述(履歴として残す):**
 
 `app/api/pipeline-result/route.ts` は認証なしで `runDemoPipeline()` の全結果をJSONで返す。build-plan §6の「フェーズ3のERP埋め込みに備えて形だけ用意」の範囲としては妥当だが、**実データを入れた瞬間に無認証の全社データ漏洩経路になる。**GAP-01より前にデータを入れないこと、またはGAP-15と同時に認証を付けること。
 
-### GAP-17 `not_applicable` ティアをUIが "A" に読み替えている
+### GAP-17 `not_applicable` ティアをUIが "A" に読み替えている 【2026-08-10 解消済み】
+
+**解消の確認:** `1f0e815 fix: 適合度ティア表示とライセンスゲーティングを仕様どおりに修正 (GAP-17/08/13)` で対応済み。`app/valuation/page.tsx`・`app/decomposition/page.tsx`に読み替えコードは残っておらず、`app/components/tag-utils.ts`の`tierLabel()`が`not_applicable`を独立した表示(「移転なし」・`neutral`バリアント)として扱う(D-109)。
+
+**以下は当初の記述(履歴として残す):**
 
 `app/valuation/page.tsx:40` と `app/decomposition/page.tsx:62` に以下がある:
 
@@ -312,7 +388,11 @@ M3 D-4.2は明示的にこれを禁じている:
 
 **作るもの:** フットボールチャートに `not_applicable` 用の第4の表示(色・凡例「移転なし」)を追加し、読み替えを削除する。**低コストかつ設計規律の直接的な違反であるため、優先して直す。**
 
-### GAP-18 M5の「重要な論点」テーブルが固定文言
+### GAP-18 M5の「重要な論点」テーブルが固定文言 【2026-08-10 解消済み】
+
+**解消の確認:** `b091319`(GAP-10/18コミット)で対応済み。`app/financial-bridge/page.tsx`の「重要な論点」は`redFlags`配列(実際の計算結果から導出)を元に構築され、該当なしの場合は「現時点で確認が必要な論点はありません」という空状態を表示する。データに関係なく常に表示される固定文言は残っていない。
+
+**以下は当初の記述(履歴として残す):**
 
 `app/financial-bridge/page.tsx:85-124` の3行のうち2行は、データに関係なく常に表示される固定文言。デモ用としては許容範囲だが、実データではレッドフラグの信頼性を損なう。判定条件をデータから導出するか、この節を落とす。
 
@@ -332,50 +412,50 @@ M3 D-4.2は明示的にこれを禁じている:
 
 ---
 
-## 5. S4 — 意図的な後回し(今回作らない。記録のみ)
+## 5. S4 — 意図的な後回し(今回作らない。記録のみ)【2026-08-10:一部先行実装あり】
 
-いずれも既存文書で明示的に後回しと決定済み。**新しく判断し直す必要はない。**
+いずれも既存文書で明示的に後回しと決定済み。**新しく判断し直す必要はない。**ただし後続の作業で以下の部分実装が先行して入っている(後回しの決定自体を覆すものではなく、器・部分機能のみ):
 
-| # | 項目 | 根拠 |
-|---|---|---|
-| GAP-19 | `DisclosureView`(出力3層目・基準別の開示文生成) | M7要件§0の2026-08-02追記。型のみ用意済み、生成ロジックはフェーズ2以降 |
-| GAP-20 | DecisionRecordの実績照合・再判定アラート | build-plan §5.8「初年度には価値を生まない」。`actualOutcomeReview` は構造のみ |
-| GAP-21 | G5〜G8 / 対応4類型の回避・受容 / 集中リスク / 分位点の要因別分解(U-3) / 第4分解要因(U-7) | それぞれ M7 D-3・M6 D-5・M5 D-7・M4 F-6・M4 §7.3.1 で後回しと決定済み |
+| # | 項目 | 根拠 | 2026-08-10時点の先行実装 |
+|---|---|---|---|
+| GAP-19 | `DisclosureView`(出力3層目・基準別の開示文生成) | M7要件§0の2026-08-02追記。型のみ用意済み、生成ロジックはフェーズ2以降 | `a61fe2b`:器(型・空の生成ロジック)を実装済み(D-123。標準準拠を主張しない設計) |
+| GAP-20 | DecisionRecordの実績照合・再判定アラート | build-plan §5.8「初年度には価値を生まない」。`actualOutcomeReview` は構造のみ | `2e81b3b`:前提が変わった場合の再判定アラート(前半)を実装済み(D-122。通知のみで書き換えない) |
+| GAP-21 | G5〜G8 / 対応4類型の回避・受容 / 集中リスク / 分位点の要因別分解(U-3) / 第4分解要因(U-7) | それぞれ M7 D-3・M6 D-5・M5 D-7・M4 F-6・M4 §7.3.1 で後回しと決定済み | `8605641`:G6(選択的開示)検出を実装済み(D-121)。`b98a032`:M4 U-3(分位点の要因別分解)を実装済み(D-124)。G5・G7・G8・対応4類型・集中リスク・U-7は未着手のまま |
 
 ---
 
-## 6. 着手順(推奨)
+## 6. 着手順(推奨)【2026-08-10:第1〜3波は完了済み】
 
 依存関係だけを根拠にした順序。スコープの取捨はユーザー判断。
 
 ```
-第1波(他のすべての前提)
-  GAP-17  ティア読み替えの削除          … 半日。設計規律の直接違反、単独で完結
-  GAP-01  永続化層                      … これがないと以降すべてが積み上がらない
-  GAP-15  認証・テナント分離            … GAP-01と同時。後付けは高くつく
-  GAP-16  出力APIの認証                 … GAP-15に相乗り
+第1波(他のすべての前提)                完了済み(2026-08-10)
+  GAP-17  ティア読み替えの削除          … 解消(1f0e815)
+  GAP-01  永続化層                      … 解消(d4ac836、Postgres+Drizzle)
+  GAP-15  認証・テナント分離            … 部分解消(DBはテナント分離済み、実認証は未)
+  GAP-16  出力APIの認証                 … 解消(x-api-key必須、fail-closed)
 
-第2波(実データを通す)
-  GAP-02  取込UI + エラー表示
-  GAP-03  財務パラメータ入力            … M6 D-10のpending状態が初めて動く
-  GAP-08  ライセンスゲート配線          … GAP-04より先。契約前でも正しく保留できる状態を作る
-  GAP-13  評価不能基準の可視化          … GAP-08と同じ機構
+第2波(実データを通す)                  完了済み(2026-08-10)
+  GAP-02  取込UI + エラー表示           … 解消(387ff7e)
+  GAP-03  財務パラメータ入力            … 解消(aa8453b)
+  GAP-08  ライセンスゲート配線          … 解消(1f0e815)
+  GAP-13  評価不能基準の可視化          … 解消(1f0e815の短期対応・2026-08-10の中期対応)
 
-第3波(監査・台帳を完成させる)
-  GAP-06  レコード単位の再計算ハッシュ
-  GAP-07  旧版係数での再計算UI          … GAP-06に依存
-  GAP-09  代表値選択 + 前年度手法での再計算値
-  GAP-12  判定件数カウンタ
+第3波(監査・台帳を完成させる)          完了済み(2026-08-10)
+  GAP-06  レコード単位の再計算ハッシュ  … 解消(e63b900)
+  GAP-07  旧版係数での再計算UI          … 部分解消(4cedd53。係数値自体は未保存、D-118で既知の制約と明記)
+  GAP-09  代表値選択 + 前年度手法での再計算値 … 解消(a91b4b8)
+  GAP-12  判定件数カウンタ              … 解消(721b09d)
 
-第4波(M5・M7を完了条件まで)
-  GAP-10  M5パイプライン + 比較先の表示
-  GAP-05  M7段階1・2(PDF + AI抽出)
-  GAP-11  炭素価格シナリオ              … 一次資料の取得が先(§4)
+第4波(M5・M7を完了条件まで)            M5は完了、M7・炭素価格は人間の判断/データ待ち
+  GAP-10  M5パイプライン + 比較先の表示 … 解消(b091319)
+  GAP-05  M7段階1・2(PDF + AI抽出)     … 未着手。E-3(AI提供者・DPA)の判断待ち
+  GAP-11  炭素価格シナリオ              … GX-ETS(日本側)は一次資料取得完了(2026-08-10)。NGFS未取得のため3シナリオの数値化は未達
 
 並行(人間作業・§4)
-  C-2 ライセンス契約 → 解けたら GAP-04
-  C-4 CICES確認     → 実装が先行している根拠の後追い
-  C-1 LOI・支払意思ヒアリング
+  C-2 ライセンス契約 → 解けたら GAP-04(WDPA/KBAアダプタ本体)
+  C-4 CICES確認     → 解消(2026-08-10、`cices-v51-notes.md`)
+  C-1 LOI・支払意思ヒアリング → 継続中
 ```
 
 ---
@@ -385,6 +465,7 @@ M3 D-4.2は明示的にこれを禁じている:
 以下は実装に入る前にユーザー判断が要る。
 
 1. **GAP-14:** 実データ通しを水カテゴリのみに絞るか、気候カテゴリの貨幣化(既存GHG算定結果 × 炭素価格)を追加するか
-2. **GAP-01:** 永続化の選択肢(SQLite で単一プロセス完結 / Postgres でマルチテナント前提)。GAP-15のテナント分離設計に直結する
+2. ~~GAP-01の永続化選択肢~~ → **解消(2026-08-10、Postgres採用済み、d4ac836)**
 3. **GAP-05:** M7段階1・2で使うAIの提供者・モデルと、顧客の開示PDFを外部APIに送ることの契約上の扱い
 4. **§4 C-2:** ライセンス契約交渉を実装より先に進めるか、契約前提の機能(GAP-04)を後回しにして先に第1〜3波を仕上げるか
+5. **【2026-08-10新設】GAP-15の残作業:** テナント解決方式(サブドメイン・APIキー・簡易ログイン等)をどう実装するか。DBのテナント分離自体は完了済みだが、「どのリクエストがどのテナントか」を決める実際の認証方式はまだ選ばれていない

@@ -21,7 +21,7 @@ import { resolveSiteLocation } from "../site/location";
 import { buildMaterialIssues } from "../site/build-material-issues";
 import { buildNatureInterfaces } from "../site/locate";
 import { buildValuationRecords } from "../monetization/build-valuation-records";
-import { ALL_PLUGINS } from "../monetization/registry";
+import { getPluginsForCategory } from "../monetization/registry";
 import { applyGeographicCalibration } from "../monetization/calibration";
 import { buildPairwiseDecomposition } from "../divergence/pairwise-decomposition";
 import { appendBindingMechanismChange } from "../decision/binding-mechanism";
@@ -86,7 +86,7 @@ describe("M8統合テスト", () => {
       input,
       config,
       calibration: calibrationV1,
-      plugins: ALL_PLUGINS,
+      plugins: getPluginsForCategory("water"),
       versions: TEST_VALUATION_VERSIONS,
     });
   }

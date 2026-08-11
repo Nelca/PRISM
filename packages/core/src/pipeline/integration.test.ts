@@ -13,7 +13,7 @@ import { runValuationPipeline } from "./valuation-pipeline";
 import { runDecisionPipeline } from "./decision-pipeline";
 import { runDisclosurePipeline } from "./disclosure-pipeline";
 import { createIdSequence } from "./ids";
-import { ALL_PLUGINS } from "../monetization/registry";
+import { getPluginsForCategory } from "../monetization/registry";
 import { buildBridge1NatureAdjustedProfit } from "../financial-bridge/bridge1";
 import { buildBridge2SocialCostView } from "../financial-bridge/bridge2";
 import { computeRecalculationHash } from "../ledger/recalculation-hash";
@@ -158,7 +158,7 @@ describe("パイプライン統合テスト:架空の1社分のデータでM1〜
         input,
         config,
         calibration,
-        plugins: ALL_PLUGINS,
+        plugins: getPluginsForCategory("water"),
         versions: TEST_VALUATION_VERSIONS,
         calibrationSetVersion: "ifvi-water-consumption-v1",
         reconciliationFunctionVersion: "ifvi-reconciliation-v1",

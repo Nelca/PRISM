@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { exchangeAmount } from "@core/types/common";
 import type { BindingMechanism, CountermeasureType } from "@core/types/decision";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
@@ -70,7 +70,7 @@ export async function saveDecisionParametersAction(
     approvalThresholdValue = parsed;
   }
 
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   await appendInteractionEvent(tenantId, {
     actor: ACTOR,
     kind: "decision_parameters",
@@ -107,7 +107,7 @@ export async function selectCountermeasureAction(
   if (!siteId || !key) {
     return { error: "対策案を指定してください。" };
   }
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   await appendInteractionEvent(tenantId, {
     actor: ACTOR,
     kind: "countermeasure_selection",
@@ -154,7 +154,7 @@ export async function recordDecisionAction(
     mechanism = { kind };
   }
 
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   const state = await loadInteractionState(tenantId);
   const current = state.bindingMechanismState.get(siteId);
   const previousMechanism = current?.mechanism ?? { kind: "weak_reference" };

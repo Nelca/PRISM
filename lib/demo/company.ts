@@ -4,10 +4,23 @@
  * 実データが入手できるまでの間、build-plan §7.1のGATE検証・UIシェルの動作確認に使う
  *架空データ。**実在の企業を参照しない、完全に架空の設定値。**
  *
- * 拠点3件:
- *  - site-042(本社工場・化学、座標既知・水ストレス地域・KBA近接・ENCORE依存度高)
- *  - site-050(金属加工工場・鉄鋼、座標既知・水ストレスのみ該当)
+ * 拠点4件(waterStress・likelySignificantDependencyImpactはいずれもWRI Aqueduct 4.0・ENCORE
+ * の実データ反映(2026-08-10、`docs/data/aqueduct-water-stress-notes.md`・
+ * `docs/data/encore-materiality-notes.md`)に基づく):
+ *  - site-042(本社工場・化学、座標既知・KBA近接(WDPAライセンス保留中)。水ストレスは
+ *    「該当なし」(愛知県のbasinはMedium-High止まり)、ENCORE依存・影響は「該当あり」
+ *    (化学工業の圧力レーティングが高い)
+ *  - site-050(金属加工工場・鉄鋼、座標既知)。水ストレスは「該当なし」。ENCORE依存・影響は
+ *    「該当あり」(鉄鋼業は水供給への依存・GHG等排出の圧力が高い。旧実装は座標・業種を
+ *    無視した固定値でfalseにしていたが、実データで訂正した)
+ *  - site-060(海外サプライヤー・繊維、インド・グジャラート州)。水ストレスは「該当あり」
+ *    (Extremely High、>80%)。ENCORE依存・影響も「該当あり」の2基準が該当する実例
+ *    (2026-08-10追加)
  *  - site-099(海外サプライヤー・繊維、住所のみでジオコーディングが失敗する設定)
+ *
+ * `rapidIntegrityDecline`(GAP-13)は拠点IDのハードコードではなく、`interfacesByCategoryForSite`
+ * が拠点の座標から`@core/site/ecological-integrity-grid`を動的に引く(2026-08-10、
+ * `docs/data/ecosystem-integrity-trend-notes.md` §8.6)。新規に追加される拠点にも自動的に適用される。
  */
 
 import { IDENTITY_CALIBRATION } from "@core/divergence/test-helpers";
@@ -15,6 +28,14 @@ import { computeRecordHash } from "@core/ledger/recalculation-hash";
 import { exchangeAmount } from "@core/types/common";
 import { buildNatureInterfaces } from "@core/site/locate";
 import type { LayerLookup } from "@core/site/locate";
+import { isHighBaselineWaterStress } from "@core/site/water-stress";
+import type { BaselineWaterStressCategory } from "@core/site/water-stress";
+import { hasHighMaterialityRating } from "@core/site/encore-materiality";
+import type { EncoreMaterialityRating } from "@core/site/encore-materiality";
+import { isRapidIntegrityDecline } from "@core/site/ecosystem-integrity-trend";
+import { lookupEcologicalIntegrityTrend } from "@core/site/ecological-integrity-grid";
+import { defaultResolveCriterion } from "@core/site/criteria";
+import type { CriterionKey } from "@core/site/criteria";
 import type { NatureInterface, Site } from "@core/types/site";
 import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput, ExchangeValuationRecord } from "@core/types/valuation";
 import type { SiteRow } from "@core/site/ingest";
@@ -27,8 +48,71 @@ export const COMPANY_NAME = "東海化成株式会社(架空)";
 export const SITE_ROWS: SiteRow[] = [
   { id: "site-042", name: "本社工場", siteType: "own_site", industrySector: "chemicals", lat: 35.1, lng: 136.9 },
   { id: "site-050", name: "金属加工工場", siteType: "own_site", industrySector: "steel", lat: 34.7, lng: 135.5 },
+  { id: "site-060", name: "海外サプライヤー(繊維・グジャラート州)", siteType: "supplier_site", industrySector: "textile", lat: 23.0, lng: 72.6 },
   { id: "site-099", name: "海外サプライヤー(繊維)", siteType: "supplier_site", industrySector: "textile", address: "未特定地区(バングラデシュ)" },
 ];
+
+/**
+ * WRI Aqueduct 4.0 `baseline_annual`(GDBの`baseline_annual`レイヤ)から抽出した実データ
+ * (取得日2026-08-10、`docs/data/aqueduct-water-stress-notes.md` §4)。拠点座標に対する
+ * 厳密なpoint-in-polygon照会(fiona/OpenFileGDBドライバ)で該当basinを直接特定した値であり、
+ * 都道府県/州単位の面積加重近似(同ノート旧版)とも一致することを確認済み。
+ */
+const BASELINE_WATER_STRESS_CATEGORY: Record<string, BaselineWaterStressCategory> = {
+  "site-042": 2, // 愛知県のbasin、Medium-High(20-40%)、bws_raw=0.300
+  "site-050": 1, // 大阪府のbasin、Low-Medium(10-20%)、bws_raw=0.200
+  "site-060": 4, // インド・グジャラート州のbasin、Extremely High(>80%)、bws_raw=6.246
+};
+
+/**
+ * ENCORE知識ベース(2026年5月版)`06. Dependency mat ratings.csv`・`07. Pressure mat ratings.csv`
+ * から抽出した実データ(取得日2026-08-10、`docs/data/encore-materiality-notes.md` §4)。
+ * デモの業種をISIC業種に対応付け、High以上のレーティングのみを列挙している(N/A・ND・M以下は省略)。
+ */
+const ENCORE_HIGH_MATERIALITY_RATINGS: Record<string, EncoreMaterialityRating[]> = {
+  // chemicals→C_20_201_2011(Manufacture of basic chemicals)。圧力: Disturbances=VH、
+  // Emissions of toxic soil and water pollutants=VH。
+  "site-042": ["VH", "VH"],
+  // steel→C_24_241(Manufacture of basic iron and steel)。依存: Water supply=H、
+  // Water flow regulation=H。圧力: Disturbances=VH、Emissions of GHG=H、
+  // Emissions of non-GHG air pollutants=H、Emissions of toxic soil and water pollutants=VH。
+  "site-050": ["H", "H", "VH", "H", "H", "VH"],
+  // textile→C_13_131(Spinning, weaving and finishing of textiles)。依存:
+  // Education, scientific and research services=VH。
+  "site-060": ["VH"],
+};
+
+/**
+ * `interfacesByCategoryForSite`で`rapidIntegrityDecline`を`highEcosystemIntegrity`と
+ * 区別するための識別子。値そのものは`@core/site/ecological-integrity-grid`が座標から
+ * 動的に引く(拠点IDのハードコードではない。2026-08-10、`docs/data/ecosystem-integrity-trend-notes.md`
+ * §8.6。任意の新規拠点にも自動的に適用される)。
+ */
+const ECOLOGICAL_INTEGRITY_TREND_SOURCE = "Ecological Integrity Index (Sun et al. 2026)";
+
+/** 座標を持つ`Site`(coordinates・またはgeocoded済みのaddress)からlat/lngを取り出す。 */
+function siteCoordinates(site: Site): { lat: number; lng: number } | null {
+  if (site.location.kind === "coordinates") {
+    return { lat: site.location.lat, lng: site.location.lng };
+  }
+  if (site.location.geocoded && site.location.lat !== undefined && site.location.lng !== undefined) {
+    return { lat: site.location.lat, lng: site.location.lng };
+  }
+  return null;
+}
+
+/**
+ * `ecosystem_integrity`という1つのlayerTypeから2つの基準(highEcosystemIntegrity・
+ * rapidIntegrityDecline)を導出するためのresolveCriterion(D-90が定めた注入パターン)。
+ * dataSourceが上記トレンドデータの識別子であればrapidIntegrityDeclineへ、それ以外は
+ * criteria.tsの既定(defaultResolveCriterion)に委ねる。
+ */
+export function resolveCriterionForDemo(iface: NatureInterface): CriterionKey | null {
+  if (iface.dataSource === ECOLOGICAL_INTEGRITY_TREND_SOURCE) {
+    return "rapidIntegrityDecline";
+  }
+  return defaultResolveCriterion(iface);
+}
 
 /** 架空のジオコーディングサービス。site-099の住所は解決できない設定。 */
 export function demoGeocode(address: string): { lat: number; lng: number } | null {
@@ -41,17 +125,70 @@ export function demoGeocode(address: string): { lat: number; lng: number } | nul
 const LAYER_LOOKUPS_BY_SITE: Record<string, LayerLookup[]> = {
   "site-042": [
     { layerType: "kba", dataSource: "IBAT Alliance", licenseMode: "pending_review", lookup: () => true },
-    { layerType: "water_stress", dataSource: "WRI Aqueduct 4.0", licenseMode: "reference_only", lookup: () => true },
-    { layerType: "dependency_impact", dataSource: "ENCORE", licenseMode: "reference_only", lookup: () => true },
+    {
+      layerType: "water_stress",
+      dataSource: "WRI Aqueduct 4.0",
+      licenseMode: "reference_only",
+      lookup: () => isHighBaselineWaterStress(BASELINE_WATER_STRESS_CATEGORY["site-042"]),
+    },
+    {
+      layerType: "dependency_impact",
+      dataSource: "ENCORE",
+      licenseMode: "reference_only",
+      lookup: () => hasHighMaterialityRating(ENCORE_HIGH_MATERIALITY_RATINGS["site-042"]),
+    },
   ],
   "site-050": [
-    { layerType: "water_stress", dataSource: "WRI Aqueduct 4.0", licenseMode: "reference_only", lookup: () => true },
-    { layerType: "dependency_impact", dataSource: "ENCORE", licenseMode: "reference_only", lookup: () => false },
+    {
+      layerType: "water_stress",
+      dataSource: "WRI Aqueduct 4.0",
+      licenseMode: "reference_only",
+      lookup: () => isHighBaselineWaterStress(BASELINE_WATER_STRESS_CATEGORY["site-050"]),
+    },
+    {
+      layerType: "dependency_impact",
+      dataSource: "ENCORE",
+      licenseMode: "reference_only",
+      lookup: () => hasHighMaterialityRating(ENCORE_HIGH_MATERIALITY_RATINGS["site-050"]),
+    },
+  ],
+  "site-060": [
+    { layerType: "kba", dataSource: "IBAT Alliance", licenseMode: "pending_review", lookup: () => true },
+    {
+      layerType: "water_stress",
+      dataSource: "WRI Aqueduct 4.0",
+      licenseMode: "reference_only",
+      lookup: () => isHighBaselineWaterStress(BASELINE_WATER_STRESS_CATEGORY["site-060"]),
+    },
+    {
+      layerType: "dependency_impact",
+      dataSource: "ENCORE",
+      licenseMode: "reference_only",
+      lookup: () => hasHighMaterialityRating(ENCORE_HIGH_MATERIALITY_RATINGS["site-060"]),
+    },
   ],
 };
 
+/**
+ * `rapidIntegrityDecline`は拠点IDに紐づく固定値ではなく、拠点の座標から
+ * `lookupEcologicalIntegrityTrend`(0.5度グリッド、全球をカバー)を動的に引く。
+ * 座標が解決できた拠点であれば、既存の3拠点に限らず**新規に追加された拠点にも
+ * 自動的に適用される**(2026-08-10、`docs/data/ecosystem-integrity-trend-notes.md` §8.6。
+ * 従来はsite-042/050/060限定のハードコードだった制約を解消した)。
+ */
 export function interfacesByCategoryForSite(site: Site): Partial<Record<"water", NatureInterface[]>> {
-  const lookups = LAYER_LOOKUPS_BY_SITE[site.id] ?? [];
+  const lookups = [...(LAYER_LOOKUPS_BY_SITE[site.id] ?? [])];
+  const coordinates = siteCoordinates(site);
+
+  if (coordinates) {
+    lookups.push({
+      layerType: "ecosystem_integrity",
+      dataSource: ECOLOGICAL_INTEGRITY_TREND_SOURCE,
+      licenseMode: "reference_only",
+      lookup: () => isRapidIntegrityDecline(lookupEcologicalIntegrityTrend(coordinates.lat, coordinates.lng)),
+    });
+  }
+
   return { water: buildNatureInterfaces(site, lookups) };
 }
 
@@ -147,9 +284,20 @@ export const DEEP_DIVE_INPUT: PhysicalQuantityInput = {
   targetRegion: "JP",
 };
 
+/**
+ * pppValue=94.46円/国際ドル(日本、2024年、PA.NUS.PPP、World Bank ICP。
+ * `docs/data/calibration-parameters-v1.md` §1、取得日2026-08-08)。
+ * IFVIのGlobal Perspective値(VFnutrition/VFdisease/VFes/VFaccess)は国際ドルで
+ * 表現されている(方法論Appendix B §B37-B41)ため、円で表示するにはこの換算が必須。
+ * 旧仮値(1.0=恒等変換)のままだと生の米ドル数値がそのまま「円」として表示されてしまう
+ * (`docs/data/acquisition-runbook.md` §3.4のフォローアップで発見)。
+ * sourceRegion=targetRegion="JP"のため所得弾力性調整(所得比100/100=1)・
+ * デフレータ・相対価格上昇(elapsedYears=0)は実質無効化されており、この案件では
+ * pppValueのみが実際に効く。
+ */
 export const DEEP_DIVE_CALIBRATION: Omit<GeographicCalibrationRecord, "sourceRegion" | "targetRegion"> = {
-  pppSource: "世界銀行ICP 2024年版",
-  pppValue: 1.0,
+  pppSource: "世界銀行ICP 2024年版(PA.NUS.PPP、docs/data/calibration-parameters-v1.md §1)",
+  pppValue: 94.46,
   incomeElasticity: 0.7,
   sourceIncomeLevel: 100,
   targetIncomeLevel: 100,
@@ -159,15 +307,23 @@ export const DEEP_DIVE_CALIBRATION: Omit<GeographicCalibrationRecord, "sourceReg
   areaScaling: 1.0,
 };
 
+/**
+ * IFVI Water Consumption Topic Methodology, Appendix D Table D1、日本(Japan)の行より転記
+ * (Global Perspective、USD(2024)/m3、national/minimum option。取得日2026-08-10、
+ * `docs/data/acquisition-runbook.md` §3.4)。プラグインは較正前(source region)の値を
+ * 受け取る前提のため、PPP等の変換は行わずIFVI公表値をそのまま渡す
+ * (`packages/core/src/monetization/calibration.ts`が地理較正を一元的に適用する)。
+ * 旧仮値(1.35 / 1.05 / 1.62 / 0.34)からの差し替え。
+ */
 export const DEEP_DIVE_CONFIG: MethodConfig = {
   depth: "deep_dive",
   unitReplacementCost: 620, // 円/m3(代替水源調達コスト、企業提供の想定値)
   externalValueFactors: {
     "lime3-water": 28_500,
-    "ifvi-vfnutrition": 1.35,
-    "ifvi-vfdisease": 1.05,
-    "ifvi-vfes": 1.62,
-    "ifvi-vfaccess": 0.34,
+    "ifvi-vfnutrition": 0.0,
+    "ifvi-vfdisease": 0.0,
+    "ifvi-vfes": 2.97,
+    "ifvi-vfaccess": 0.0,
   },
   vfesFitnessDimensions: {
     ecologicalFit: 0.75,

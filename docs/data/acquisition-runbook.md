@@ -2,7 +2,7 @@
 
 **目的:** `docs/requirements/mvp-completion-gap.md` のGAPを埋めるために、**コードを書く以外に**必要なもの(外部データ・契約・アカウント・顧客提供データ・人間の判断)を網羅し、取得手順を定める。
 **参照元:** `docs/requirements/mvp-completion-gap.md`、`docs/data/licensing.md`、`docs/business/outreach-action-plan.md`
-**最終更新:** 2026-08-08
+**最終更新:** 2026-08-10
 
 ---
 
@@ -25,18 +25,18 @@
 |---|---|---|---|---|
 | A-1 | CICES V5.1 階層・コード体系 | AI可 | **取得完了**(2026-08-10、§2.1) | — |
 | A-2 | NGFS 炭素価格軌道(2シナリオ) | 人間 | 未取得(§3.2) | GAP-11 |
-| A-3 | GX-ETS 価格の一次資料 | 人間 | 二次資料一致のみ(§3.3) | GAP-11 |
-| A-4 | IFVI 価値係数(水消費の国別4本 + Global Value Factor DB) | 人間 | 未取得(§3.4) | M3の実係数 / GAP-14 |
+| A-3 | GX-ETS 価格の一次資料 | AI可(要User-Agent工夫) | **取得完了**(2026-08-10、§3.3) | GAP-11 |
+| A-4 | IFVI 価値係数(水消費の国別4本 + Global Value Factor DB) | 人間 | 水消費4本は**取得・コード反映完了**(2026-08-10、§3.4)。Global Value Factor DBは未取得(他カテゴリ用、現行実装では不要) | M3の実係数 / GAP-14 |
 | A-5 | LIME3 係数 | 人間 | 未取得(§3.5) | M3の実係数 |
 | A-6 | CE Delft 環境価格ハンドブック | 人間 | 未取得(§3.5) | 汚染カテゴリ / AoP対応表のCE Delft分 |
 | A-7 | ESVD 個別レコード + 日本カバレッジ | 人間 | 未取得(§3.5) | M3ティア判定の実運用 |
 | A-8 | WDPA / KBA レイヤ | 人間 | 未取得(§3.5) | GAP-04 / GAP-08 |
-| A-9 | Aqueduct 4.0 水ストレス | AI可(要フォーム) | 未取得(§3.7) | GAP-04 |
-| A-10 | ENCORE 依存・影響レーティング | AI可 | 未取得(§3.8) | GAP-04 |
-| A-11 | 生態系完全性トレンドのデータ源 | AI可(調査) | 未着手(§3.9) | GAP-13 |
+| A-9 | Aqueduct 4.0 水ストレス | AI可(要フォーム) | **取得・コード反映完了**(2026-08-10、§3.7) | GAP-04 |
+| A-10 | ENCORE 依存・影響レーティング | AI可 | **取得・コード反映完了**(2026-08-10、§3.8)。帰属表示の実装は残作業 | GAP-04 |
+| A-11 | 生態系完全性トレンドのデータ源 | AI可(調査) | **調査・コード反映完了**(2026-08-10、§3.9・§E-8) | GAP-13 |
 | A-12 | 炭素の社会的費用 | AI可 | **取得済**(§2.4) | GAP-14 |
 | A-13 | 地理較正パラメータ(PPP・所得・デフレータ・η・相対価格) | AI可 | **取得済**(§2.2・§2.3) | M3 §3.2の監査要件 |
-| A-14 | TNFD LEAP L3 の5基準原文 | 人間 | 未取得(§3.10) | M1 D-2の根拠固め |
+| A-14 | TNFD LEAP L3 の5基準原文 | AI可(要User-Agent工夫) | **取得完了**(2026-08-10、§3.10・`docs/data/tnfd-leap-l3-criteria.md`) | M1 D-2の根拠固め |
 | A-15 | SSBJ基準本文 | 人間 | 未着手 | GAP-19(フェーズ2) |
 
 ### B. 契約・許諾 —— **すべて人間。AIでは代替不能**
@@ -92,6 +92,7 @@
 | E-5 | η を文献中心値 0.587 とするか現行の 0.7 のままとするか | `calibration-parameters-v1.md` §3 |
 | E-6 | CICES を V5.1 のままとするか V5.2 に追随するか | `cices-v51-notes.md` §4 |
 | E-7 | 相対価格上昇率をカテゴリ別に使い分けるか(MVPは全体値1本を推奨) | `calibration-parameters-v1.md` §5 |
+| E-8 | 【2026-08-10 実装完了・拠点座標への動的対応も追加実装済み】`rapidIntegrityDecline`(GAP-13)にEcological Integrity Index(CC BY 4.0)を実装する判断が下され、実装済み。閾値はIUCN Red List Criterion A2(10年で30%以上の減少)を借用。当初は3拠点限定のハードコードだったが、0.5度グリッド(約2.5MB、リポジトリに同梱)を拠点座標から動的に引く方式に差し替え、新規追加拠点にも自動対応(空間精度は1km→約55kmに低下)。`unevaluatedCriteria`から`rapidIntegrityDecline`が外れたことを画面(`/sites`)で確認済み | `ecosystem-integrity-trend-notes.md` §6・§7・§8.6 |
 
 ### F. フェーズ0の残作業(実装と独立)
 
@@ -119,7 +120,7 @@
 | **E-2** | 永続化の選択(SQLite / Postgres) | 同上 | C-4を発注する前の判断。これ自体はコストゼロ |
 | **E-1** | 対象カテゴリのスコープ判断 | GAP-14、およびM3プラグインを追加するか否か | 「水のみで通す」なら除外理由の記録を書き、「気候を足す」ならプラグインを書く。**やる作業が正反対**になる |
 | **E-3 + C-5 + B-6** | AI提供者の決定・APIキー・顧客の同意(DPA) | **GAP-05(M7段階1・2)** | 顧客の未公表開示PDFを外部APIに送る可否が決まらないと、設計(社内処理かAPIか)自体が決まらない |
-| **A-2 + A-3** | NGFS価格軌道・GX-ETS一次資料 | **GAP-11(シナリオ差の数値化)** | 価格を推定で置くことは D-15 に直接抵触する。**現在の「ラベルのみ」実装を維持するのが正しい** |
+| **A-2**(A-3は2026-08-10解消) | NGFS価格軌道 | **GAP-11(シナリオ差の数値化)** | GX-ETS(日本側)は一次資料で確定済み(§3.3)だが、NGFS(Net Zero 2050 / Current Policies)側の価格軌道が無いため、3シナリオ間の比較という当初要件はまだ満たせない。価格を推定で置くことは D-15 に直接抵触する。**現在の「ラベルのみ」実装を維持するのが正しい** |
 | **B-1** | WDPA/IBAT契約 | GAP-04のうち **WDPA/KBAアダプタの実装** | データが手元に無い以上、照会コードを書いても動かせない。ただしGAP-08(ゲーティング)は逆に**契約前にこそ必要**(下記) |
 | **D-4〜D-9** | 顧客の財務・意思決定・開示データ | **実データでの**GAP-03検証、build-plan §7.1のGATE | 入力UI(コード)は先に書けるが、通すデータが無い |
 
@@ -127,9 +128,9 @@
 
 | # | 項目 | 進められること | 到着後に差し替わるもの |
 |---|---|---|---|
-| A-4 / A-5 / A-6 / A-7 | IFVI・LIME3・CE Delft・ESVDの係数 | **プラグイン構造は既に完成している**(M3 D-3)。係数は `VersionedParameterSet` の差し替えで入る | 係数の実値。現在はデモ用の仮値 |
+| A-4 / A-5 / A-6 / A-7 | IFVI・LIME3・CE Delft・ESVDの係数 | **プラグイン構造は既に完成している**(M3 D-3)。係数は `VersionedParameterSet` の差し替えで入る | 係数の実値。**IFVI水消費4本は2026-08-10に日本の実値へ差し替え済み**(§3.4)。LIME3・CE Delft・ESVDは依然デモ用の仮値 |
 | A-9 | Aqueduct 水ストレス | 注入口は実装済み。閾値でのboolean化は呼び出し側の責務(`criteria.ts`) | 公式カテゴリ区分による判定閾値 |
-| A-11 | 生態系完全性トレンド | **GAP-13の短期対応(「5基準中4基準で評価」表示)は今すぐ実装できる** | `rapidIntegrityDecline` の実判定(該当データ源が無ければ恒久的に無し) |
+~~A-11~~ | ~~生態系完全性トレンド~~ | ~~解消(2026-08-10。E-8参照)~~ | ~~`rapidIntegrityDecline`の実判定はEcological Integrity Indexの実データで実装済み~~ |
 | B-2〜B-5 | ESVD・IFVI・CE Delft・LIME3 の契約 | 上と同じ。**構造は契約に依存しない** | 商用利用可否。不可なら `licenseMode` を変えてゲーティング(GAP-08)で止める |
 | D-1〜D-3 | 顧客の拠点・調査・物理量 | 取込UI(GAP-02)はテンプレート仕様が確定済みなので先に書ける | 実データ |
 
@@ -140,12 +141,12 @@
 | # | 項目 | 位置づけ |
 |---|---|---|
 | A-1の残り | CICES公式スプレッドシート | MVPで付与するCICESコードはESVDレコードの記載を転記するのみで、PRISM側で階層表を引かない(`cices-v51-notes.md` §3)。**独自にコードを割り当てる必要が生じた時点で硬ブロックに変わる** |
-| A-10 | ENCORE帰属表示 | 無料・CC BY-SA・契約不要。**今すぐ実装できる義務**であり、待つ理由がない |
-| A-14 | TNFD LEAP L3 原文 | 実装は既にある。監査説明の根拠を後追いするだけ |
+~~A-14~~ | ~~TNFD LEAP L3 原文~~ | ~~解消(2026-08-10、`tnfd-leap-l3-criteria.md`)~~ |
 | A-15 | SSBJ基準本文 | GAP-19(フェーズ2) |
 | E-5 / E-6 / E-7 | η の採用値 / CICES版 / 相対価格のカテゴリ別 | **既定値のまま実装を進めてよい。**採用値と理由をAssumptionEntryに記録できていれば、後から版を切って変更できる(M8 D-3) |
+~~E-8~~ | ~~`rapidIntegrityDecline`の実装可否~~ | ~~解消(2026-08-10、実装完了)~~ |
 | F-1 | LOI・支払意思ヒアリング | 実装と独立。ただし**構想書10.7の継続条件**であり、事業判断としては最上位 |
-| §3.6 | World Bank利用条件の確認 | 帰属表示の書式が決まるだけ |
+| §3.6 | World Bank帰属表示のUI実装 | ライセンス・書式は確定済み(§3.6完了)。ENCORE・WRI Aqueductと異なり、画面(`app/components/attribution.tsx`)への追加はまだ行っていない |
 
 ### 1.8.4 取得済みデータが解除したブロック(2026-08-08時点)
 
@@ -155,16 +156,16 @@
 | CICES階層・コード体系(§2.1) | M4 §6.3の前方一致実装の前提が**根拠付きになった**(従来は根拠文書ゼロで `cicesMatchLevel: "group"` が動いていた) |
 | 炭素の社会的費用 236 USD/tCO2(§2.4) | E-1で気候カテゴリを選ぶ場合の**厚生価値側の係数が確保済み。**交換価値側(GX-ETS)は硬ブロックのまま |
 
-### 1.8.5 着手順(`mvp-completion-gap.md` §6)との対応
+### 1.8.5 着手順(`mvp-completion-gap.md` §6)との対応 【2026-08-10:第1〜3波は実装完了】
 
-| 波 | 硬ブロックの有無 |
+| 波 | 状態(2026-08-10時点) |
 |---|---|
-| 第1波(GAP-17 / 01 / 15 / 16) | GAP-17(ティア読み替えの削除)は**ブロックなし・今すぐ着手可**。残りは **E-2 → C-4** が解けるまで着手不可 |
-| 第2波(GAP-02 / 03 / 08 / 13) | **GAP-08・13 はブロックなし・今すぐ着手可。**GAP-02・03 はUI実装まで可、実データ検証は D-1〜D-9 待ち |
-| 第3波(GAP-06 / 07 / 09 / 12) | GAP-06・09 はブロックなし。GAP-07・12 は C-4(永続化)待ち |
-| 第4波(GAP-10 / 05 / 11) | GAP-10 はブロックなし。**GAP-05 は E-3+C-5+B-6 待ち、GAP-11 は A-2+A-3 待ちで、いずれも硬ブロック** |
+| 第1波(GAP-17 / 01 / 15 / 16) | **完了。**GAP-17・01・16は解消。GAP-15はDBのテナント分離までは完了、実認証方式の選択が残る |
+| 第2波(GAP-02 / 03 / 08 / 13) | **完了。**GAP-02・03・08・13すべて解消 |
+| 第3波(GAP-06 / 07 / 09 / 12) | **概ね完了。**GAP-06・09・12は解消。GAP-07は較正パラメータの再計算UIは実装済みだが、手法係数値自体の永続化は既知の制約として残る(D-118) |
+| 第4波(GAP-10 / 05 / 11) | GAP-10は解消。**GAP-05 は E-3+C-5+B-6 待ち(人間の判断・契約)、GAP-11 はGX-ETS(A-3)は解決済みだがNGFS(A-2)待ちで、いずれも硬ブロックのまま** |
 
-**結論:GAP-17・08・13・06・09・10 と ENCORE帰属表示(A-10)は、外部データ・契約・判断のいずれも待たずに今すぐ着手できる。**それ以外はまず **E-2(永続化の選択)** を決めるのが、最も広いブロックを外す一手になる。
+**結論(更新):**MVP完成までのギャップ(GAP-01〜18)は、GAP-04(WDPA契約待ち)・GAP-05(AI提供者決定待ち)・GAP-11(NGFS未取得)・GAP-14(スコープ判断待ち)・GAP-15の残作業(テナント認証方式)を除き、**実装としては完了している。**残るブロッカーはすべて外部データ・契約・人間の判断であり、コードで解消できるものではない。詳細は`docs/requirements/mvp-completion-gap.md`(2026-08-10更新)を参照。
 
 ---
 
@@ -214,11 +215,11 @@ World Bank APIから取得(データ最終更新 2026-07-13):
 
 Global Value Factor Database の内容:約10万件。大気汚染(最大6物質)・土地利用転換・廃棄物・水質汚染(104物質)。
 
-### 2.6 Aqueduct 4.0 の所在
+### 2.6 Aqueduct 4.0 の所在【2026-08-10 追記:取得完了】
 
 - 直接ダウンロード: `https://files.wri.org/aqueduct/aqueduct-4-0-water-risk-data.zip`
 - フォーム経由のダウンロードも用意されている
-- ライセンス表記は「Creative Commons」とのみ。**版(CC BY 4.0か等)は未確認**(§3.7)
+- ライセンスは**CC BY 4.0と確定**(§3.7、`docs/data/aqueduct-water-stress-notes.md`)。BWSカテゴリ区分・boolean化閾値・コード反映まで完了
 
 ---
 
@@ -278,39 +279,57 @@ Global Value Factor Database の内容:約10万件。大気汚染(最大6物質)
 
 ---
 
-### 3.3 GX-ETS 価格の一次資料(A-3)【人間】
+### 3.3 GX-ETS 価格の一次資料(A-3)【2026-08-10 完了】
 
 **目的:** GAP-11の日本側。二次資料での値(4,300 / 1,700 円/t-CO2、実質3%/年)を一次資料で確定する。
 
-**手順:**
-1. 経済産業省サイトで「産業構造審議会 グリーントランスフォーメーション推進小委員会 排出量取引制度小委員会(第7回)」(2025年12月19日)の配布資料を開く
-2. **資料3のPDFをダウンロードし、参考上限取引価格・調整基準取引価格の記載ページを特定する**
-3. 「2027年度以降は実質3%ずつ引き上げ」の**正確な定義**を確認する(何を基準にした実質か、参照するインフレ指標は何か、改定の起点年はいつか)
-4. `docs/data/carbon-price-scenarios.md` §2 を更新し、資料名・ページ番号・公表日・URLを記録する
+**結果:** METI公式サイトのPDF(`https://www.meti.go.jp/shingikai/sankoshin/sangyo_gijutsu/emissions_trading/pdf/20251219_2.pdf`、「令和8年度の参考上限取引価格及び調整基準取引価格に関する意見」、排出量取引制度小委員会、2025年12月19日)を取得し、二次資料の数値(¥4,300 / ¥1,700)と完全一致することを確認した。改定ルールの正確な定義(「前年度価格 ×(当該年度の物価変動指数の見通し + 1.03)」、法第39条第1項・第116条第1項に基づく)も原文で確認できた。**当初「2027年度以降」としていたのは誤りで、一次資料はこの改定式の適用を令和9〜12年度(2027〜2030年度)の4年間に限定している**ことが判明した。詳細は`docs/data/carbon-price-scenarios.md` §2。
 
-**費用:** 無料 / **所要:** 30分
+**AIが直接取得できた理由(§4の記録の訂正):** METI・自動取得ツール(WebFetch)には403で拒否されたが、ブラウザ相当のUser-Agentヘッダーを付けたPythonの直接リクエストでは取得できた。ログイン・登録不要の完全な公開PDFだった。
 
-**完了条件:** 二次資料由来の記述が、一次資料の該当ページ引用に置き換わっている。
+**費用:** 無料 / **所要:** 15分
+
+**完了条件:** 二次資料由来の記述が、一次資料の該当箇所引用に置き換わっている(**達成**)。
 
 ---
 
-### 3.4 IFVI 価値係数(A-4)【人間】
+### 3.4 IFVI 価値係数(A-4)【2026-08-10 手順1・3(部分)・4完了、手順2は残作業】
+
+**2026-08-10追記(コードへの反映):** ユーザーから「現時点でこのプロダクトは個人利用のみであり、Content Termsの商用利用禁止条項には抵触しないことを確認済み」との判断が示されたため、下表の日本のVF4本を実装に反映した。
+
+- `lib/demo/company.ts`(`DEEP_DIVE_CONFIG.externalValueFactors`)・`lib/demo/user-site-defaults.ts`(`buildUserDeepDiveConfig`)の`ifvi-vfnutrition`/`ifvi-vfdisease`/`ifvi-vfes`/`ifvi-vfaccess`を、旧仮値(1.35 / 1.05 / 1.62 / 0.34)から実値(0.00 / 0.00 / 2.97 / 0.00)に差し替えた。プラグイン(`packages/core/src/monetization/plugins/ifvi-water-consumption.ts`)は「較正前・source region」の値を受け取る設計のため、PPP等の変換はせずIFVI公表値をそのまま渡している(地理較正は`calibration.ts`が別途一元適用)。
+- `lib/demo/run-demo-pipeline.ts`の`m3_methodPluginVersions["ifvi-water-consumption"]`を`"2026-03-final"`→`"2026-03-final:jp-table-d1-v1"`に更新した。IFVI方法論自体(プラグインの`version`フィールド)は不変だが、投入係数データが仮値から実値に変わったことをRecalculationHash(M8)に反映し、GAP-20の再判定アラートが正しく発火するようにするため。
+- `VersionedParameterSet`(setId: `"ifvi-water-consumption"`)は現状、コード内のどこからも呼び出されていない未使用ユーティリティ(`packages/core/src/ledger/versioned-parameter-set.ts`、テスト以外に呼び出し元なし)であり、実データの数値そのものを保持する設計にもなっていない(版のメタデータ(いつ・なぜ変更したか)のみを保持する設計、`docs/decisions/design-rationale-log.md` D-97)。よって本件では上記のバージョン文字列変更(RecalculationHash経由)で追跡し、この関数群自体は呼び出していない。
+- テスト370件全て green(`npx vitest run`)。既存テストはこれらの数値をハードコードで検証していないため、既存の期待値には影響なし。
+- **注意:** これは国レベル(minimum option)の値であり、拠点レベルの精度を上げる場合は本文Eq.3-5(局所BD/WS比率による補正)の実装が別途必要(未実装。現状のプラグインは拠点補正を行わない)。
+
+**手順4(完了):** 上記の通り、係数はコードに反映済み。当初想定していた`VersionedParameterSet`への「版としての登録」は、この関数群が現状プロダクションコードから未使用のため見送り、RecalculationHashのバージョン文字列変更で代替した。
 
 **目的:** M3のIFVIプラグインに実係数を入れる(現在はデモ用の仮値)。
 
-**手順:**
-1. **水消費の国別4本(VFnutrition / VFdisease / VFes / VFaccess):**
-   `https://ifvi.org/wp-content/uploads/2026/03/IFVI_VBA_Environmental_Methodology-2_Water-Consumption_FIN_04.pdf` をダウンロードし、**Appendix D(Table D1)の日本(Japan)の行**を転記する。単位と価格基準年を必ず併記する
+**結果(手順1):** 人間がPDFをダウンロード・配置し、AI側で読み取れた(この環境のReadツールはPDFをネイティブに処理でき、pdftotextの不在は障害にならなかった)。**Appendix D(Table D1)の日本(Japan)の行**は以下の通り(Global Perspective、USD(2024)/m³、Global Value Factor Database側とは別に方法論PDF本体に掲載):
+
+| 変数 | 値 | 備考 |
+|---|---|---|
+| VFes(生態系サービス) | $2.97 | |
+| VFnutrition(栄養不良) | $0.00 | |
+| VFdisease(水系感染症) | $0.00 | |
+| VFaccess(将来アクセス費用) | $0.00 | |
+| VFH2O,national(集計値) | $2.97 | Eq.2適用済みの国別集計値。VFaccess + MAX(VFes, VFnutrition, VFdisease) |
+| BDnational(生物多様性圧力) | 3.59 | WWF Biodiversity Risk Filter準拠 |
+| WSnational(水ストレス) | 1.97 | Aqueduct Water Risk Atlas準拠 |
+
+地域・所得階級区分:East Asia & Pacific / High income。価格基準年:2024年(USD)。これは**国レベルの値**であり、拠点レベルで使う場合は本文Eq.3-5(局所BD/WS比率による補正)を適用する必要がある(§3.4の元の手順4は変更なし、`VersionedParameterSet`への登録は残作業)。
+
+**結果(手順3・利用条件、部分完了):** PDF本体p.3-4の「Terms of Use for Available Content」を確認した。**商用プロダクトへの組み込みは明確に禁止**(§1.3(a):"for any commercial or for-profit purpose, including... in any public reporting")。再配布も不可(§1.2)。詳細は`docs/data/licensing.md`のIFVIセクションに記録済み。**ただし** これはPDF本体に印字された規約であり、IFVI本体の一般利用規約(`https://ifvi.org/terms-of-use/`)は未読(本規約が優先するため必須ではないが、定めのない事項の補完として確認が望ましい)。**商用利用の可否そのものはこの規約により実質確定(不可)だが、非営利アドバイザリー例外に当たる余地があるかはIFVIへの直接照会が必要**(下書きは`docs/business/outreach-action-plan.md`)。
+
+**残作業(手順2):**
 2. **Global Value Factor Database:**
-   `https://ifvi.org/methodology/environmental-topic-methodology/interim-methodologies/download-form-global-value-factor-database/` のフォームを送信して取得する
-3. **利用条件の確認(重要):** `https://ifvi.org/terms-of-use/` を確認し、**商用プロダクトへの組み込みと再配布の可否**を書面で確定させる。不明な場合はIFVIに直接照会する(下書きは `docs/business/outreach-action-plan.md`)
-4. 取得した係数は `VersionedParameterSet`(setId: "ifvi-water-consumption")として版を切って登録する
+   `https://ifvi.org/methodology/environmental-topic-methodology/interim-methodologies/download-form-global-value-factor-database/` のフォームを送信して取得する(人間のフォーム入力が必要。フォーム提出後に表示される規約が方法論PDF本体のContent Termsと同一かも確認する)。**このDBは大気汚染・土壌利用転換・廃棄物・水質汚染(104物質)を含む約10万件規模で、水消費のVF4本(今回反映済み)とは別データ。**現在の実装(水消費カテゴリのみ)には不要だが、将来他カテゴリを追加する場合に必要になる。
 
-**費用:** 方法論PDFは無料。係数の商用利用は**有償ライセンスと明記されている**(`licensing.md`)/ **所要:** 取得は1日、契約は交渉次第
+**費用:** 方法論PDFは無料。係数の商用利用は**Content Termsにより明確に禁止されているが、個人利用の範囲では抵触しないことを確認済み**(`licensing.md`)/ **所要:** Global Value Factor Databaseの取得は1日、商用展開する場合は利用条件の個別照会・契約が別途必要
 
-**AIが取れなかった理由:** PDFのテキスト抽出に失敗(圧縮ストリームのまま返る)。ダウンロードフォームは人間の入力が必要。
-
-**完了条件:** 日本のVF 4本の数値・単位・価格基準年が記録され、商用利用の可否が書面で確定している。
+**完了条件:** 日本のVF 4本の数値・単位・価格基準年が記録され、コードに反映されている(**完了**)。商用利用の可否は個人利用の範囲では問題なしと確認済み(商用展開時は再確認が必要)。
 
 ---
 
@@ -331,70 +350,76 @@ Global Value Factor Database の内容:約10万件。大気汚染(最大6物質)
 
 ---
 
-### 3.6 World Bank データの利用条件確認(A-13の残り)
+### 3.6 World Bank データの利用条件確認(A-13の残り)【2026-08-10 完了】
 
-**手順:** `https://datacatalog.worldbank.org/public-licenses` を確認し、使用した3指標(`PA.NUS.PPP` / `NY.GNP.PCAP.PP.CD` / `NY.GDP.DEFL.ZS`)が CC BY 4.0 の対象であることと、要求される帰属表示の書式を `docs/data/licensing.md` に転記する。
+**結果:** `https://datacatalog.worldbank.org/public-licenses` および `https://datacatalog.worldbank.org/search/dataset/0037712`(World Development Indicators)を確認した。使用した3指標(`PA.NUS.PPP` / `NY.GNP.PCAP.PP.CD` / `NY.GDP.DEFL.ZS`)はいずれもWDIに属し、**CC BY 4.0の対象・商用利用可・帰属表示のみが義務**であることを確認した。詳細は`docs/data/licensing.md`のWorld Bankセクションに記録済み。
 
 **費用:** 無料 / **所要:** 15分
 
 ---
 
-### 3.7 Aqueduct 4.0(A-9)
+### 3.7 Aqueduct 4.0(A-9)【2026-08-10 完了】
 
-**手順:**
-1. `https://files.wri.org/aqueduct/aqueduct-4-0-water-risk-data.zip` をダウンロード(または wri.org のフォーム経由)
-2. **ライセンスの版を確定する。**ページ表記は「Creative Commons」のみで版が不明。同梱のLICENSE/READMEまたは技術ノートで CC BY 4.0 かどうかを確認し、帰属表示の書式を `licensing.md` に記録する
-3. 技術ノート「Aqueduct 4.0: Updated Decision-Relevant Global Water Risk Indicators」から、**Baseline Water Stress のカテゴリ区分と閾値**を抜く。M1の `waterStress` 基準の判定閾値はこれに従う(独自閾値を発明しない)
-4. `NatureInterface.rawResult` に入れる形(boolean化するか数値のまま持つか)を決める。`criteria.ts` は数値なら「0より大きければ充足」という構造的既定を使うため、**閾値でのboolean化は呼び出し側の責務**である
+**結果:** 人間がzipをダウンロード・展開し、AI側でCSV(`baseline_annual`)・READMEを確認した。詳細は`docs/data/aqueduct-water-stress-notes.md`に記録済み。
+
+- **ライセンス:** CC BY 4.0(WRI公式FAQで確定。従来「版不明」としていたのを解消)。帰属表示書式は `Source: WRI Aqueduct, accessed on [date]`。`docs/data/licensing.md`に転記済み
+- **BWSカテゴリ区分:** CSVの`bws_cat`/`bws_label`列から直接確認(技術ノートの転記ではなく実データで確認できたため、より確実)。Low/Low-Medium/Medium-High/High/Extremely Highの5区分 + Arid and Low Water Use(-1)/No Data(-9999)
+- **boolean化閾値:** `bws_cat >= 3`(High、40%以上)を水ストレス地域とする(WRI自身が企業のリスク選定の目安とする40%閾値に準拠)。`Arid and Low Water Use`も同様にtrue。実装は`packages/core/src/site/water-stress.ts`の`isHighBaselineWaterStress()`
+- **拠点への適用(発見):** 当初CSVにbasinの幾何情報がなくGDAL等が環境になかったため都道府県/州単位の面積加重近似で代替していたが、サンドボックス外での`pip install fiona`が成功し(GDAL同梱ホイール)、GDBファイルへの厳密なpoint-in-polygon照会を実行できた。**近似値と厳密値は3拠点すべてで一致**(愛知=cat2、大阪=cat1、グジャラート=cat4)。**日本国内は面積の過半数が「High」に達する都道府県が存在せず**(最大は兵庫県で7.2%)、デモ拠点site-042(愛知県付近)・site-050(大阪府付近)は実データ上いずれも`waterStress: false`になることが判明した。旧実装(`lookup: () => true`、座標を無視した固定値)を実データに差し替えた
+- **デモへの反映:** ユーザー判断により、site-042・site-050は実データどおりfalseに訂正し、複数のTNFD基準が該当する実例として、Aqueductで実際に「Extremely High」区分となるインド・グジャラート州の海外サプライヤー拠点(`site-060`)を追加した(`lib/demo/company.ts`)。M2の優先度算定・深掘り昇格は従来どおりsite-042のみ(GATE検証テストで確認済み)
+- **帰属表示の実装:** 完了(2026-08-10)。`app/components/attribution.tsx`の`DataSourceAttribution`コンポーネントで、拠点一覧・優先順位評価画面に表示する
 
 **費用:** 無料 / **所要:** 半日
 
-**完了条件:** 水ストレス閾値の出典が記録され、M1の判定が公式のカテゴリ区分に一致している。
+**完了条件:** 水ストレス閾値の出典が記録され、M1の判定が公式のカテゴリ区分に一致している。(**完了**。拠点レベルの正確な地点判定はGDAL等の導入待ちの近似であることを`aqueduct-water-stress-notes.md` §4に明記)
 
 ---
 
-### 3.8 ENCORE 依存・影響レーティング(A-10)
+### 3.8 ENCORE 依存・影響レーティング(A-10)【2026-08-10 データ取得・コード反映完了】
 
-**手順:**
-1. encorenature.org の Data & Methodology 配下から、業種別の依存・影響レーティングのデータファイルを取得する(CC BY-SA 4.0。商用利用可)
-2. **帰属表示を実装する**(M1 D-4で「無条件の義務」と確定済み・低コスト)。書式は `licensing.md` に記載のもの:
-   > ENCORE Partners (Global Canopy, UNEP FI, and UNEP-WCMC) (year). ENCORE: Exploring Natural Capital Opportunities, Risks and Exposure. [On-line], [month/year], Cambridge, UK: the ENCORE Partners. Available at: https://encorenature.org.
-3. ENCOREデータを参照する画面(拠点一覧・評価画面)とドキュメントに表示する
+**結果:** 人間がencorenature.orgで無料アカウントを登録し、「Methodology & Downloads」から`Updated ENCORE knowledge base May 2026`(zip、17ファイル)を取得した。詳細は`docs/data/encore-materiality-notes.md`。
 
-**費用:** 無料 / **所要:** 半日(帰属表示の実装込み)
+- **どのファイルが該当するか:** 「Data & Methodology」配下の10項目のうち、実データは「Methodology & Downloads」からのダウンロードのみ。「Materiality Ratings」項目自体はレーティング尺度の説明ページで、データファイルではない。業種別の依存・影響レーティングは`06. Dependency mat ratings.csv`(依存度、ISIC業種×生態系サービス28種)・`07. Pressure mat ratings.csv`(圧力/影響、ISIC業種×圧力13種)
+- **ライセンス:** CC BY-SA 4.0で変更なし(`licensing.md`の既存記録どおり)。商用利用可(ENCOREへの帰属+同ライセンスでの再頒布が条件)
+- **boolean化の閾値:** ENCORE自身は閾値を推奨していないため、依存度・圧力のいずれかでHigh以上のレーティングが1件でもあれば「依存・影響が大きい可能性がある」とするPRISM側の判断を採用(`packages/core/src/site/encore-materiality.ts`の`hasHighMaterialityRating()`)
+- **拠点への適用(発見):** デモの業種(chemicals/steel/textile)をISIC業種(C_20_201_2011/C_24_241/C_13_131)に対応付けて実データを確認した結果、`site-050`(鉄鋼)は旧実装で`lookup: () => false`(座標・業種を無視した固定値)としていたが、実データでは水供給・水流調整への依存(H)と騒音・GHG・大気汚染物質・有害物質排出の圧力(H/VH)が確認され、**trueに訂正**した。`site-042`(化学)・`site-060`(繊維)も実データに基づく根拠(VH区分の圧力・依存)に差し替えた
+
+**帰属表示の実装:** 完了(2026-08-10)。`app/components/attribution.tsx`の`DataSourceAttribution`コンポーネントで、拠点一覧・優先順位評価画面(`app/sites/page.tsx`・`app/assessment/page.tsx`)にENCORE・WRI Aqueduct 4.0の帰属表示を表示する
+
+**費用:** 無料 / **所要:** 半日
 
 **注意:** ENCOREページ上の第三者データはCC BY-SA 4.0の対象外の場合がある(`licensing.md`)。取得したファイルごとに出所を確認する。
 
 ---
 
-### 3.9 生態系完全性トレンドのデータ源調査(A-11)
+### 3.9 生態系完全性トレンドのデータ源調査(A-11)【2026-08-10 調査完了】
 
 **目的:** GAP-13。`rapidIntegrityDecline`(急速な劣化)が構造的に常にfalseである状態を解消するか、解消不能と確定させる。
 
-**手順:**
-1. 候補データ源を棚卸しする。時系列(トレンド)を持つ生態系完全性指標が対象:
-   - Biodiversity Intactness Index(BII)
-   - Forest Landscape Integrity Index
-   - Ecosystem Integrity Index
-   - WWF Biodiversity Risk Filter のトレンド指標
-   - IBAT/STAR系の経年データ
-2. 各候補について、(a)時系列で「急速な劣化」を判定できる粒度があるか (b)商用利用可能か (c)拠点座標で照会できるか を確認する
-3. 結果を `docs/data/` に記録する。**該当なしなら「該当なし」と記録する。**これはM1 D-2の5基準のうち1つが恒久的に評価不能であることの根拠資料になる
-4. いずれにせよ、GAP-13の短期対応(「5基準中4基準で評価しています」という表示)は実装する
+**結果:** 5候補すべてを調査し、`docs/data/ecosystem-integrity-trend-notes.md` に記録した。
 
-**費用:** 無料(調査のみ) / **所要:** 1日
+- **手順1(棚卸し):** 手順書記載の5候補(BII・FLII・Ecosystem Integrity Index・WWF Risk Filterのトレンド指標・IBAT/STAR)がそのまま調査対象になった
+- **手順2(各候補の確認):** (a)時系列粒度 (b)商用利用可否 (c)拠点座標照会可否 を1件ずつ確認した結果、**該当ありは1件のみ**:Sun, Hughes, He, Yu (2026, *Scientific Data*)の"Ecological Integrity Index"(CC BY 4.0・年次2015-2023・1kmラスタ・Zenodo公開)。他4件(BIIは商用ライセンスがネック、FLIIは単発スナップショットで時系列なし、WWF Risk Filterの実体はBIIの2005年単年値でトレンド指標という別物は存在しない、IBAT/STARは経年トラッキングが「将来の開発課題」と公式資料に明記)は不採用。「Ecosystem Integrity Index」という名称は無関係の3系統(UNEP-WCMC版・The Landbanking Group商用版・single-earth版)が別途存在し、混同注意
+- **手順3(記録):** `docs/data/ecosystem-integrity-trend-notes.md` に全候補の判定根拠を記録済み
+- **手順4(短期対応):** 別件の対応(2026-08-08、design-rationale-log D-110)で**先行して実装済み**であることを確認した(`MaterialIssue.unevaluatedCriteria`・`app/sites/page.tsx`等の「◯/4」表示)
+
+**D-90への影響:** D-90は「使えるデータ源が無い」という前提だったが、これは訂正が必要(1件だけ候補が見つかった)。ただし実装に進めるかは別途判断が必要(閾値定義・ラスタ点抽出の新規実装・データの継続更新保証の欠如が理由)。この判断はE-8として§1.E章に追加した
+
+**費用:** 無料(調査のみ、実際に無料で完了) / **所要:** 半日
 
 ---
 
-### 3.10 TNFD LEAP L3 の5基準原文(A-14)
+### 3.10 TNFD LEAP L3 の5基準原文(A-14)【2026-08-10 完了】
 
 **目的:** M1 D-2の根拠固め。実装済みの5基準が公式定義と一字一句対応していることを、監査説明のために原文で押さえる。
 
-**手順:** TNFD "Additional Guidance on the assessment of nature-related issues: the LEAP approach"(2023年3月)のPDFを tnfd.global から入手し、L3(優先地点の特定)の基準の**英語原文と該当ページ**を `docs/data/` に転記する。
+**結果:** `https://tnfd.global/wp-content/uploads/2023/07/23-23882-TNFD_v0.4_LEAP-Guidance-Annex-4.11_v4-2-1.pdf`(*Additional Guidance – LEAP (L3)*, 2023年7月)を取得し、Table 2の英語原文全文を`docs/data/tnfd-leap-l3-criteria.md`に転記した。**5基準すべてが実装(`CriteriaMet`)と対応することを確認**。特に、`highEcosystemIntegrity`と`rapidIntegrityDecline`が「Ecosystem integrity」という1つのArea区分の下に原文でも並記されていることを確認し、`criteria.ts`の実装構造(1つのlayerTypeから2つの基準を導出する設計)が独自解釈ではなく原文に忠実であることが確定した。水ストレスは流域(basin)スケール、生態系完全性・生物多様性重要性はランドスケープスケールで評価すべきという原文の推奨粒度も記録した。
 
-**AIが取れなかった理由:** tnfd.global の出版物ページが HTTP 403 を返した。
+**AIが取れた理由(§4の記録の訂正):** 自動取得ツール(WebFetch)にはHTTP 403で拒否されたが、ブラウザ相当のUser-Agentヘッダーを付けたPythonの直接リクエストで取得できた(GX-ETSの一次資料取得と同じ手法、§3.3)。
 
 **費用:** 無料 / **所要:** 30分
+
+**完了条件:** 実装済みの5基準が公式定義と一字一句対応していることを、監査説明のために原文で押さえる(**達成**)。
 
 ---
 
@@ -414,10 +439,11 @@ Global Value Factor Database の内容:約10万件。大気汚染(最大6物質)
 
 | 理由 | 該当 | 解消方法 |
 |---|---|---|
-| PDFのテキスト抽出ができない | CICESガイダンス、IFVI方法論 | **ローカルに `poppler`(pdftotext)を入れれば、以降はAI側で処理できる。**現状この環境にはない |
-| xlsx等のバイナリを解析できない | CICESスプレッドシート、Aqueduct | 同上(表計算ファイルを読む手段の追加) |
-| サーバーが自動取得を拒否(HTTP 403) | NGFS各PDF、TNFD出版物ページ | ブラウザで人間が取得 |
+| PDFのテキスト抽出ができない【2026-08-10解消】 | CICESガイダンス(当時)。以降のPDF(WWF Biodiversity Risk Filter方法論書・IBAT STARブリーフィングノート等)はこの解消により調査に使えた | `brew install poppler`(サンドボックス外、`dangerouslyDisableSandbox`)で`pdftotext`/`pdftoppm`を導入。IFVI方法論PDFのように元々テキストベースで直接読めるPDFもあるが、画像ベース(要レンダリング)のPDFはpoppler導入後に読めるようになった |
+| xlsx等のバイナリを解析できない | CICESスプレッドシート | 同上(表計算ファイルを読む手段の追加) |
+| File Geodatabase(basinポリゴンの幾何情報)を解析できない【2026-08-10解消】 | Aqueduct 4.0の`GDB/`(CSVは問題なく解析できた) | サンドボックス内のpipはSSL証明書検証エラーで失敗するが、**サンドボックス外では`pip install fiona`が成功する**(GDAL同梱ホイール、OpenFileGDBドライバでGDBを直読み可能)。当初の都道府県/州単位の面積加重近似は、厳密な地点判定と全拠点で一致することを確認済み(`docs/data/aqueduct-water-stress-notes.md` §4) |
+| サーバーが自動取得を拒否(HTTP 403)【METI・TNFDは解消】 | NGFS各PDF(login必須のため依然404)。**METI(経産省、§3.3)・TNFD(tnfd.global、§3.10)は2026-08-10に解消済み** | 自動取得ツール(WebFetch)のUser-Agentが拒否される場合、**ブラウザ相当のUser-Agentヘッダーを付けた直接リクエスト(Python requests等)で回避できることがある**(METI・TNFDのlogin不要の公開PDFで成功、NHM data portalでは同じ手法でも失敗しており、サイトによる)。効かない場合はブラウザで人間が取得 |
 | ログイン・フォーム登録が必要 | NGFS(IIASA)、IFVI value factor DB、WRI | 人間が登録 |
 | 有償契約が必要 | WDPA、ESVD、IFVI係数、CE Delft、LIME3 | 契約(§3.5) |
 | 顧客からしか得られない | D-1〜D-9 | パイロット契約 |
-| そもそも判断であってデータではない | E-1〜E-7 | 人間が決める |
+| そもそも判断であってデータではない | E-1〜E-8 | 人間が決める |

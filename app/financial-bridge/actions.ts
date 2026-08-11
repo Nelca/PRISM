@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDefaultTenantId } from "@/lib/db/client";
+import { getTenantId } from "@/lib/db/client";
 import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 import type { CompanyFinancialsInput } from "@/lib/demo/interaction-state";
@@ -47,7 +47,7 @@ export async function saveCompanyFinancialsAction(
     values[field.name] = value;
   }
 
-  const tenantId = getDefaultTenantId();
+  const tenantId = await getTenantId();
   await appendInteractionEvent(tenantId, {
     actor: ACTOR,
     kind: "company_financials",

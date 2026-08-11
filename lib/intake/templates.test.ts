@@ -11,7 +11,7 @@ import { runValuationPipeline } from "@core/pipeline/valuation-pipeline";
 import { runDecisionPipeline } from "@core/pipeline/decision-pipeline";
 import { runDisclosurePipeline } from "@core/pipeline/disclosure-pipeline";
 import { createIdSequence } from "@core/pipeline/ids";
-import { ALL_PLUGINS } from "@core/monetization/registry";
+import { getPluginsForCategory } from "@core/monetization/registry";
 import { exchangeAmount } from "@core/types/common";
 import type { ExchangeValuationRecord } from "@core/types/valuation";
 import type { EvidenceCandidate } from "@core/disclosure/evidence-match";
@@ -96,7 +96,7 @@ describe("templates/の記入例からM1〜M8を通しで実行できる", () =>
         input: dataset.engagementConfig.deepDive,
         config: dataset.engagementConfig.methodConfig,
         calibration: dataset.engagementConfig.calibration,
-        plugins: ALL_PLUGINS,
+        plugins: getPluginsForCategory("water"),
         versions: TEST_VALUATION_VERSIONS,
         calibrationSetVersion: "ifvi-water-consumption-v1",
         reconciliationFunctionVersion: "ifvi-reconciliation-v1",
