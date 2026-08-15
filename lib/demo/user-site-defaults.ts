@@ -44,7 +44,9 @@ export function buildUserDeepDiveConfig(siteId: string, params: UserSiteDeepDive
       unitReplacementCost: params.unitReplacementCost,
       // IFVI Table D1(日本、Global Perspective、USD(2024)/m3)。company.tsのDEEP_DIVE_CONFIGと同じ出典。
       externalValueFactors: {
-        "lime3-water": 28_500,
+        // AIST-IDEA Ver.4.0(LIME3)、取水(表層水)・利子率2%・消費国=日本の統合化スコア(US$/m3、較正前)。
+        // company.tsのDEEP_DIVE_CONFIGと同じ出典・同じ仮定(docs/data/lime3-coefficients-notes.md §3.2)。
+        "lime3-water": 0.0135886259,
         "ifvi-vfnutrition": 0.0,
         "ifvi-vfdisease": 0.0,
         "ifvi-vfes": 2.97,

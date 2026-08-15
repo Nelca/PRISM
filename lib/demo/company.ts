@@ -319,7 +319,10 @@ export const DEEP_DIVE_CONFIG: MethodConfig = {
   depth: "deep_dive",
   unitReplacementCost: 620, // 円/m3(代替水源調達コスト、企業提供の想定値)
   externalValueFactors: {
-    "lime3-water": 28_500,
+    // AIST-IDEA Ver.4.0(LIME3)、取水(表層水)・利子率2%・消費国=日本の統合化スコア(US$/m3、較正前)。
+    // アスエネ社が保有するライセンス(標準版、有効期限2027-06-30)の範囲内で利用。
+    // 表層水/地下水の選択・価格基準年は未確認の仮定を含む(docs/data/lime3-coefficients-notes.md §3.2)。
+    "lime3-water": 0.0135886259,
     "ifvi-vfnutrition": 0.0,
     "ifvi-vfdisease": 0.0,
     "ifvi-vfes": 2.97,

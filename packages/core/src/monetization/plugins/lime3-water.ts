@@ -9,6 +9,9 @@
  *
  * 係数自体(LIME3の重み付けテーブルから導かれる$/DALY相当の価値係数)は既存資産であり、
  * 自前で計算しない(D-03)。MethodConfig.externalValueFactors["lime3-water"]として受け取る。
+ *
+ * 実データ(AIST-IDEA Ver.4.0):docs/data/lime3-coefficients-notes.md。
+ * アスエネ社保有ライセンス(標準版、有効期限2027-06-30)の範囲内。
  */
 
 import type { MethodOutput, MonetizationMethodPlugin, PhysicalQuantityInput, MethodConfig } from "../../types/valuation";
@@ -18,7 +21,7 @@ const VALUE_FACTOR_KEY = "lime3-water";
 export const lime3WaterPlugin: MonetizationMethodPlugin = {
   methodId: "lime3-water",
   version: "3.0.0", // LIME3
-  licenseMode: "bring_your_own_license", // ライセンス条件は licensing.md で未確認(次のアクション)
+  licenseMode: "bring_your_own_license", // アスエネ社保有のAIST-IDEA標準版ライセンスで利用(licensing.md参照)
   supportedCategories: ["water"],
 
   evaluate(input: PhysicalQuantityInput, config: MethodConfig): MethodOutput[] {
