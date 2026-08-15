@@ -80,9 +80,11 @@ describe("M5統合テスト:M3のValuationRecordから2ブリッジ・自然債�
     const natureDebt = computeNatureDebt(
       internalizationStatus.uninternalizedCost,
       [
-        { scenario: "ngfs_net_zero_2050", probability: 1 / 3, period: 5 },
-        { scenario: "ngfs_current_policies", probability: 1 / 3, period: 5 },
-        { scenario: "gx_ets_official", probability: 1 / 3, period: 5 },
+        { scenario: "ngfs_net_zero_2050_gcam", probability: 1 / 5, period: 5 },
+        { scenario: "ngfs_net_zero_2050_remind", probability: 1 / 5, period: 5 },
+        { scenario: "ngfs_current_policies_gcam", probability: 1 / 5, period: 5 },
+        { scenario: "ngfs_current_policies_remind", probability: 1 / 5, period: 5 },
+        { scenario: "gx_ets_official", probability: 1 / 5, period: 5 },
       ],
       0.05
     );

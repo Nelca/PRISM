@@ -25,6 +25,8 @@ describe("replacementCostPlugin", () => {
     expect(output.discountRateStatus).toBe("no_time_dimension");
     expect(output.discountRate).toBeNull();
     expect(output.transferFitness.tier).toBe("not_applicable");
+    // 単価はすでに円建てのため、地理較正(PPP等)をスキップする(D-127・D-128)
+    expect(output.skipGeographicCalibration).toBe(true);
   });
 
   it("unitReplacementCostが未指定の場合はエラーを投げる(推定で埋めない)", () => {

@@ -23,16 +23,25 @@ import { createSeededRng } from "@core/monetization/rng";
 import { runFinancialBridgePipeline } from "@core/pipeline/financial-bridge-pipeline";
 import { computeRecalculationHash } from "@core/ledger/recalculation-hash";
 import { exchangeAmount } from "@core/types/common";
+import type { ExchangeAmount } from "@core/types/common";
 import type { ExchangeValuationRecord, WelfareValuationRecord } from "@core/types/valuation";
 import type { DisclosureClaim } from "@core/types/disclosure";
 import type { EvidenceCandidate } from "@core/disclosure/evidence-match";
 import type { ExclusionRecord } from "@core/disclosure/selective-disclosure";
 import type { IntentionalDecisionInput } from "@core/pipeline/disclosure-pipeline";
-import type { BaselineNpvInput } from "@core/types/financial-bridge";
+import type { BaselineNpvInput, CarbonPriceScenario } from "@core/types/financial-bridge";
 import type { ApprovalThreshold, BindingMechanism } from "@core/types/decision";
+import { convertNgfsPriceToJpy, lookupNgfsCarbonPrice } from "@core/financial-bridge/carbon-price-trajectory";
 import {
   BASELINE_NPV,
+  buildClimateCountermeasureCandidates,
   buildCountermeasureCandidates,
+  CLIMATE_BASELINE_NPV,
+  CLIMATE_DEEP_DIVE_CALIBRATION,
+  CLIMATE_DEEP_DIVE_CONFIG,
+  CLIMATE_DEEP_DIVE_INPUT,
+  CLIMATE_DEEP_DIVE_PHYSICAL_QUANTITY_ID,
+  CLIMATE_FINANCIALS,
   COMPANY_NAME,
   DEEP_DIVE_CALIBRATION,
   DEEP_DIVE_CONFIG,
@@ -49,6 +58,12 @@ import {
   SITE_ROWS,
 } from "./company";
 import type { CountermeasureCandidate } from "./company";
+
+/**
+ * 気候カテゴリ実証用の拠点(四日市工場、GAP-11・D-128)。この拠点だけを他と区別する
+ * 分岐が複数箇所にあるため、定数化してハードコード文字列の重複を避ける。
+ */
+const CLIMATE_SITE_ID = "site-070";
 import type { UserSiteEntry } from "./site-entry";
 import {
   buildUserBaselineNpv,
@@ -108,9 +123,19 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   const deepDiveParamsBySiteId = new Map(userSiteEntries.map((entry) => [entry.row.id, entry.deepDive]));
 
   // --- M2:優先度算定の結果によらない手動昇格/降格を合成する ---
-  const manualOverrides = new Set(
-    userSiteEntries.filter((entry) => entry.deepDive.forcePromote).map((entry) => `${entry.row.id}-mi-water`)
-  );
+  /**
+   * 「上位20%」は`Math.ceil(件数 × 0.2)`(暫定値、depth-decision.ts)であり、母集団が小さいと
+   * 昇格枠が1件しかない。site-070(気候)を母集団に追加したことで、この1件枠を
+   * site-042(水)と奪い合う形になり、母集団のスコア次第でsite-042が自然昇格から
+   * 外れてしまうことが分かった(D-128で発見)。**flagshipのデモ拠点(site-042)は
+   * 常に深掘りを見せる前提のため、site-070と同様に明示的な手動昇格に切り替える。**
+   */
+  const manualOverrides = new Set([
+    ...userSiteEntries.filter((entry) => entry.deepDive.forcePromote).map((entry) => `${entry.row.id}-mi-water`),
+    "site-042-mi-water",
+    // 気候カテゴリ実証用の拠点は自然な優先度順位に委ねず、確実にdeep_diveへ昇格させる(D-128)。
+    `${CLIMATE_SITE_ID}-mi-climate`,
+  ]);
   const manualDemotions = new Set<string>();
   for (const [materialIssueId, mode] of interactions.depthOverrides) {
     if (mode === "promote") manualOverrides.add(materialIssueId);
@@ -123,7 +148,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     interfacesByCategoryForSite,
     excludedCategoriesForSite,
     resolveCriterion: resolveCriterionForDemo,
-    screeningValuationForMaterialIssue: (issue) => screeningValuationForMaterialIssue(issue.siteId),
+    screeningValuationForMaterialIssue: (issue) => screeningValuationForMaterialIssue(issue.siteId, issue.impactCategory),
     promotionOptions: { manualOverrides, manualDemotions },
     idSequence,
     now: NOW,
@@ -147,6 +172,19 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
           // v1(pppValue=1.0恒等)→v2(pppValue=94.46実値)。パラメータ実値が変わったため版を上げる。
           calibrationSetVersion: "ifvi-water-consumption-v2",
           reconciliationFunctionVersion: "ifvi-reconciliation-v1",
+          fitnessTierThresholdVersion: "fitness-tier-v1",
+        };
+      }
+      if (siteId === CLIMATE_SITE_ID) {
+        return {
+          physicalQuantityId: CLIMATE_DEEP_DIVE_PHYSICAL_QUANTITY_ID,
+          input: CLIMATE_DEEP_DIVE_INPUT,
+          config: CLIMATE_DEEP_DIVE_CONFIG,
+          calibration: CLIMATE_DEEP_DIVE_CALIBRATION,
+          // climateカテゴリのみに絞る(waterのMethodConfigには気候用の係数が無い)。
+          plugins: getPluginsForCategory("climate"),
+          calibrationSetVersion: "ghg-carbon-price-conversion-v1",
+          reconciliationFunctionVersion: "none", // reconciliationを持たないプラグイン(交換価値・厚生価値の合成不可)
           fitnessTierThresholdVersion: "fitness-tier-v1",
         };
       }
@@ -194,13 +232,21 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
    * M5・M6は交換価値(exchange)のレコードのみを使う(厚生価値は投資判断に使わない、という
    * 既存の設計原則。company.tsコメント参照)。代表値の上書きが厚生価値を指していても、
    * 決定計算では常にexchange概念のレコードにフォールバックする。
+   *
+   * **2026-08-15改修(D-128):** 従来は`${siteId}-mi-water`にハードコードしており、
+   * 気候カテゴリの拠点(GAP-11実証用)では代表値が引けなかった。1拠点につき現状は
+   * 深掘りに昇格するMaterialIssueが1つだけという前提(`promoted`から実際に昇格した
+   * materialIssueIdを引く)は変えず、カテゴリを決め打ちしない形に一般化した。
+   * デフォルトの手法(`methodId === "replacement-cost"`)も、水以外のカテゴリには存在しない
+   * ため`valueConcept === "exchange"`の先頭レコードに一般化した。
    */
   function representativeRecordForSite(siteId: string): ExchangeValuationRecord | undefined {
-    const materialIssueId = `${siteId}-mi-water`;
+    const materialIssueId = promoted.find((d) => siteIdFromMaterialIssueId(d.materialIssueId) === siteId)?.materialIssueId;
+    if (!materialIssueId) return undefined;
     const records = valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [];
     const id = representativeRecordByMaterialIssue[materialIssueId];
     const overridden = records.find((r) => r.id === id && r.valueConcept === "exchange");
-    const fallback = records.find((r) => r.methodId === "replacement-cost" && r.valueConcept === "exchange");
+    const fallback = records.find((r) => r.valueConcept === "exchange");
     return (overridden ?? fallback) as ExchangeValuationRecord | undefined;
   }
 
@@ -215,10 +261,13 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     const site = assessment.sites.find((s) => s.id === siteId);
     if (!site) return [];
 
-    // lime3-waterプラグインは常にwelfare概念を返す(monetization/plugins/lime3-water.tsの実装より)
-    const lime3 = siteRecords.find((r) => r.methodId === "lime3-water") as WelfareValuationRecord | undefined;
-
     const isFlagshipSite = siteId === "site-042";
+    const isClimateShowcaseSite = siteId === CLIMATE_SITE_ID;
+
+    // ブリッジ2(厚生価値ビュー)の情報源。水はlime3-water、気候は社会的費用(GAP-11・D-128)。
+    // いずれも常にwelfare概念を返す(monetization/plugins/lime3-water.ts・ghg-carbon-price-conversion.ts)。
+    const welfareMethodId = isClimateShowcaseSite ? "ghg-carbon-price-conversion.ghg-social-cost" : "lime3-water";
+    const lime3 = siteRecords.find((r) => r.methodId === welfareMethodId) as WelfareValuationRecord | undefined;
     const deepDiveParams = deepDiveParamsBySiteId.get(siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
 
     /**
@@ -236,7 +285,9 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
         }
       : isFlagshipSite
         ? BASELINE_NPV
-        : buildUserBaselineNpv(deepDiveParams);
+        : isClimateShowcaseSite
+          ? CLIMATE_BASELINE_NPV
+          : buildUserBaselineNpv(deepDiveParams);
 
     const approvalThreshold: ApprovalThreshold | "pending" = enteredParameters
       ? enteredParameters.approvalThresholdValue === null
@@ -244,7 +295,11 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
         : { value: exchangeAmount(enteredParameters.approvalThresholdValue), source: "manual_entry" }
       : {
           value: exchangeAmount(
-            isFlagshipSite ? BASELINE_NPV.value + 25_000_000 : deepDiveParams.approvalThresholdValue
+            isFlagshipSite
+              ? BASELINE_NPV.value + 25_000_000
+              : isClimateShowcaseSite
+                ? CLIMATE_BASELINE_NPV.value + 10_000_000
+                : deepDiveParams.approvalThresholdValue
           ),
           source: "manual_entry",
         };
@@ -265,7 +320,38 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
         }
       : isFlagshipSite
         ? FLAGSHIP_FINANCIALS
-        : buildUserFinancials(deepDiveParams);
+        : isClimateShowcaseSite
+          ? CLIMATE_FINANCIALS
+          : buildUserFinancials(deepDiveParams);
+
+    /**
+     * GAP-11(D-127・D-128):気候カテゴリの拠点(site-070)だけ、NGFSのシナリオ別炭素価格軌道を
+     * 使って実際にシナリオごとに異なる未内部化コストを計算する。水カテゴリの拠点は
+     * 従来どおり(全シナリオ共通の`uninternalizedCost`)のまま変更しない。
+     *
+     * 対象年は2030年(period=5・NOW=2027年のため、軌道データの5年刻みのうち直近の年)。
+     * `gx_ets_official`シナリオは指定せず、`representative`(GX-ETS価格ベース)の
+     * 基準コストにフォールバックさせる(4シナリオ分のみ上書きする設計、nature-debt.ts参照)。
+     */
+    const uninternalizedCostByScenario: Partial<Record<CarbonPriceScenario, ExchangeAmount>> | undefined =
+      isClimateShowcaseSite
+        ? (() => {
+            const physicalQuantityTco2 = CLIMATE_DEEP_DIVE_INPUT.physicalQuantity;
+            const year = 2030;
+            const costFor = (scenario: "net_zero_2050" | "current_policies", model: "gcam" | "remind") =>
+              exchangeAmount(
+                physicalQuantityTco2 * convertNgfsPriceToJpy(lookupNgfsCarbonPrice(scenario, model, "japan", year)) -
+                  (companyFinancials.currentlyInternalizedCost as number)
+              );
+            return {
+              ngfs_net_zero_2050_gcam: costFor("net_zero_2050", "gcam"),
+              ngfs_net_zero_2050_remind: costFor("net_zero_2050", "remind"),
+              ngfs_current_policies_gcam: costFor("current_policies", "gcam"),
+              ngfs_current_policies_remind: costFor("current_policies", "remind"),
+            };
+          })()
+        : undefined;
+
     const financialBridgeResult = runFinancialBridgePipeline({
       exchangeRecord: representative,
       ...(lime3 ? { welfareRecord: lime3 } : {}),
@@ -275,14 +361,18 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       currentlyInternalizedCost: companyFinancials.currentlyInternalizedCost,
       existingImpairmentThreshold: companyFinancials.existingImpairmentThreshold,
       financials: companyFinancials.creditMetrics,
-      // 3シナリオ均等割り(M5 D-4.3の中立的な初期値。PRISMは特定シナリオを推奨しない)
+      // 5シナリオ均等割り(M5 D-4.3の中立的な初期値。PRISMは特定シナリオを推奨しない)。
+      // NGFS 2シナリオはGCAM/REMIND-MAgPIEの2モデルに分けている(D-127)。
       internalizationProbabilities: [
-        { scenario: "ngfs_net_zero_2050", probability: 1 / 3, period: 5 },
-        { scenario: "ngfs_current_policies", probability: 1 / 3, period: 5 },
-        { scenario: "gx_ets_official", probability: 1 / 3, period: 5 },
+        { scenario: "ngfs_net_zero_2050_gcam", probability: 1 / 5, period: 5 },
+        { scenario: "ngfs_net_zero_2050_remind", probability: 1 / 5, period: 5 },
+        { scenario: "ngfs_current_policies_gcam", probability: 1 / 5, period: 5 },
+        { scenario: "ngfs_current_policies_remind", probability: 1 / 5, period: 5 },
+        { scenario: "gx_ets_official", probability: 1 / 5, period: 5 },
       ],
       discountRate: baselineNpv.discountRate,
       socialCostInternalizationRate: 0.15,
+      ...(uninternalizedCostByScenario ? { uninternalizedCostByScenario } : {}),
     });
 
     const financialBridge = {
@@ -296,7 +386,9 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     // --- M6:対策案4種を並行して計算し、比較テーブル/散布図に使う ---
     const candidates: CountermeasureCandidate[] = isFlagshipSite
       ? buildCountermeasureCandidates(representative.id)
-      : buildUserCountermeasureCandidates(siteId, representative.id, deepDiveParams);
+      : isClimateShowcaseSite
+        ? buildClimateCountermeasureCandidates(representative.id)
+        : buildUserCountermeasureCandidates(siteId, representative.id, deepDiveParams);
 
     const bindingState = interactions.bindingMechanismState.get(siteId);
     const bindingMechanism: BindingMechanism = bindingState?.mechanism ?? { kind: "weak_reference" };
@@ -377,20 +469,21 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   });
 
   // --- M7:開示検証(site-042固定claim + 深掘りに進んだ他拠点の自動生成claim) ---
-  const userClaims: DisclosureClaim[] = decisions
-    .filter((d) => d.siteId !== "site-042")
-    .map((d) => {
-      const site = assessment.sites.find((s) => s.id === d.siteId)!;
-      const params = deepDiveParamsBySiteId.get(d.siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
-      return buildUserDisclosureClaim(site, params);
-    });
+  // site-070(気候カテゴリ実証用、D-128)は除外する。buildUserDisclosureClaimは水消費削減の
+  // コミットメントを模した文言を生成するため、気候カテゴリの拠点には意味を持たない。
+  const decisionsForAutoClaims = decisions.filter((d) => d.siteId !== "site-042" && d.siteId !== CLIMATE_SITE_ID);
+  const userClaims: DisclosureClaim[] = decisionsForAutoClaims.map((d) => {
+    const site = assessment.sites.find((s) => s.id === d.siteId)!;
+    const params = deepDiveParamsBySiteId.get(d.siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
+    return buildUserDisclosureClaim(site, params);
+  });
   // 実際にアップロードされたPDFからAIが抽出したclaim(GAP-05)。特定拠点のvaluation recordとの
   // 紐づけは持たないため、candidatesForClaimは常に空を返し、段階3はG1(証拠なし)と判定する
   // (推測でsiteを割り当てない。D-15)。
   const extractedClaims: DisclosureClaim[] = [...interactions.extractedDisclosureClaimsBySourceDocument.values()].flat();
   const baseClaims: DisclosureClaim[] = [DISCLOSURE_CLAIM, ...userClaims, ...extractedClaims];
   const claimSiteId = new Map<string, string>([[DISCLOSURE_CLAIM.id, "site-042"]]);
-  userClaims.forEach((claim, i) => claimSiteId.set(claim.id, decisions.filter((d) => d.siteId !== "site-042")[i].siteId));
+  userClaims.forEach((claim, i) => claimSiteId.set(claim.id, decisionsForAutoClaims[i].siteId));
 
   // M7①(記載を弱める)の上書きテキストを適用する。
   const claims: DisclosureClaim[] = baseClaims.map((claim) => {
@@ -494,13 +587,17 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       // 手法(2026-03-final)は不変。係数データを仮値からIFVI Table D1(日本)実値に差し替えたため、
       // GAP-20の再判定アラートが発火するようデータ版を明示的に区別する。
       "ifvi-water-consumption": "2026-03-final:jp-table-d1-v1",
+      // GAP-11・D-128:気候カテゴリの拠点(site-070)を追加し、初めて実際に接続した。
+      "ghg-carbon-price-conversion": "1.0.0",
     },
     m3_geoCalibrationVersion: "ifvi-water-consumption-v2",
     m3_fitnessTierThresholdVersion: "fitness-tier-v1",
     m4_decompositionAlgorithmVersion: DECOMPOSITION_VERSIONS.algorithmVersion,
     m4_cicesMatchLevel: DECOMPOSITION_VERSIONS.cicesMatchLevel,
     m4_aopMappingVersion: DECOMPOSITION_VERSIONS.aopMappingVersion,
-    m5_carbonPriceScenarioSetVersion: "carbon-price-v1",
+    // v1(シナリオはラベルのみ、全シナリオ同一コスト)→v2(NGFS軌道に基づきシナリオ別の
+    // 未内部化コストを実際に算出。GAP-11・D-127・D-128)。
+    m5_carbonPriceScenarioSetVersion: "carbon-price-v2",
     m6_bindingMechanismDefinitionVersion: "binding-mechanism-v1",
     m7_gapDetectionRuleVersion: "gap-detection-v1",
   });

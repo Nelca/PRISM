@@ -138,7 +138,7 @@ export default async function FinancialBridgePage() {
                     <p className="tooltip-note">この数値は開示の参考情報としてのみ使用され、上の自然調整後利益には反映されません。</p>
                   </>
                 ) : (
-                  <p style={{ color: "var(--ink-faint)" }}>この拠点はlime3-water(厚生価値)レコードがありません。</p>
+                  <p style={{ color: "var(--ink-faint)" }}>この拠点には厚生価値(welfare)のレコードがありません。</p>
                 )}
               </Card>
             </div>

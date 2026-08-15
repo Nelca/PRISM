@@ -5,7 +5,7 @@ import { sensitivityFraction, unevaluatedCriteriaNote } from "../components/crit
 import { DataSourceAttribution } from "../components/attribution";
 import { AddSiteForm } from "./add-site-form";
 
-const CATEGORY_LABEL: Record<string, string> = { water: "取水量・水ストレス" };
+const CATEGORY_LABEL: Record<string, string> = { water: "取水量・水ストレス", climate: "GHG排出量" };
 
 export default async function SitesPage() {
   const result = await getOrCreateLatestResult(await getTenantId());

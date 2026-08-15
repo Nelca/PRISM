@@ -24,6 +24,7 @@
  */
 
 import { IDENTITY_CALIBRATION } from "@core/divergence/test-helpers";
+import type { ImpactCategory } from "@core/types/common";
 import { computeRecordHash } from "@core/ledger/recalculation-hash";
 import { exchangeAmount } from "@core/types/common";
 import { buildNatureInterfaces } from "@core/site/locate";
@@ -50,6 +51,11 @@ export const SITE_ROWS: SiteRow[] = [
   { id: "site-050", name: "金属加工工場", siteType: "own_site", industrySector: "steel", lat: 34.7, lng: 135.5 },
   { id: "site-060", name: "海外サプライヤー(繊維・グジャラート州)", siteType: "supplier_site", industrySector: "textile", lat: 23.0, lng: 72.6 },
   { id: "site-099", name: "海外サプライヤー(繊維)", siteType: "supplier_site", industrySector: "textile", address: "未特定地区(バングラデシュ)" },
+  // 気候カテゴリのMaterialIssueをGAP-11(NGFS/GX-ETSシナリオの数値差)実証のために追加した専用拠点
+  // (2026-08-15、design-rationale-log D-128)。site-042に気候カテゴリを足す案は、
+  // run-demo-pipeline.tsが「1拠点=1意思決定」を前提にしているため見送り、site-060追加時と
+  // 同じ前例(単一の新機能を示すための専用拠点)に倣った。
+  { id: "site-070", name: "四日市工場", siteType: "own_site", industrySector: "petrochemicals", lat: 34.965, lng: 136.625 },
 ];
 
 /**
@@ -62,6 +68,9 @@ const BASELINE_WATER_STRESS_CATEGORY: Record<string, BaselineWaterStressCategory
   "site-042": 2, // 愛知県のbasin、Medium-High(20-40%)、bws_raw=0.300
   "site-050": 1, // 大阪府のbasin、Low-Medium(10-20%)、bws_raw=0.200
   "site-060": 4, // インド・グジャラート州のbasin、Extremely High(>80%)、bws_raw=6.246
+  // site-070は気候カテゴリ実証用の拠点であり、水ストレス区分は本題ではないため
+  // site-042と同水準(Medium-High)を仮に採用した(個別のAqueduct照会は行っていない)。
+  "site-070": 2,
 };
 
 /**
@@ -80,6 +89,8 @@ const ENCORE_HIGH_MATERIALITY_RATINGS: Record<string, EncoreMaterialityRating[]>
   // textile→C_13_131(Spinning, weaving and finishing of textiles)。依存:
   // Education, scientific and research services=VH。
   "site-060": ["VH"],
+  // petrochemicals→石油化学もchemicalsのISIC区分(C_20_201_2011)を流用(site-042と同じ)。
+  "site-070": ["VH", "VH"],
 };
 
 /**
@@ -167,6 +178,20 @@ const LAYER_LOOKUPS_BY_SITE: Record<string, LayerLookup[]> = {
       lookup: () => hasHighMaterialityRating(ENCORE_HIGH_MATERIALITY_RATINGS["site-060"]),
     },
   ],
+  "site-070": [
+    {
+      layerType: "water_stress",
+      dataSource: "WRI Aqueduct 4.0",
+      licenseMode: "reference_only",
+      lookup: () => isHighBaselineWaterStress(BASELINE_WATER_STRESS_CATEGORY["site-070"]),
+    },
+    {
+      layerType: "dependency_impact",
+      dataSource: "ENCORE",
+      licenseMode: "reference_only",
+      lookup: () => hasHighMaterialityRating(ENCORE_HIGH_MATERIALITY_RATINGS["site-070"]),
+    },
+  ],
 };
 
 /**
@@ -176,7 +201,13 @@ const LAYER_LOOKUPS_BY_SITE: Record<string, LayerLookup[]> = {
  * 自動的に適用される**(2026-08-10、`docs/data/ecosystem-integrity-trend-notes.md` §8.6。
  * 従来はsite-042/050/060限定のハードコードだった制約を解消した)。
  */
-export function interfacesByCategoryForSite(site: Site): Partial<Record<"water", NatureInterface[]>> {
+/**
+ * site-070(気候カテゴリ実証用、D-128)のみ`climate`キーで返し、他の拠点は従来どおり
+ * `water`のみを返す。TNFD LEAP L3の5基準(`CriteriaMet`)はカテゴリ非依存の汎用モデルであり、
+ * 気候固有の感応度基準は存在しないため、水と同じlookup機構をそのまま流用する
+ * (`build-material-issues.test.ts`が同じ前提で"climate"カテゴリを組み立てているのと同型)。
+ */
+export function interfacesByCategoryForSite(site: Site): Partial<Record<ImpactCategory, NatureInterface[]>> {
   const lookups = [...(LAYER_LOOKUPS_BY_SITE[site.id] ?? [])];
   const coordinates = siteCoordinates(site);
 
@@ -189,6 +220,9 @@ export function interfacesByCategoryForSite(site: Site): Partial<Record<"water",
     });
   }
 
+  if (site.id === "site-070") {
+    return { climate: buildNatureInterfaces(site, lookups) };
+  }
   return { water: buildNatureInterfaces(site, lookups) };
 }
 
@@ -207,8 +241,13 @@ const SCREENING_VERSIONS = {
   aopMappingVersion: "aop-mapping-v1",
 };
 
-export function screeningValuationForMaterialIssue(siteId: string): ExchangeValuationRecord {
-  const centralValue = siteId === "site-042" ? 12_000_000 : 1_500_000;
+export function screeningValuationForMaterialIssue(
+  siteId: string,
+  category: ImpactCategory = "water"
+): ExchangeValuationRecord {
+  // 気候カテゴリ(site-070):8,000 tCO2e × GX-ETS調整基準取引価格(¥1,700/tCO2、令和8年度)の概算。
+  // 水カテゴリの既存分岐は変更しない。
+  const centralValue = category === "climate" ? 8_000 * 1_700 : siteId === "site-042" ? 12_000_000 : 1_500_000;
   return {
     id: `screen-${siteId}`,
     methodId: "replacement-cost",
@@ -338,6 +377,60 @@ export const DEEP_DIVE_CONFIG: MethodConfig = {
 };
 
 /**
+ * 気候カテゴリ(site-070、四日市工場)の深掘り評価設定(GAP-11実証用、D-128)。
+ * `ghg-carbon-price-conversion.ts`の2値(社会的費用・GX-ETS価格)を使う。
+ */
+export const CLIMATE_DEEP_DIVE_PHYSICAL_QUANTITY_ID = "pq-site070-climate-2027";
+
+/** 8,000 tCO2e/年(企業提供の想定値、Scope1+2相当)。実在の数値ではない架空デモ値。 */
+export const CLIMATE_DEEP_DIVE_INPUT: PhysicalQuantityInput = {
+  category: "climate",
+  physicalQuantity: 8_000,
+  unit: "tCO2e",
+  siteId: "site-070",
+  sourceRegion: "JP",
+  targetRegion: "JP",
+};
+
+/**
+ * 社会的費用(USD建て)にはDEEP_DIVE_CALIBRATIONと同じPPP係数を適用する(IFVIのvfesと同種の
+ * 国際ドル建て値のため)。GX-ETS価格は`skipGeographicCalibration: true`(プラグイン側で設定済み、
+ * D-127・D-128)によりこの較正の影響を受けない。
+ */
+export const CLIMATE_DEEP_DIVE_CALIBRATION: Omit<GeographicCalibrationRecord, "sourceRegion" | "targetRegion"> =
+  DEEP_DIVE_CALIBRATION;
+
+/**
+ * `carbon-social-cost-usd-per-tco2`:IFVI GHG Emissions Topic Methodology、2023年価格水準
+ * (`docs/data/acquisition-runbook.md` §2.4)。
+ * `gx-ets-adjustment-baseline-price-jpy-per-tco2`:令和8年度(2026年度)調整基準取引価格
+ * (`docs/data/carbon-price-scenarios.md` §2)。
+ */
+export const CLIMATE_DEEP_DIVE_CONFIG: MethodConfig = {
+  depth: "deep_dive",
+  externalValueFactors: {
+    "carbon-social-cost-usd-per-tco2": 236,
+    "gx-ets-adjustment-baseline-price-jpy-per-tco2": 1_700,
+  },
+};
+
+/** 四日市工場の企業提供財務データ(架空デモ値)。FLAGSHIP_FINANCIALSより小規模な事業単位という設定。 */
+export const CLIMATE_FINANCIALS = {
+  reportedOperatingProfit: exchangeAmount(800_000_000),
+  /** 既に炭素税・省エネ法対応費用等として実際に支払っている額。 */
+  currentlyInternalizedCost: exchangeAmount(2_000_000),
+  existingImpairmentThreshold: exchangeAmount(30_000_000),
+  creditMetrics: { netDebt: 1_600_000_000, ebitda: 900_000_000, interestExpense: 80_000_000 },
+};
+
+export const CLIMATE_BASELINE_NPV: BaselineNpvInput = {
+  value: 800_000_000,
+  discountRate: 0.06,
+  horizon: 10,
+  source: "manual_entry",
+};
+
+/**
  * M6:対策案。coreの`Countermeasure`型には案のラベル・回避物理量フィールドが無いため、
  * デモ層でこのサイドカー型に包んで保持する(M6画面で複数案を並べて比較するため)。
  */
@@ -400,6 +493,51 @@ export function buildCountermeasureCandidates(replacementCostRecordId: string): 
       countermeasure: {
         type: "acceptance",
         targetSiteId: "site-042",
+        investmentCost: { initial: 0, recurring: 500_000 },
+        avoidedNatureCost: [],
+      },
+    },
+  ];
+}
+
+/** M6:四日市工場のGHG削減対策案3種(企業提供の想定値)。 */
+export function buildClimateCountermeasureCandidates(gxEtsRecordId: string): CountermeasureCandidate[] {
+  return [
+    {
+      key: "reduction",
+      label: "省エネ設備投資・燃料転換",
+      avoidedPhysicalQuantity: 2_000, // tCO2e/年
+      countermeasure: {
+        type: "reduction",
+        targetSiteId: "site-070",
+        investmentCost: { initial: 120_000_000, recurring: 4_000_000 },
+        avoidedNatureCost: [
+          { year: 0, amount: exchangeAmount(3_400_000), sourceValuationRecordId: gxEtsRecordId },
+          { year: 1, amount: exchangeAmount(3_400_000), sourceValuationRecordId: gxEtsRecordId },
+        ],
+      },
+    },
+    {
+      key: "transfer",
+      label: "排出権(クレジット)の購入",
+      avoidedPhysicalQuantity: 0,
+      countermeasure: {
+        type: "transfer",
+        targetSiteId: "site-070",
+        investmentCost: { initial: 0, recurring: 10_000_000 },
+        avoidedNatureCost: [
+          { year: 0, amount: exchangeAmount(13_600_000), sourceValuationRecordId: gxEtsRecordId },
+          { year: 1, amount: exchangeAmount(13_600_000), sourceValuationRecordId: gxEtsRecordId },
+        ],
+      },
+    },
+    {
+      key: "acceptance",
+      label: "対策を実施せず監視を継続",
+      avoidedPhysicalQuantity: 0,
+      countermeasure: {
+        type: "acceptance",
+        targetSiteId: "site-070",
         investmentCost: { initial: 0, recurring: 500_000 },
         avoidedNatureCost: [],
       },

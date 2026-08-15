@@ -52,6 +52,26 @@ describe("buildValuationRecordsForPlugin", () => {
     expect(record.recalculationHash).toMatch(/^vr:[0-9a-f]+$/);
   });
 
+  it("skipGeographicCalibrationがtrueの場合、非恒等な較正でも中心値が変化しない(D-127・D-128)", () => {
+    const config: MethodConfig = { depth: "screening", unitReplacementCost: 500 };
+    const nonIdentityCalibration: Omit<GeographicCalibrationRecord, "sourceRegion" | "targetRegion"> = {
+      ...identityCalibration,
+      pppValue: 94.46, // company.tsのDEEP_DIVE_CALIBRATIONと同じ値
+    };
+
+    const group = buildValuationRecordsForPlugin(replacementCostPlugin, {
+      physicalQuantityId: "pq-1",
+      input,
+      config,
+      calibration: nonIdentityCalibration,
+      versions: TEST_VALUATION_VERSIONS,
+    });
+
+    // replacementCostPluginはskipGeographicCalibration: trueを返すため、
+    // pppValue=94.46を渡しても中心値は 1 × 500 のまま(94.46倍に膨張しない)
+    expect(group.records[0].centralValue).toBe(500);
+  });
+
   it("IFVI(複数内訳)は methodId が {親手法ID}.{内訳ID} 形式になる", () => {
     const config: MethodConfig = {
       depth: "screening",

@@ -119,6 +119,16 @@ export interface MethodOutput {
   discountRateStatus: DiscountRateStatus;
   /** 層iii:除外事項(数値に混ぜない)。 */
   scopeExclusions: string[];
+  /**
+   * trueの場合、地理較正(`calibration.ts`のPPP・所得弾力性等)を適用せず、
+   * `centralValue`をそのまま最終値として扱う(D-127・D-128)。
+   *
+   * 地理較正は「国際ドル建て等、較正が必要な値」を前提に一律適用される設計だが、
+   * 手法によっては既に現地通貨(例:円)で表現された値(代替費用法の単価、
+   * GX-ETS取引価格)を返す。これらに同じ較正を適用すると誤って二重変換されるため、
+   * このフラグで明示的にスキップする。省略時はfalse(既存の全プラグインの挙動は不変)。
+   */
+  skipGeographicCalibration?: boolean;
 }
 
 export interface GoldenTestVector {

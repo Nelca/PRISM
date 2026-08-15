@@ -100,7 +100,10 @@ function buildValuationRecordFromOutput(
   versions: ValuationRecordVersions,
   rng?: () => number
 ): ValuationRecord {
-  const centralValue = applyGeographicCalibration(output.centralValue, calibration);
+  // 較正が不要な値(すでに現地通貨で表現された値)はスキップする(D-127・D-128)。
+  const centralValue = output.skipGeographicCalibration
+    ? output.centralValue
+    : applyGeographicCalibration(output.centralValue, calibration);
   const quantileRange = combineUncertainty(centralValue, output.parameterUncertainty, output.transferFitness, { rng });
 
   const common = {

@@ -16,6 +16,8 @@ const METHOD_LABEL: Record<string, string> = {
   "replacement-cost": "代替費用法(浄水コスト)",
   "lime3-water": "LIME3(水消費統合指標)",
   "ifvi-water-consumption": "IFVI 水ストレス係数",
+  "ghg-carbon-price-conversion.ghg-social-cost": "炭素の社会的費用(IFVI GHG方法論)",
+  "ghg-carbon-price-conversion.ghg-gx-ets-price": "GX-ETS調整基準取引価格",
 };
 
 /** 幅を決める要因(M4 U-3)。中心値の要因とは別の集合。 */

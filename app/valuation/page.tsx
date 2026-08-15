@@ -14,6 +14,8 @@ const METHOD_LABEL: Record<string, string> = {
   "replacement-cost": "代替費用法(浄水コスト)",
   "lime3-water": "LIME3(水消費統合指標)",
   "ifvi-water-consumption": "IFVI 水ストレス係数",
+  "ghg-carbon-price-conversion.ghg-social-cost": "炭素の社会的費用(IFVI GHG方法論)",
+  "ghg-carbon-price-conversion.ghg-gx-ets-price": "GX-ETS調整基準取引価格",
 };
 
 export default async function ValuationPage({ searchParams }: { searchParams: Promise<{ issue?: string }> }) {
@@ -62,8 +64,9 @@ export default async function ValuationPage({ searchParams }: { searchParams: Pr
         <div className="screen__title-row">
           <h1 className="screen__title">価値の算定</h1>
           <Guide>
-            同じ対象に複数の算定方法を並行して適用し、幅を持った試算を出します。M3は現状waterカテゴリの
-            3手法(代替費用法・LIME3・IFVI水ストレス係数)を実装しており、深掘り対象になった課題には常にこの3手法を並行実行します。
+            同じ対象に複数の算定方法を並行して適用し、幅を持った試算を出します。M3は現状water(代替費用法・LIME3・
+            IFVI水ストレス係数の3手法)とclimate(炭素の社会的費用・GX-ETS価格の2手法)の2カテゴリを実装しており、
+            深掘り対象になった課題には該当カテゴリの手法を並行実行します。
           </Guide>
         </div>
       </div>

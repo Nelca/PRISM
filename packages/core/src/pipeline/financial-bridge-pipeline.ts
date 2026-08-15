@@ -55,6 +55,13 @@ export interface FinancialBridgePipelineOptions {
 
   /** ブリッジ2の内部化率(厚生価値ビュー側、開示専用)。 */
   socialCostInternalizationRate?: number;
+
+  /**
+   * シナリオ別に異なる未内部化コストを使う場合に指定する(GAP-11・D-127)。
+   * 指定が無いシナリオは`internalizationStatus.uninternalizedCost`にフォールバックする
+   * (`computeNatureDebt()`の第4引数、後方互換)。
+   */
+  uninternalizedCostByScenario?: Partial<Record<InternalizationProbability["scenario"], ExchangeAmount>>;
 }
 
 export interface FinancialBridgePipelineResult {
@@ -75,7 +82,8 @@ export function runFinancialBridgePipeline(options: FinancialBridgePipelineOptio
   const natureDebt = computeNatureDebt(
     internalizationStatus.uninternalizedCost,
     options.internalizationProbabilities,
-    options.discountRate
+    options.discountRate,
+    options.uninternalizedCostByScenario
   );
 
   // ブリッジ1の「将来内部化見込みコスト」は自然債務そのもの(M5 D-1が §4 の自然債務と

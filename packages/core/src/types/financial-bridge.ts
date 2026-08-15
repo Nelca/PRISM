@@ -51,8 +51,21 @@ export interface InternalizationStatus {
   uninternalizedCost: ExchangeAmount;
 }
 
-/** M5 D-4.2:NGFS 2種 + GX-ETS公式価格帯。独自シナリオは発明しない。 */
-export type CarbonPriceScenario = "ngfs_net_zero_2050" | "ngfs_current_policies" | "gx_ets_official";
+/**
+ * M5 D-4.2:NGFS 2種 + GX-ETS公式価格帯。独自シナリオは発明しない。
+ *
+ * NGFS 2種はモデル別(GCAM 6.0 NGFS / REMIND-MAgPIE 3.3-4.8)に分けている(design-rationale-log D-127)。
+ * 同じシナリオでもモデルによって炭素価格が大きく異なり(2050年Net Zero 2050・日本:
+ * GCAM $1,350 vs REMIND-MAgPIE $709、docs/data/carbon-price-scenarios.md §1)、単一モデルを
+ * 「代表値」として選ばず、2モデルをレンジとして扱う判断による。MESSAGEix-GLOBIOMは
+ * 日本単体の内訳を持たないため対象外。
+ */
+export type CarbonPriceScenario =
+  | "ngfs_net_zero_2050_gcam"
+  | "ngfs_net_zero_2050_remind"
+  | "ngfs_current_policies_gcam"
+  | "ngfs_current_policies_remind"
+  | "gx_ets_official";
 
 /** 企業が主観的に設定する。デフォルトは均等割り(各1/3)、PRISMは特定シナリオを推奨しない(M5 D-4.3)。 */
 export interface InternalizationProbability {

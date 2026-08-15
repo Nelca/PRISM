@@ -94,6 +94,9 @@ export const ghgCarbonPriceConversionPlugin: MonetizationMethodPlugin = {
         "参考上限取引価格(¥4,300/tCO2、2026年度)は上限であり実勢価格ではないため使用していない。" +
           "調整基準取引価格のみを使用する(docs/data/carbon-price-scenarios.md §2)。",
       ],
+      // GX-ETS価格はすでに円建てであり、地理較正(PPP等)の対象ではない
+      // (社会的費用(USD建て)とは異なる。D-127・D-128で発見・修正)。
+      skipGeographicCalibration: true,
     };
 
     return [socialCost, gxEtsPrice];

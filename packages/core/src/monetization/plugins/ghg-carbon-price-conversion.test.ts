@@ -36,6 +36,9 @@ describe("ghgCarbonPriceConversionPlugin", () => {
     expect(gxEts.centralValue).toBe(1_000 * 1_700);
     expect(gxEts.aopCode).toBe("not_applicable");
     expect(gxEts.discountRateStatus).toBe("no_time_dimension");
+    // GX-ETS価格はすでに円建てのため地理較正をスキップし、社会的費用(USD建て)はスキップしない(D-127・D-128)
+    expect(gxEts.skipGeographicCalibration).toBe(true);
+    expect(socialCost.skipGeographicCalibration).toBeUndefined();
   });
 
   it("社会的費用の係数が未指定の場合はエラーを投げる(推定で埋めない)", () => {

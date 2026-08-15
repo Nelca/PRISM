@@ -7,7 +7,7 @@ import { exchangeAmount } from "../types/common";
 describe("computeComparisonTargets", () => {
   const natureDebt = computeNatureDebt(
     exchangeAmount(1_000_000),
-    [{ scenario: "ngfs_net_zero_2050", probability: 1, period: 0 }],
+    [{ scenario: "ngfs_net_zero_2050_gcam", probability: 1, period: 0 }],
     0.05
   );
 

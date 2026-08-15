@@ -40,6 +40,9 @@ export const replacementCostPlugin: MonetizationMethodPlugin = {
       discountRate: null,
       discountRateStatus: "no_time_dimension", // M3 D-8.1
       scopeExclusions: ["将来の水ストレス悪化に伴うコスト上昇は見込んでいない(それはIFVIのVFaccessが担う)"],
+      // unitReplacementCostは企業提供の現地通貨(円)建て単価であり、地理較正(PPP等)の
+      // 対象ではない(D-127・D-128で発見・修正)。
+      skipGeographicCalibration: true,
     };
 
     return [output];
