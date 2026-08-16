@@ -60,7 +60,8 @@ export const interactionEvent = pgTable(
     actor: text("actor").notNull(),
     /**
      * depth_override / representative_selection / countermeasure_selection /
-     * binding_mechanism_change / disclosure_claim_override / intentional_decision
+     * binding_mechanism_change / disclosure_claim_override / intentional_decision /
+     * site_update / site_removal
      */
     kind: text("kind").notNull(),
     /** 操作対象のID(materialIssueId / siteId / claimId 等)。 */

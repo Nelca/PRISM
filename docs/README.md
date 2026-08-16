@@ -26,6 +26,9 @@ docs/
   demo-guide.md                  ダミーデータでのローカルデモ手順書(セットアップ〜画面の見どころ)
   data-intake-guide.md           実データ受け入れガイド(3ファイルの記入方法・記入者・投入方法)
   mobile-continuation-guide.md   Claude Codeを使えない間の作業継続ガイド(iPhoneアプリ等・コード実行不可の環境向け)
+  uiux-revision-directive.md     UI/UX修正指示書 第1版(初見ユーザー向けの画面統合・用語・導線の修正指示15件。実施済み)
+  uiux-revision-directive-2.md   UI/UX修正指示書 第2版(実画面レビューに基づくディテール改善11件。実施済み)
+  uiux-revision-directive-3.md   UI/UX修正指示書 第3版(ユーザーストーリー整合6件。「見るだけの表」の解消・操作後の次アクション提示等)
 
   requirements/                  モジュール単位の要件定義
     m1-target-definition.md          済(対象定義とLocate)

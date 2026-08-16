@@ -39,7 +39,17 @@ export type InteractionKind =
   /** 企業単位の財務データ(M5)。財務・経理部門が入力する。 */
   | "company_financials"
   /** 決定単位の入力(M6 D-4・D-10)。経営企画・経理が入力する。 */
-  | "decision_parameters";
+  | "decision_parameters"
+  /**
+   * 登録済み拠点の編集・削除(指示B-03)。subjectIdは拠点ID。
+   *
+   * この2種は現在値を持たない=`projectInteractionState`にcaseがない。`site` は
+   * 追記のみの例外として更新・削除ができるテーブルであり、拠点の現在値はその行そのものだから、
+   * イベント側で畳み込み直す対象がない。それでも追記するのは、**誰がいつ何を変えたか**を
+   * 記録に残すため(payload.logMessage が /ledger の変更履歴に出る)。
+   */
+  | "site_update"
+  | "site_removal";
 
 export interface InteractionEvent {
   id: string;

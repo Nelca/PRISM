@@ -3,61 +3,82 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+/**
+ * サイドナビ(指示01)。
+ *
+ * 番号付きのステッパーも完了マークも置かない。初回にしか情報価値がなく、
+ * 複数年・毎四半期の反復利用では視覚ノイズに転じるため。順序は
+ * 「業務順の並び」と「動詞のグループ見出し」だけで暗黙に伝える。
+ */
 const NAV = [
   {
-    group: "対象の把握",
+    group: "評価する",
     items: [
-      { href: "/intake", label: "データの取込", sub: "3ファイルの検証と登録" },
-      { href: "/sites", label: "対象定義とLocate", sub: "拠点・サプライヤーの登録" },
-      { href: "/assessment", label: "評価の優先順位", sub: "評価が必要な課題を絞り込む" },
+      { href: "/sites", label: "データと拠点の登録", sub: "CSV一括または1件ずつ" },
+      { href: "/assessment", label: "評価対象の絞り込み", sub: "詳細評価に進む課題を決める" },
+      { href: "/valuation", label: "価値の算定と代表値の選択", sub: "複数の方法を比べて1つ選ぶ" },
     ],
   },
   {
-    group: "価値の算定と判断",
+    group: "判断する",
     items: [
-      { href: "/valuation", label: "価値の算定", sub: "複数の算定方法を並べて比較" },
-      { href: "/decomposition", label: "算定結果の比較", sub: "方法によるちがいを整理する" },
       { href: "/financial-bridge", label: "財務への影響", sub: "利益・リスクへの反映" },
-      { href: "/decision", label: "対策の検討", sub: "投資判断への影響を確認" },
+      { href: "/decision", label: "対策と判定", sub: "承認基準をまたぐかを確認" },
     ],
   },
   {
-    group: "開示と記録",
-    items: [
-      { href: "/disclosure", label: "開示内容の確認", sub: "記載内容と根拠の整合" },
-      { href: "/ledger", label: "変更履歴", sub: "判断の記録と根拠" },
-    ],
+    group: "開示する",
+    items: [{ href: "/disclosure", label: "開示への反映", sub: "記載内容と根拠の整合" }],
   },
 ];
 
-export function Nav() {
+/** 業務フローの外にある参照画面(指示05)。ステップ列と混ぜず、ナビ下部に置く。 */
+const REFERENCE = { href: "/ledger", label: "記録(監査証跡)", sub: "誰がいつ何を選んだか" };
+
+interface NavProps {
+  /**
+   * 未完了の必須判断がある画面のhref集合(指示01-4)。layout.tsx(server)が
+   * `deriveOpenTasks` から導出して渡す。この配列はサーバー専用モジュールを
+   * 経由しない、ただの文字列配列なのでclient componentへのpropsとして渡せる。
+   */
+  needsAttentionHrefs: string[];
+}
+
+export function Nav({ needsAttentionHrefs }: NavProps) {
   const pathname = usePathname();
+  const needsAttention = new Set(needsAttentionHrefs);
+
+  const item = (entry: { href: string; label: string; sub: string }) => (
+    <Link
+      key={entry.href}
+      href={entry.href}
+      className={`nav__item${pathname === entry.href ? " active" : ""}`}
+    >
+      <div className="nav__label">
+        {entry.label}
+        <small>{entry.sub}</small>
+      </div>
+      {needsAttention.has(entry.href) && (
+        <span className="nav__dot" role="img" aria-label="未完了の判断があります" title="未完了の判断があります" />
+      )}
+    </Link>
+  );
 
   return (
     <div className="nav">
       {NAV.map((section) => (
         <div key={section.group}>
           <div className="nav__section-label">{section.group}</div>
-          {section.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`nav__item${pathname === item.href ? " active" : ""}`}
-            >
-              <div className="nav__label">
-                {item.label}
-                <small>{item.sub}</small>
-              </div>
-            </Link>
-          ))}
+          {section.items.map(item)}
         </div>
       ))}
+
+      <div className="nav__divider" />
+      {item(REFERENCE)}
+
       <div className="nav__divider" />
       <div className="nav__foot">
-        トップ:
-        <Link href="/" style={{ color: "#B9C2CE" }}>
-          概要へ戻る
-        </Link>
+        <Link href="/">ホーム</Link>
       </div>
     </div>
   );

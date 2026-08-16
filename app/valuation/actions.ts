@@ -7,7 +7,7 @@ import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 
 const ACTOR = "宮里";
 
-const REVALIDATE_PATHS = ["/", "/valuation", "/decomposition", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
+const REVALIDATE_PATHS = ["/", "/valuation", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
 
 export interface ChangeRepresentativeFormState {
   error?: string;

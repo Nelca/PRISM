@@ -1,0 +1,94 @@
+import { describe, expect, test } from "vitest";
+import { runDemoPipeline, DEFAULT_RNG_SEED } from "@/lib/demo/run-demo-pipeline";
+import { emptyInteractionState } from "@/lib/demo/interaction-state";
+import type { InteractionState } from "@/lib/demo/interaction-state";
+import { deriveFindings, deriveOpenTasks, deriveStepProgress } from "./open-tasks";
+
+function run(interactions: InteractionState = emptyInteractionState()) {
+  return runDemoPipeline({ userSites: [], interactions, rngSeed: DEFAULT_RNG_SEED });
+}
+
+/** 承認閾値だけを未入力にした状態(M6 D-10:仮の値は置かず判定を保留にする)。 */
+function withPendingThreshold(): InteractionState {
+  const interactions = emptyInteractionState();
+  interactions.decisionParameters.set("site-042", {
+    baselineNpvValue: 1_200_000_000,
+    discountRate: 0.06,
+    horizon: 10,
+    approvalThresholdValue: null,
+  });
+  return interactions;
+}
+
+describe("deriveOpenTasks", () => {
+  test("実際の計算結果から導出する(該当のない項目は出さない)", () => {
+    const tasks = deriveOpenTasks(run());
+    const ids = tasks.map((task) => task.id);
+
+    expect(ids).toContain("representative-value");
+    expect(ids).toContain("impairment");
+    // 既定のデモデータでは全拠点の閾値が入っているため、保留のタスクは出ない。
+    expect(ids).not.toContain("approval-threshold");
+    // すべてのタスクが遷移先とリンクラベルを持つ(ホームのチェックリストから直接飛べる)。
+    expect(tasks.every((task) => task.href.startsWith("/") && task.linkLabel.length > 0)).toBe(true);
+  });
+
+  test("承認閾値が未入力なら、誰に聞けばよいかまで書いたタスクを出す", () => {
+    const tasks = deriveOpenTasks(run(withPendingThreshold()));
+    const pending = tasks.find((task) => task.id === "approval-threshold");
+
+    expect(pending).toBeDefined();
+    expect(pending!.text).toContain("承認閾値が未入力のため判定が保留中です(財務・経営企画部門への確認が必要)");
+    expect(pending!.href).toBe("/decision");
+  });
+});
+
+describe("deriveStepProgress", () => {
+  test("6ステップの完了状態をパイプライン結果から導く", () => {
+    const steps = deriveStepProgress(run());
+    expect(steps.map((step) => step.order)).toEqual([1, 2, 3, 4, 5, 6]);
+
+    const byHref = new Map(steps.map((step) => [step.href, step]));
+    expect(byHref.get("/sites")!.done).toBe(true);
+    expect(byHref.get("/assessment")!.done).toBe(true);
+    // 代表値が未選択のため③は未完了、判定は確定しているため⑤は完了。
+    expect(byHref.get("/valuation")!.done).toBe(false);
+    expect(byHref.get("/financial-bridge")!.done).toBe(true);
+    expect(byHref.get("/decision")!.done).toBe(true);
+  });
+
+  test("判定が保留の拠点があれば⑤は未完了", () => {
+    const steps = deriveStepProgress(run(withPendingThreshold()));
+    expect(steps.find((step) => step.href === "/decision")!.done).toBe(false);
+  });
+});
+
+describe("deriveFindings", () => {
+  test("「またがない」も確定した結論として出す", () => {
+    const findings = deriveFindings(run());
+    const notCrossing = findings.find((finding) => finding.id === "finding-verdict-does-not-cross");
+
+    expect(notCrossing).toBeDefined();
+    expect(notCrossing!.headline).toContain("承認基準をまたがない");
+    expect(notCrossing!.detail).toContain("この論点は今回の投資判断を変えない");
+  });
+
+  test("減損テストの前提に抵触する拠点を発見として出す(正確な値はtitle属性に退避)", () => {
+    const findings = deriveFindings(run());
+    const impairment = findings.find((finding) => finding.id === "finding-impairment");
+
+    expect(impairment).toBeDefined();
+    expect(impairment!.headline).toContain("減損テストの前提の見直しが必要な水準");
+    expect(impairment!.exact).toMatch(/円$/);
+    expect(impairment!.href).toBe("/financial-bridge");
+  });
+
+  test("判定が保留中の拠点は発見ではなくタスクとして扱う", () => {
+    const findings = deriveFindings(run(withPendingThreshold()));
+    const verdictFindings = findings.filter((finding) => finding.id.startsWith("finding-verdict-"));
+
+    for (const finding of verdictFindings) {
+      expect(finding.headline).not.toContain("本社工場");
+    }
+  });
+});

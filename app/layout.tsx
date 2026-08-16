@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Shippori_Mincho, Noto_Sans_JP, JetBrains_Mono } from "next/font/google";
 import { COMPANY_NAME } from "@/lib/demo/company";
+import { getTenantId } from "@/lib/db/client";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { deriveOpenTasks } from "@/lib/pipeline/open-tasks";
 import { Nav } from "./components/nav";
 import "./globals.css";
 
@@ -38,11 +41,36 @@ export const metadata: Metadata = {
  */
 export const dynamic = "force-dynamic";
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+/**
+ * ナビの状態表示(指示01-4)に使う「要対応のhref集合」。
+ *
+ * `getOrCreateLatestResult` は React.cache でメモ化してあるため、ここで呼んでも
+ * 各page.tsx側の呼び出しと合わせて同一リクエスト内では1回しかDBを読みに行かない。
+ * ホーム(/)と記録(/ledger)はタスクの遷移先ではないため、念のため除外する
+ * (deriveOpenTasksが返すhrefは現状どちらも含まないが、将来の追加に備えた防御)。
+ */
+async function getNeedsAttentionHrefs(): Promise<string[]> {
+  const tenantId = await getTenantId();
+  const result = await getOrCreateLatestResult(tenantId);
+  const hrefs = new Set(deriveOpenTasks(result).map((task) => task.href));
+  hrefs.delete("/");
+  hrefs.delete("/ledger");
+  return Array.from(hrefs);
+}
+
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const needsAttentionHrefs = await getNeedsAttentionHrefs();
+
   return (
     <html lang="ja" className={`${shipporiMincho.variable} ${notoSansJP.variable} ${jetbrainsMono.variable}`}>
       <body>
         <div className="app">
+          {/*
+            指示12:デモ注記はページ末尾のfooter-noteで毎画面繰り返すと景色化して読まれなくなるため、
+            レイアウト共通の細いバナー1本に集約する(各page.tsxのfooter-noteは削除済み)。
+          */}
+          <div className="demo-banner">デモデータ(架空企業)を表示中 — 実在の企業・実データではありません</div>
+
           <div className="brand">
             <div className="brand__mark">
               <svg viewBox="0 0 24 24" fill="none">
@@ -56,7 +84,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </div>
             <div>
               <div className="brand__name">PRISM</div>
-              <div className="brand__tag">Natural Capital Decision Layer</div>
+              <div className="brand__tag">自然資本の意思決定レイヤー</div>
             </div>
           </div>
 
@@ -67,7 +95,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               </div>
             </div>
             <div className="topbar__right">
-              <span className="env-badge">PILOT ENV — FY2027</span>
+              <span className="env-badge">パイロット環境・FY2027</span>
               <div className="user-chip">
                 <div className="user-chip__avatar">宮</div>
                 <span>宮里 様(サステナビリティ推進室)</span>
@@ -75,7 +103,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </div>
           </div>
 
-          <Nav />
+          <Nav needsAttentionHrefs={needsAttentionHrefs} />
 
           <div className="main">{children}</div>
         </div>

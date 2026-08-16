@@ -7,10 +7,19 @@ import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 
 const ACTOR = "宮里";
 
-const REVALIDATE_PATHS = ["/", "/sites", "/assessment", "/valuation", "/decomposition", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
+const REVALIDATE_PATHS = ["/", "/sites", "/assessment", "/valuation", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
 
 export interface DepthOverrideFormState {
   error?: string;
+  /**
+   * C-02:切替が成功したことと、その結果どこで何が見られるようになったかを
+   * 行内で返すための成功情報。`DepthToggle` がこれを見てインライン確認を出す。
+   * 画面には文言だけを出し、この値(内部モード)自体は表示しない。
+   */
+  applied?: {
+    mode: "promote" | "demote" | "auto";
+    materialIssueId: string;
+  };
 }
 
 export async function setDepthOverrideAction(
@@ -38,6 +47,14 @@ export async function setDepthOverrideAction(
   });
   await executeAndPersistRun(tenantId);
 
+  /**
+   * revalidatePath はServer Function内で呼ぶと、同じレスポンスに
+   * 「アクションの戻り値」と「再レンダリング済みのRSC Payload」の両方を載せる。
+   * したがって、戻り値(下の applied)は再レンダリング後もそのまま useActionState の
+   * state として残り、更新後の画面にインライン確認を出せる。
+   * 参照: node_modules/next/dist/docs/01-app/02-guides/server-actions.md
+   *      「A single response carries data and UI」
+   */
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
-  return {};
+  return { applied: { mode, materialIssueId } };
 }

@@ -2,17 +2,12 @@ import { getTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { buildDisclosureView } from "@core/disclosure/build-disclosure-view";
 import { INTERNAL_REVIEW_TEMPLATE } from "@core/disclosure/templates/internal-review-template";
-import { Card, Guide, Tag } from "../components/ui";
+import { Card, GuideBox, GuideButton, KV, ScreenLead, Tag } from "../components/ui";
+import { formatDepthReason, gapTypeLabel } from "../components/labels";
+import { Num } from "../components/numeric";
+import { StepNav } from "../components/step-nav";
 import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
 import { PdfIntakeForm } from "./pdf-intake-form";
-
-const GAP_LABEL: Record<string, string> = {
-  G1_no_evidence: "根拠なし",
-  G2_weak_evidence: "根拠がやや弱い",
-  G3_scope_mismatch: "対象範囲が一致しない",
-  G4_period_mismatch: "対象期間が一致しない",
-  G6_selective_disclosure: "触れていない対象がある",
-};
 
 const EXCLUSION_KIND_LABEL: Record<string, string> = {
   not_assessed: "評価対象に入っていない",
@@ -40,12 +35,19 @@ export default async function DisclosurePage() {
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">開示内容の確認</h1>
-          <Guide>
-            登録済みの開示claimから記載内容と根拠の整合を確認します。真偽の断定は行わず、根拠の充足状況のみを示します。
-            根拠が不足している場合、①記載を弱める・②根拠を追加取得する(詳細評価キューへ追加)・③判断の理由を記録する、の3つの対応から選べます。
-          </Guide>
+          <h1 className="screen__title">開示への反映</h1>
+          <GuideButton />
         </div>
+        <ScreenLead>開示文言と根拠の整合を確認します</ScreenLead>
+        {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
+        <GuideBox>
+          この画面では、開示文言と根拠の整合を確認します。<b>1.</b>{" "}
+          「PDFから主張を抽出する」で開示物を読み込みます(抽出だけをAIが行い、根拠の十分性判定はAIを使いません) →{" "}
+          <b>2.</b> 記載ごとのカードで、根拠が充足しているか・どの種別の不足かを確認します → <b>3.</b>{" "}
+          不足がある記載では、①記載を弱める・②根拠を追加取得する(詳細評価キューへ追加)・③判断の理由を記録する、の
+          3つから対応を選びます → <b>4.</b> 末尾の「開示文の下書き」で、登録済みのレコードから組み立てた文案を確認します。
+          記載の真偽は断定せず、根拠の充足状況だけを示します。材料が足りない項目を文章で埋めることはしません。
+        </GuideBox>
       </div>
 
       <Card
@@ -65,25 +67,18 @@ export default async function DisclosurePage() {
             subtitle={claim ? `${claim.sourceDocument} ${claim.sourcePageOrSection}` : undefined}
             headExtra={
               <>
-                {finding.gapType ? <Tag variant="warn">{GAP_LABEL[finding.gapType] ?? finding.gapType}</Tag> : <Tag variant="ok">根拠充足</Tag>}
+                {finding.gapType ? <Tag variant="warn">{gapTypeLabel(finding.gapType)}</Tag> : <Tag variant="ok">根拠充足</Tag>}
                 {claim?.extractionConfidence === "low" && <Tag variant="warn">AI抽出確信度低・要レビュー</Tag>}
               </>
             }
           >
-            <table className="data-table" style={{ marginBottom: finding.recommendedActions.length > 0 ? 14 : 0 }}>
-              <thead>
-                <tr>
-                  <th>GapFinding ID</th>
-                  <th>一致した根拠件数</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="num">{finding.id}</td>
-                  <td className="num">{finding.evidenceMatch.matchedRecordIds.length}</td>
-                </tr>
-              </tbody>
-            </table>
+            {/*
+              照合用のGapFinding IDは本文から外した(指示06)。監査で辿る必要がある場合は
+              記録(監査証跡)画面から参照できれば足りる。
+            */}
+            <div style={{ marginBottom: finding.recommendedActions.length > 0 ? 14 : 0 }}>
+              <KV k="一致した根拠の件数" v={<Num value={finding.evidenceMatch.matchedRecordIds.length} unit="件" />} />
+            </div>
 
             {/*
               G6:開示が触れている範囲に含まれるのに評価していない対象。
@@ -106,7 +101,12 @@ export default async function DisclosurePage() {
                       <tr key={`${exclusion.siteId}-${exclusion.kind}`}>
                         <td>{exclusion.scope}</td>
                         <td>{EXCLUSION_KIND_LABEL[exclusion.kind] ?? exclusion.kind}</td>
-                        <td style={{ fontSize: 12 }}>{exclusion.reason}</td>
+                        {/*
+                          B-04(点検分):この理由文はM2のDepthDecision.exclusionReasonをそのまま
+                          運んでいる経路があり(lib/demo/run-demo-pipeline.ts)、内部変数名や
+                          廃止済み用語が漏れうるため、assessment/page.tsxと同じ整形関数を通す。
+                        */}
+                        <td style={{ fontSize: 12 }}>{formatDepthReason(exclusion.reason)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -176,7 +176,7 @@ export default async function DisclosurePage() {
         </p>
       </Card>
 
-      <p className="footer-note">PRISM design preview — データはすべてデモ用の架空値です。実在の企業を参照しません。</p>
+      <StepNav current="/disclosure" result={result} />
     </div>
   );
 }

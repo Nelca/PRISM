@@ -7,6 +7,7 @@
  * 参照: docs/roadmap/implementation-plan.md T-11、承認済み計画のB-2
  */
 
+import { cache } from "react";
 import { runDemoPipeline, DEFAULT_RNG_SEED, RESULT_SCHEMA_VERSION } from "@/lib/demo/run-demo-pipeline";
 import type { DemoPipelineResult } from "@/lib/demo/run-demo-pipeline";
 import { listSiteEntries } from "@/lib/db/repositories/sites";
@@ -42,8 +43,18 @@ export async function executeAndPersistRun(tenantId: string): Promise<DemoPipeli
  * 2が必要な理由:ページは保存済みrunをそのまま読むため(計画B-2)、結果の構造を変える
  * コード変更をデプロイすると、古い形のrunを新しいコードが読んで壊れる。
  * 古いrunは削除せず残したまま(追記のみ)、新しい版のrunを積む。
+ *
+ * **同一リクエスト内でのメモ化:** layout.tsx(ナビの状態表示・指示01-4)とpage.tsx双方が
+ * 同じrunを読むようになったため、`React.cache` でラップしてリクエスト単位に結果を
+ * 共有する(DB読み出し・版台帳への書き込みの重複を避ける)。Next.jsの推奨パターン。
+ * 参照: node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md
+ * 「Sharing data with context and React.cache」。Server Componentのレンダー外
+ * (テストからの直接呼び出し等)では`react`パッケージの`cache`は素通し実装になり、
+ * 単に毎回実行されるだけで安全。
  */
-export async function getOrCreateLatestResult(tenantId: string): Promise<DemoPipelineResult> {
+export const getOrCreateLatestResult = cache(async function getOrCreateLatestResult(
+  tenantId: string
+): Promise<DemoPipelineResult> {
   const latest = await getLatestRun(tenantId);
   if (latest && latest.resultSchemaVersion === RESULT_SCHEMA_VERSION) {
     // 保存済みrunを返す場合も、そのrunが使った版が台帳にあることを保証する。
@@ -57,4 +68,4 @@ export async function getOrCreateLatestResult(tenantId: string): Promise<DemoPip
     return latest.result;
   }
   return executeAndPersistRun(tenantId);
-}
+});

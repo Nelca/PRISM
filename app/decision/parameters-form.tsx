@@ -6,10 +6,24 @@ import type { DecisionParametersInput } from "@/lib/demo/interaction-state";
 
 const initialState: DecisionParametersFormState = {};
 
-export function DecisionParametersForm({ siteId, current }: { siteId: string; current?: DecisionParametersInput }) {
+/**
+ * `emphasis`:C-06。承認閾値が未入力で判定が保留の拠点では、このフォームが
+ * 「この画面の最初の仕事」になるため、判定結果カードの本文先頭に主要ボタン
+ * (pill-btn--primary)として置く。確定後は見出し脇の小さなボタンのまま。
+ */
+export function DecisionParametersForm({
+  siteId,
+  current,
+  emphasis,
+}: {
+  siteId: string;
+  current?: DecisionParametersInput;
+  emphasis?: boolean;
+}) {
   return (
     <ModalForm
       triggerLabel={current ? "投資判断の前提を更新" : "投資判断の前提を入力"}
+      triggerVariant={emphasis ? "primary" : undefined}
       title="投資判断の前提"
       subtitle="経営企画・経理に確認する項目です。承認閾値は後から入力できます"
       action={saveDecisionParametersAction}
@@ -55,7 +69,7 @@ export function DecisionParametersForm({ siteId, current }: { siteId: string; cu
       </div>
 
       <p className="tooltip-note">
-        承認閾値が未入力でも、自然調整後NPVのレンジと自然関連コストは表示されます。判定(またぐ/またがない)だけが
+        承認閾値が未入力でも、投資対効果(NPV)のレンジと自然関連コストは表示されます。判定(またぐ/またがない)だけが
         保留になります。**業界標準値で仮置きすることはしません。**
       </p>
     </ModalForm>
