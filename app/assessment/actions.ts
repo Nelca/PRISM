@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getTenantId } from "@/lib/db/client";
-import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
-import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
+import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 
 const ACTOR = "宮里";
 
@@ -39,13 +38,20 @@ export async function setDepthOverrideAction(
   const label = mode === "promote" ? "詳細評価" : mode === "demote" ? "概算評価" : "自動判定";
   const tenantId = await getTenantId();
 
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "depth_override",
-    subjectId: materialIssueId,
-    payload: { mode, logMessage: `評価対象「${materialIssueId}」の深度を${label}に変更` },
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: `評価の深さの${label}への切替`,
+    events: [
+      {
+        actor: ACTOR,
+        kind: "depth_override",
+        subjectId: materialIssueId,
+        payload: { mode, logMessage: `評価対象「${materialIssueId}」の深度を${label}に変更` },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   /**
    * revalidatePath はServer Function内で呼ぶと、同じレスポンスに

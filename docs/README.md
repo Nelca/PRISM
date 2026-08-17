@@ -28,7 +28,10 @@ docs/
   mobile-continuation-guide.md   Claude Codeを使えない間の作業継続ガイド(iPhoneアプリ等・コード実行不可の環境向け)
   uiux-revision-directive.md     UI/UX修正指示書 第1版(初見ユーザー向けの画面統合・用語・導線の修正指示15件。実施済み)
   uiux-revision-directive-2.md   UI/UX修正指示書 第2版(実画面レビューに基づくディテール改善11件。実施済み)
-  uiux-revision-directive-3.md   UI/UX修正指示書 第3版(ユーザーストーリー整合6件。「見るだけの表」の解消・操作後の次アクション提示等)
+  uiux-revision-directive-3.md   UI/UX修正指示書 第3版(ユーザーストーリー整合6件。実施済み)
+  uiux-revision-directive-4.md   UI/UX修正指示書 第4版(機能バグ根治+④⑤のサマリー先行への再設計・比較ペア選択・用語補足等16件。実施済み)
+  uiux-revision-directive-5.md   UI/UX修正指示書 第5版(第4版の本体反映確認+新規発見の機能バグ4件・散布図指標の修正・Card配列key警告の解消。実施済み)
+  uiux-revision-directive-6.md   UI/UX修正指示書 第6版(件数スケール設計の全画面適用。指摘漏れの原因分析・課題セレクタの常時コンボ化・⑥のサマリー先行化・④⑤詳細の単一描画。実施済み)
 
   requirements/                  モジュール単位の要件定義
     m1-target-definition.md          済(対象定義とLocate)

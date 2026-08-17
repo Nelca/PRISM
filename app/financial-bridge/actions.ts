@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getTenantId } from "@/lib/db/client";
-import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
-import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
+import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 import type { CompanyFinancialsInput } from "@/lib/demo/interaction-state";
 
 const REVALIDATE_PATHS = ["/", "/financial-bridge", "/decision", "/ledger"];
@@ -48,13 +47,20 @@ export async function saveCompanyFinancialsAction(
   }
 
   const tenantId = await getTenantId();
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "company_financials",
-    subjectId: "company",
-    payload: { financials: values, logMessage: "企業単位の財務データを更新" },
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "企業全体の財務データの入力",
+    events: [
+      {
+        actor: ACTOR,
+        kind: "company_financials",
+        subjectId: "company",
+        payload: { financials: values, logMessage: "企業単位の財務データを更新" },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return { saved: true };

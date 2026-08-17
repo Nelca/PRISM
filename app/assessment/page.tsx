@@ -8,6 +8,7 @@ import { formatDepthReason, formatIssueExclusionReason, materialIssueLabel } fro
 import { StepNav } from "../components/step-nav";
 import { DataSourceAttribution } from "../components/attribution";
 import { DepthToggle } from "./depth-toggle";
+import { TaskBanner } from "../components/task-banner";
 
 /**
  * 「上位◯%」の閾値(M2 D-3の暫定20%)。DepthDecision自体にはこの値を持つフィールドが
@@ -107,14 +108,19 @@ export default async function AssessmentPage() {
           この画面では、詳細評価に進める課題を決めます。<b>1.</b> 優先度(感応度・影響しうる財務規模・不確実性・
           開示必須性の4項目を合成した順位)を確認します → <b>2.</b> 表の「評価の深さ」で、詳細評価する課題を切り替えで
           指定します → <b>3.</b> 指定できたら「価値の算定と代表値の選択」へ進みます。
+          <b>概算評価</b>は、全課題に自動で行う簡易な優先度づけまでで止まります。<b>詳細評価</b>にすると、
+          次の「価値の算定」で貨幣価値の算定から投資判断への反映までを行う対象になります。
           優先度が上位の課題は自動で詳細評価になっていますが、手動で変更できます(変更は理由とともに記録に残ります)。
           対象外とした課題も表の末尾に理由付きで残ります。
         </GuideBox>
       </div>
 
+      {/* D-11-1:残タスクの頭出しバナー(全6画面共通。残タスクがある時だけ出る)。 */}
+      <TaskBanner current="/assessment" result={result} />
+
       <Card
         title="評価対象の一覧"
-        subtitle="この画面の唯一の表。優先度を見て、詳細評価する課題を指定します"
+        subtitle="優先度を見て、詳細評価する課題を指定します"
         padBody={false}
         foot="優先度は感応度・影響しうる財務規模・不確実性・開示必須性の4項目を同一バッチ内で順位化して合算した値です。感応度が高い課題は自然への依存・影響が強く、財務影響が生じやすい評価候補です(感応度の分数は、実際に評価できた基準の数を分母にしています)。評価の深さはクリックで切り替えられ、切り替えは記録に残ります。対象外とした課題は末尾に理由付きで残ります"
       >
@@ -126,7 +132,13 @@ export default async function AssessmentPage() {
               <th colSpan={4} style={{ textAlign: "center" }}>
                 優先度の内訳
               </th>
-              <th rowSpan={2}>評価の深さ</th>
+              {/* D-04:切替が何を引き起こすかをheaderのtitleでも説明する(ガイド文と同じ因果)。 */}
+              <th
+                rowSpan={2}
+                title="概算評価=全課題に自動で行う簡易な優先度づけまで。詳細評価=次の「価値の算定」で貨幣価値の算定〜投資判断への反映まで行う対象になる"
+              >
+                評価の深さ
+              </th>
               <th rowSpan={2}>理由</th>
             </tr>
             <tr>

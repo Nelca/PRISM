@@ -20,6 +20,18 @@ export async function executeAndPersistRun(tenantId: string): Promise<DemoPipeli
   const [userSites, interactions] = await Promise.all([listSiteEntries(tenantId), loadInteractionState(tenantId)]);
 
   const result = runDemoPipeline({ userSites, interactions, rngSeed: DEFAULT_RNG_SEED });
+  return persistComputedRun(tenantId, result);
+}
+
+/**
+ * 既に計算済みの結果をrunとして永続化する。
+ *
+ * 「検証してから永続化」(第4版 D-01)の共通ヘルパー
+ * (`lib/pipeline/try-run-with-interaction.ts`)が、事前検証で得た結果をそのまま
+ * 保存するために使う。パイプラインの実行と永続化を分けておくことで、
+ * **成功した計算だけを保存する**という順序を呼び出し側が守れる。
+ */
+export async function persistComputedRun(tenantId: string, result: DemoPipelineResult): Promise<DemoPipelineResult> {
   await persistRun({ tenantId, rngSeed: DEFAULT_RNG_SEED, result });
 
   // 実際に使われた版を台帳に取り込む(M8「後から手で入力する設計にしない」)。

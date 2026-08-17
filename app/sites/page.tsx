@@ -8,6 +8,7 @@ import { DataSourceAttribution } from "../components/attribution";
 import { RegisterTabs } from "./register-tabs";
 import { EditSiteButton } from "./add-site-form";
 import { RemoveSiteButton } from "./remove-site-button";
+import { TaskBanner } from "../components/task-banner";
 
 /**
  * 記入者の対応表(指示02)。以前は `docs/data-intake-guide.md` というリポジトリ内パスを
@@ -88,6 +89,9 @@ export default async function SitesPage() {
           が算出されます。座標も住所もない行は評価に進めないため、黙って消さず理由付きで下段に残します。
         </GuideBox>
       </div>
+
+      {/* D-11-1:残タスクの頭出しバナー(全6画面共通。残タスクがある時だけ出る)。 */}
+      <TaskBanner current="/sites" result={result} />
 
       <div className="grid-2">
         <Card title="登録する" subtitle="CSVで一括、または1件ずつ">

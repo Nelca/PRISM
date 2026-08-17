@@ -2,7 +2,14 @@ import { describe, expect, test } from "vitest";
 import { runDemoPipeline, DEFAULT_RNG_SEED } from "@/lib/demo/run-demo-pipeline";
 import { emptyInteractionState } from "@/lib/demo/interaction-state";
 import type { InteractionState } from "@/lib/demo/interaction-state";
-import { deriveFindings, deriveOpenTasks, deriveStepProgress } from "./open-tasks";
+import {
+  decompositionForMaterialIssue,
+  deriveFindings,
+  deriveOpenTasks,
+  deriveStepProgress,
+  hasRepresentativeSelection,
+  materialIssueIdsWithoutRepresentativeSelection,
+} from "./open-tasks";
 
 function run(interactions: InteractionState = emptyInteractionState()) {
   return runDemoPipeline({ userSites: [], interactions, rngSeed: DEFAULT_RNG_SEED });
@@ -90,5 +97,70 @@ describe("deriveFindings", () => {
     for (const finding of verdictFindings) {
       expect(finding.headline).not.toContain("本社工場");
     }
+  });
+});
+
+/**
+ * 第4版 D-02:「まだ代表値を選んでいない課題」の判定が③の画面と未完了タスクで
+ * 二重実装になっていた。同じ関数を通ることと、既定値のままの課題と明示選択済みの
+ * 課題が区別されることを検証する。
+ */
+describe("代表値の選択状況の判定(D-02)", () => {
+  const FLAGSHIP_ISSUE = "site-042-mi-water";
+
+  /** 本社工場だけ代表値を明示的に選んだ状態。 */
+  function withExplicitSelection(): InteractionState {
+    const records = run().valuation.valuationRecordsByMaterialIssue[FLAGSHIP_ISSUE];
+    const chosen = records.find((r) => r.methodId === "replacement-cost")!;
+    const interactions = emptyInteractionState();
+    interactions.representativeRecordId.set(FLAGSHIP_ISSUE, chosen.id);
+    interactions.representativeSelection.set(FLAGSHIP_ISSUE, {
+      recordId: chosen.id,
+      methodId: chosen.methodId,
+      valueConcept: "exchange",
+      reason: "既存の社内基準に合わせるため",
+    });
+    return interactions;
+  }
+
+  test("何も選んでいなければ、すべての課題が未選択として挙がる", () => {
+    const result = run();
+    const unselected = materialIssueIdsWithoutRepresentativeSelection(result);
+
+    expect(unselected).toContain(FLAGSHIP_ISSUE);
+    expect(unselected.length).toBe(result.valuation.divergenceDecompositions.length);
+    expect(hasRepresentativeSelection(result, FLAGSHIP_ISSUE)).toBe(false);
+  });
+
+  test("明示的に選んだ課題は未選択に挙がらない(既定値のままの課題とは区別する)", () => {
+    const result = run(withExplicitSelection());
+
+    expect(hasRepresentativeSelection(result, FLAGSHIP_ISSUE)).toBe(true);
+    expect(materialIssueIdsWithoutRepresentativeSelection(result)).not.toContain(FLAGSHIP_ISSUE);
+  });
+
+  test("未完了タスクの件数が、③の画面が使う判定と必ず一致する", () => {
+    for (const interactions of [emptyInteractionState(), withExplicitSelection()]) {
+      const result = run(interactions);
+      const unselected = materialIssueIdsWithoutRepresentativeSelection(result);
+      const task = deriveOpenTasks(result).find((t) => t.id === "representative-value");
+
+      if (unselected.length === 0) {
+        expect(task).toBeUndefined();
+      } else {
+        expect(task!.text).toContain(`${unselected.length}件`);
+      }
+      // 工程の進捗(ホーム)の「選択済み◯/◯件」も同じ数え方から出る。
+      const progress = deriveStepProgress(result).find((step) => step.href === "/valuation")!;
+      expect(progress.note).toContain(`${result.valuation.divergenceDecompositions.length - unselected.length}/`);
+    }
+  });
+
+  test("分解の引き当ては課題IDで一意に決まる", () => {
+    const result = run();
+    for (const materialIssueId of Object.keys(result.valuation.valuationRecordsByMaterialIssue)) {
+      expect(decompositionForMaterialIssue(result, materialIssueId)).toBeDefined();
+    }
+    expect(decompositionForMaterialIssue(result, "存在しない課題")).toBeUndefined();
   });
 });

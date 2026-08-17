@@ -9,8 +9,7 @@ import {
   replaceSiteEntries,
   updateSiteEntry,
 } from "@/lib/db/repositories/sites";
-import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
-import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
+import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 import { loadCompanyDataset } from "@/lib/intake/load-company-dataset";
 import { toSiteEntries } from "@/lib/intake/to-site-entries";
 import { DEFAULT_DEEP_DIVE_PARAMS } from "@/lib/demo/user-site-defaults";
@@ -161,10 +160,23 @@ export async function addSiteAction(_prevState: AddSiteFormState, formData: Form
   }
 
   const tenantId = await getTenantId();
-  await addSiteEntry(tenantId, parsed.row, parsed.deepDive);
 
-  // 入力が変わったので新しいrunを1回だけ作る。ページ側は再計算しない(計画B-2)。
-  await executeAndPersistRun(tenantId);
+  /**
+   * 追加後の一覧でまず計算してみて、成功したときだけDBへ書く(第4版 D-01-2)。
+   * 検証用の拠点IDは仮のもので、実際の採番は `addSiteEntry` が行う(採番結果を
+   * 取り込むため、書き込み後にもう一度計算して保存する)。
+   */
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "拠点の追加",
+    userSites: (current) => [...current, { row: { ...parsed.row, id: "site-user-pending" }, deepDive: parsed.deepDive }],
+    // 入力が変わったので新しいrunを1回だけ作る。ページ側は再計算しない(計画B-2)。
+    commit: async () => {
+      await addSiteEntry(tenantId, parsed.row, parsed.deepDive);
+    },
+  });
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};
@@ -196,25 +208,39 @@ export async function updateSiteAction(_prevState: AddSiteFormState, formData: F
 
   const changes = describeSiteChanges({ row: existing.row, deepDive: existing.deepDive }, parsed);
 
-  try {
-    await updateSiteEntry(tenantId, siteId, parsed.row, parsed.deepDive);
-  } catch (cause) {
-    return { error: errorMessage(cause) };
-  }
-
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "site_update",
-    subjectId: siteId,
-    payload: {
-      changes,
-      logMessage:
-        changes.length > 0
-          ? `拠点「${parsed.row.name}」の登録内容を変更(${changes.join("、")})`
-          : `拠点「${parsed.row.name}」の登録内容を保存(変更なし)`,
+  let updateError: string | undefined;
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "拠点の登録内容の変更",
+    userSites: (current) =>
+      current.map((entry) =>
+        entry.row.id === siteId ? { row: { ...parsed.row, id: siteId }, deepDive: parsed.deepDive } : entry
+      ),
+    commit: async () => {
+      try {
+        await updateSiteEntry(tenantId, siteId, parsed.row, parsed.deepDive);
+      } catch (cause) {
+        updateError = errorMessage(cause);
+        throw cause;
+      }
     },
+    events: [
+      {
+        actor: ACTOR,
+        kind: "site_update",
+        subjectId: siteId,
+        payload: {
+          changes,
+          logMessage:
+            changes.length > 0
+              ? `拠点「${parsed.row.name}」の登録内容を変更(${changes.join("、")})`
+              : `拠点「${parsed.row.name}」の登録内容を保存(変更なし)`,
+        },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: updateError ?? outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};
@@ -243,22 +269,33 @@ export async function removeSiteAction(_prevState: AddSiteFormState, formData: F
     return { error: "対象の拠点が見つかりません。すでに削除された可能性があります。" };
   }
 
-  try {
-    await removeSiteEntry(tenantId, siteId);
-  } catch (cause) {
-    return { error: errorMessage(cause) };
-  }
-
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "site_removal",
-    subjectId: siteId,
-    payload: {
-      name: existing.row.name,
-      logMessage: `拠点「${existing.row.name}」を評価対象の一覧から削除(過去の計算結果・監査証跡は残ります)`,
+  let removeError: string | undefined;
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "拠点の削除",
+    userSites: (current) => current.filter((entry) => entry.row.id !== siteId),
+    commit: async () => {
+      try {
+        await removeSiteEntry(tenantId, siteId);
+      } catch (cause) {
+        removeError = errorMessage(cause);
+        throw cause;
+      }
     },
+    events: [
+      {
+        actor: ACTOR,
+        kind: "site_removal",
+        subjectId: siteId,
+        payload: {
+          name: existing.row.name,
+          logMessage: `拠点「${existing.row.name}」を評価対象の一覧から削除(過去の計算結果・監査証跡は残ります)`,
+        },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: removeError ?? outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};
@@ -314,17 +351,27 @@ export async function importCompanyDatasetAction(
   const { entries, unmappedFields } = toSiteEntries(dataset);
   const tenantId = await getTenantId();
 
-  await replaceSiteEntries(tenantId, entries);
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "depth_override",
-    subjectId: `${dataset.engagementConfig.deepDive.siteId}-mi-${dataset.engagementConfig.deepDive.category}`,
-    payload: {
-      mode: "promote",
-      logMessage: `実データを取り込み(拠点${entries.length}件)。詳細評価の対象を${dataset.engagementConfig.deepDive.siteId}に指定`,
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "実データの取り込み",
+    userSites: () => entries,
+    commit: async () => {
+      await replaceSiteEntries(tenantId, entries);
     },
+    events: [
+      {
+        actor: ACTOR,
+        kind: "depth_override",
+        subjectId: `${dataset.engagementConfig.deepDive.siteId}-mi-${dataset.engagementConfig.deepDive.category}`,
+        payload: {
+          mode: "promote",
+          logMessage: `実データを取り込み(拠点${entries.length}件)。詳細評価の対象を${dataset.engagementConfig.deepDive.siteId}に指定`,
+        },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { errors: [outcome.message] };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return { importedSiteCount: entries.length, unmapped: unmappedFields };

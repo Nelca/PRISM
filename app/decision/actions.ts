@@ -4,9 +4,8 @@ import { revalidatePath } from "next/cache";
 import { exchangeAmount } from "@core/types/common";
 import type { BindingMechanism, CountermeasureType } from "@core/types/decision";
 import { getTenantId } from "@/lib/db/client";
-import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
-import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
+import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 
 const REVALIDATE_PATHS = ["/", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
 
@@ -71,24 +70,31 @@ export async function saveDecisionParametersAction(
   }
 
   const tenantId = await getTenantId();
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "decision_parameters",
-    subjectId: siteId,
-    payload: {
-      parameters: {
-        baselineNpvValue: values.baselineNpvValue,
-        discountRate: values.discountRate,
-        horizon: values.horizon,
-        approvalThresholdValue,
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "投資判断の前提の入力",
+    events: [
+      {
+        actor: ACTOR,
+        kind: "decision_parameters",
+        subjectId: siteId,
+        payload: {
+          parameters: {
+            baselineNpvValue: values.baselineNpvValue,
+            discountRate: values.discountRate,
+            horizon: values.horizon,
+            approvalThresholdValue,
+          },
+          logMessage:
+            approvalThresholdValue === null
+              ? `${siteId}の投資判断の前提を更新(承認閾値は未入力のため判定は保留)`
+              : `${siteId}の投資判断の前提と承認閾値を更新`,
+        },
       },
-      logMessage:
-        approvalThresholdValue === null
-          ? `${siteId}の投資判断の前提を更新(承認閾値は未入力のため判定は保留)`
-          : `${siteId}の投資判断の前提と承認閾値を更新`,
-    },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return { saved: true };
@@ -108,13 +114,13 @@ export async function selectCountermeasureAction(
     return { error: "対策案を指定してください。" };
   }
   const tenantId = await getTenantId();
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "countermeasure_selection",
-    subjectId: siteId,
-    payload: { key },
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "対策案の選択",
+    events: [{ actor: ACTOR, kind: "countermeasure_selection", subjectId: siteId, payload: { key } }],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};
@@ -166,13 +172,20 @@ export async function recordDecisionAction(
   }
 
   if (mechanismChanged || !current) {
-    await appendInteractionEvent(tenantId, {
-      actor: ACTOR,
-      kind: "binding_mechanism_change",
-      subjectId: siteId,
-      payload: { mechanism, reason, logMessage: `対策の判定結果を「${BINDING_LABELS[kind]}」で選択・記録` },
+    const outcome = await tryRunAndPersist(tenantId, {
+      label: "反映先の記録",
+      events: [
+        {
+          actor: ACTOR,
+          kind: "binding_mechanism_change",
+          subjectId: siteId,
+          payload: { mechanism, reason, logMessage: `対策の判定結果を「${BINDING_LABELS[kind]}」で選択・記録` },
+        },
+      ],
     });
-    await executeAndPersistRun(tenantId);
+    if (!outcome.ok) {
+      return { error: outcome.message };
+    }
   }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);

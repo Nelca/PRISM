@@ -407,6 +407,16 @@ h4 {
 .card + .card {
   margin-top: 16px;
 }
+/*
+ * 縦リズムの補完(第4版 D-09)。`.card + .card` は「素のブロック(.grid-2等)が
+ * 間に挟まる」と効かなくなり、カードの上余白が消えていた(例:③の価値概念グループの
+ * 2カラム直後の「投資判断に使う代表値の選択」)。カードでない主要ブロックの前後にも
+ * 同じ16pxを、inline styleではなくこの規則で与える。
+ */
+.screen :is(.grid-2, .grid-3, .cross-issue-note, .combo, .pipeline-warning) + .card,
+.screen .card + :is(.grid-2, .grid-3) {
+  margin-top: 16px;
+}
 .card__head {
   display: flex;
   align-items: center;
@@ -1258,4 +1268,174 @@ hr.rule {
   to {
     background: transparent;
   }
+}
+
+/* 適用できなかった操作の告知(第4版 D-01-3)-------------------------------
+   エラーではなく「保存済みの操作のうち、今回の計算に反映できなかったもの」の告知。
+   破壊的な赤(brick)ではなく注意色(gold)で、画面ヘッダー直下に置く。 */
+.pipeline-warning {
+  border: 1px solid var(--gold-line);
+  background: var(--gold-soft);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.pipeline-warning__title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--gold);
+}
+.pipeline-warning__list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--ink);
+}
+
+/* 比較ペアの選択ピル(第4版 D-07)。ペア数は1課題内の手法数(2〜5)の組合せで
+   最大10個程度に収まり、課題数・拠点数に比例しないためピルのままでよい(第6版§0.1)。 */
+.selector-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* 対象切替コンボボックス(第6版 D-21)---------------------------------------
+   件数に関わらず常に同じ形:閉=トリガーボタン1つ、開=検索+スクロールリスト。
+   第4版D-06の「閾値でピル/リストが切り替わる」設計は廃止した(§0の原因1)。 */
+.combo {
+  position: relative;
+  margin-bottom: 16px;
+  max-width: 520px;
+}
+.combo__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.combo__trigger:hover {
+  border-color: var(--accent);
+}
+.combo__value {
+  font-weight: 600;
+}
+.combo__meta {
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.combo__attention {
+  margin-left: 8px;
+  color: var(--brick);
+}
+.combo__panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  padding: 10px 12px;
+}
+.combo__search {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 8px 10px;
+  background: var(--surface);
+}
+.combo__search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.combo__count {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin: 6px 2px;
+}
+.combo__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.combo__item {
+  display: block;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.combo__item:hover {
+  background: var(--line-soft);
+}
+.combo__item--active {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.combo__empty {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* 一行説明つきの用語(第4版 D-12)。点線下線+title。 */
+.term {
+  border-bottom: 1px dashed var(--ink-faint);
+  cursor: help;
+}
+
+/* 頭出しバナー(第4版 D-11-1)-----------------------------------------------
+   「この画面でやること」を画面ヘッダー直下に出す。残タスクがある時だけ表示し、
+   各項目はページ内の該当カードへのアンカーリンク。 */
+.task-banner {
+  border: 1px solid var(--accent-line, var(--line));
+  background: var(--accent-soft);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.task-banner__title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-ink, var(--accent));
+}
+.task-banner__list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--ink);
+}
+.task-banner__list a {
+  color: inherit;
+}
+
+/* 図の読み下し文(第4版 D-07)。tooltip-note(小書き)と違い、本文として常設する。 */
+.chart-narrative {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--ink);
 }

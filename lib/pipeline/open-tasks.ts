@@ -30,6 +30,11 @@ export interface OpenTask {
   text: string;
   href: string;
   linkLabel: string;
+  /**
+   * その画面内の該当カードのアンカーID(第4版 D-11-1)。頭出しバナーが
+   * `#anchor` へのページ内リンクに使う。該当カードが1つに定まらない場合は省略。
+   */
+  anchor?: string;
 }
 
 /** 6ステップの工程と完了状態(ホームの進捗ブロックだけが描く。常設ナビには出さない)。 */
@@ -51,6 +56,47 @@ export interface Finding {
   exact?: string;
   href: string;
   linkLabel: string;
+}
+
+/* --------------------------------------------------------------------------
+   代表値の選択状況(第4版 D-02)
+   -------------------------------------------------------------------------- */
+
+/**
+ * 課題(MaterialIssue)に対応する乖離分解を引く。
+ *
+ * `runValuationPipeline` は分解のIDを `dd-${materialIssueId}` で作る
+ * (packages/core/src/pipeline/valuation-pipeline.ts)。以前は③の画面が
+ * 「レコードの物理量ID」経由で引き当てており、④・ホームの `deriveOpenTasks` とは
+ * 別経路だった。**同じ課題を指しているのに判定が食い違う余地があったため、
+ * 引き当ても判定もこの1箇所に集約する。**
+ */
+export function decompositionForMaterialIssue(
+  result: DemoPipelineResult,
+  materialIssueId: string
+): DivergenceDecomposition | undefined {
+  return result.valuation.divergenceDecompositions.find((d) => d.id === `dd-${materialIssueId}`);
+}
+
+/**
+ * 「利用者が代表値を明示的に選んだ」課題かどうか。
+ *
+ * `representativeValueSelection` は、利用者が理由付きで手法を選んだときにだけ
+ * coreが載せる(M4 §7.4)。**既定の代表値(代替費用法)のまま運用している課題とは
+ * 明確に区別する。**未選択の課題にドットや案内リンクを出す判定は、③の画面も
+ * ホーム/④の未完了タスクも、必ずこの関数を通す。
+ */
+export function hasRepresentativeSelection(result: DemoPipelineResult, materialIssueId: string): boolean {
+  return decompositionForMaterialIssue(result, materialIssueId)?.representativeValueSelection !== undefined;
+}
+
+/** まだ代表値を選んでいない(既定値のまま運用中の)課題のID。 */
+export function materialIssueIdsWithoutRepresentativeSelection(result: DemoPipelineResult): string[] {
+  return Object.keys(result.valuation.valuationRecordsByMaterialIssue).filter(
+    (materialIssueId) =>
+      decompositionForMaterialIssue(result, materialIssueId) !== undefined &&
+      !hasRepresentativeSelection(result, materialIssueId)
+  );
 }
 
 /** 手法間の差が「何倍」かを示す倍率。比が1未満のときは逆数を取る(向きは問わない)。 */
@@ -145,17 +191,19 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
   if (maxRatio !== null && maxRatio > DIVERGENCE_ALERT_RATIO) {
     tasks.push({
       id: "divergence",
+      anchor: "pair-comparison",
       text: `算定方法によって試算結果に最大${maxRatio.toFixed(1)}倍の差がある。代表値の選択理由を確認してください。`,
       href: "/valuation",
       linkLabel: "確認する",
     });
   }
 
-  // ③ 代表値が未選択(既定値のまま)の課題があるか
-  const unselected = valuation.divergenceDecompositions.filter((d) => !d.representativeValueSelection).length;
+  // ③ 代表値が未選択(既定値のまま)の課題があるか。判定は③の画面と同じ関数を使う(D-02)。
+  const unselected = materialIssueIdsWithoutRepresentativeSelection(result).length;
   if (unselected > 0) {
     tasks.push({
       id: "representative-value",
+      anchor: "representative-selection",
       text: `${unselected}件の課題で、投資判断に使う代表値がまだ選択されていない(既定値を使用中)。`,
       href: "/valuation",
       linkLabel: "代表値を選ぶ",
@@ -174,6 +222,7 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
     const scope = pendingSites.length === 1 ? `${pendingSites[0]}で` : `${pendingSites.length}拠点で`;
     tasks.push({
       id: "approval-threshold",
+      anchor: "site-summary",
       text: `${scope}承認閾値が未入力のため判定が保留中です(財務・経営企画部門への確認が必要)。`,
       href: "/decision",
       linkLabel: "閾値を入力する",
@@ -185,6 +234,7 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
   if (weakBinding > 0) {
     tasks.push({
       id: "binding-mechanism",
+      anchor: "site-summary",
       text: `${weakBinding}件の判定が「${bindingLabel("weak_reference")}」のままで、社内制度に拘束されていない。`,
       href: "/decision",
       linkLabel: "反映先を決める",
@@ -196,6 +246,7 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
   if (impairmentAffected > 0) {
     tasks.push({
       id: "impairment",
+      anchor: "site-summary",
       text: `${impairmentAffected}拠点で、自然債務が既存の減損テスト前提の閾値を上回っている。`,
       href: "/decision",
       linkLabel: "対策を検討",
@@ -207,6 +258,7 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
   if (gapsFound > 0) {
     tasks.push({
       id: "disclosure-gap",
+      anchor: "gap-findings",
       text: `開示文言${gapsFound}件で、記載内容に対する根拠が不足している。`,
       href: "/disclosure",
       linkLabel: "確認する",
@@ -243,7 +295,8 @@ function countProgress(result: DemoPipelineResult): ProgressCounts {
     issueCount: assessment.priorityScores.length,
     promoted: assessment.depthDecisions.filter((d) => d.depth === "deep_dive").length,
     decompositionCount: decompositions.length,
-    selected: decompositions.filter((d) => d.representativeValueSelection).length,
+    // 「選択済み◯/◯件」も③の画面と同じ判定から数える(D-02)。
+    selected: decompositions.length - materialIssueIdsWithoutRepresentativeSelection(result).length,
     decisionCount: decisions.length,
     confirmed: decisions.filter((d) => d.decision.decisionRecord.verdict !== "pending").length,
     gapCount: gapFindings.length,

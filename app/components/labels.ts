@@ -105,6 +105,52 @@ export function decompositionFactorLabel(factor: string): string {
   return DECOMPOSITION_FACTOR_LABEL[factor as DecompositionFactor] ?? factor;
 }
 
+/**
+ * 要因ラベルの短縮版(2026-08-17レビュー・第5版)。ウォーターフォールのバー幅(84px)に対して
+ * 通常表記(例:「地域差による調整の違い」)が長すぎ、2段振り分けをしても隣接バーの
+ * ラベルと詰まって読みにくかった。図の軸ラベルにのみ使い、本文の読み下し文
+ * (narrative)・凡例には通常表記を使う。
+ */
+export const DECOMPOSITION_FACTOR_SHORT_LABEL: Record<DecompositionFactor, string> = {
+  endpointCoverage: "対象範囲の違い",
+  discountRate: "割引率の違い",
+  geographicCalibration: "地域差調整の違い",
+};
+
+export function decompositionFactorShortLabel(factor: string): string {
+  return DECOMPOSITION_FACTOR_SHORT_LABEL[factor as DecompositionFactor] ?? decompositionFactorLabel(factor);
+}
+
+/**
+ * 財務用語の一行説明(第4版 D-12)。④の画面で初出時に点線下線+titleで出す。
+ *
+ * 説明文の出典(推測で書かない):構想書 `docs/concept-v2.md` §9.3(M5:財務接続の式)と
+ * M5要件定義 `docs/requirements/m5-financial-bridge.md` D-1〜D-5。
+ * これらはPRISM独自の管理会計指標(非GAAP)であり、一般的な会計基準の用語ではない。
+ */
+export const FINANCIAL_TERM_NOTE: Record<string, string> = {
+  自然調整後営業利益:
+    "報告営業利益から「依存リスクの正常化調整」と「将来内部化見込みコスト」を差し引いた、PRISM独自の管理会計指標です。一般的な会計基準の用語ではありません。",
+  依存リスク正常化調整:
+    "自然への依存に伴って将来顕在化しうるコストの調整分です。価値の算定(③)で選んだ交換価値の代表値から算出します。",
+  将来内部化見込みコスト:
+    "現在は支払っていないものの、規制や価格付けにより将来自社の負担になる見込みのコストです。自然債務(期待損失)の算出と接続しています。",
+  未内部化コスト:
+    "算定した交換価値の総額から、既に炭素税・水利用料等として実際に支払っている額(内部化済み分)を差し引いた残りです。",
+  内部化率:
+    "算定した交換価値の総額のうち、既に実費として支払っている額の割合です(内部化済みコスト ÷ 総額)。",
+  "自然債務(期待損失)":
+    "未内部化コストに、炭素価格シナリオ別の内部化確率と割引係数を掛けて見込み額に変換した期待損失です。未内部化コストの全額を債務とはみなしません。",
+  減損テストの前提:
+    "既存の減損テストで使っている前提(閾値)を自然債務が上回るかどうかの比較です。上回る場合、前提の見直しが必要になりえます。",
+  "格付・資本コスト":
+    "信用格付機関が一般的に参照する財務指標の変化を算術で示すものです。実際の格付・資本コストへの影響は予測・断定しません。",
+};
+
+export function financialTermNote(term: string): string | undefined {
+  return FINANCIAL_TERM_NOTE[term];
+}
+
 /** 開示ギャップの種別(M7)。⑥の画面と、ホームの発見サマリーが同じ辞書を参照する。 */
 export const GAP_TYPE_LABEL: Record<GapType, string> = {
   G1_no_evidence: "根拠なし",

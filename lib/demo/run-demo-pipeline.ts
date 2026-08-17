@@ -15,7 +15,9 @@
 
 import { runAssessmentPipeline } from "@core/pipeline/assessment-pipeline";
 import { runValuationPipeline } from "@core/pipeline/valuation-pipeline";
+import { RepresentativeValueSelectionError } from "@core/divergence/representative-value";
 import { runDecisionPipeline } from "@core/pipeline/decision-pipeline";
+import { NoContributingRecordError } from "@core/decision/dominant-assumption";
 import { runDisclosurePipeline } from "@core/pipeline/disclosure-pipeline";
 import { createIdSequence } from "@core/pipeline/ids";
 import { getPluginsForCategory } from "@core/monetization/registry";
@@ -75,6 +77,23 @@ import {
 } from "./user-site-defaults";
 import { emptyInteractionState } from "./interaction-state";
 import type { InteractionState } from "./interaction-state";
+import { methodLabel } from "@/app/components/method-labels";
+
+/**
+ * 「保存済みの操作のうち、今回の計算にそのまま適用できなかったもの」の記録(第4版 D-01-3)。
+ *
+ * 操作イベントは追記のみで消せない(計画B-1)。過去に保存された操作が、その後の
+ * 設定変更などで解釈できなくなることは起こりうる。そのとき**黙って無視せず**、
+ * 何が適用されなかったのかを結果に載せ、該当画面に表示する。
+ */
+export interface PipelineWarning {
+  /** Reactのkeyと重複排除に使う内部キー。画面には出さない。 */
+  id: string;
+  /** この警告を表示する画面のパス。 */
+  screen: string;
+  /** 画面にそのまま出す平易な日本語。内部IDや例外文言は含めない。 */
+  message: string;
+}
 
 const NOW = "2027-02-14T09:12:00Z";
 const DECISION_MAKER = "宮里(サステナビリティ推進室)";
@@ -115,7 +134,26 @@ export interface RunPipelineInput {
   rngSeed: number;
 }
 
+/**
+ * M6の計算に使える不確実性レンジを持つレコードか。
+ *
+ * `packages/core` の M6 は、対策で回避できる自然関連コストのレンジを
+ * 「出典ValuationRecordの p5/p50・p95/p50 の比」で按分する(nature-adjusted-npv.ts)。
+ * さらに深掘り推奨の特定は「(p95-p5)/p50 が最大のレコード」を選ぶ(dominant-assumption.ts)。
+ * **中心値(p50)が0のレコードを出典にすると、この2つの割り算が 0/0 = NaN になり、
+ * 支配的レコードが1件も選べず `NoContributingRecordError` が投げられる。**
+ *
+ * IFVIの水アクセス係数(VFaccess)は日本の公表値が0であり(company.ts の
+ * `ifvi-vfaccess: 0.0`、IFVI Table D1)、これを代表値に選ぶとこの条件に合致する。
+ * `packages/core` は変更しない方針のため、**出典レコードの選定をデモ層で行う。**
+ */
+function hasUsableUncertaintyRange(record: ExchangeValuationRecord): boolean {
+  const { p5, p50, p95 } = record.quantileRange;
+  return Number.isFinite(p5) && Number.isFinite(p50) && Number.isFinite(p95) && p50 !== 0;
+}
+
 export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInput()) {
+  const warnings: PipelineWarning[] = [];
   const idSequence = createIdSequence("ae");
   const rng = createSeededRng(input.rngSeed);
   const userSiteEntries = input.userSites;
@@ -156,9 +194,22 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
 
   const promoted = assessment.depthDecisions.filter((d) => d.depth === "deep_dive");
 
-  const valuation = runValuationPipeline({
+  /**
+   * 保存済みの代表値選択が、現在の手法セットに存在しない手法を指している場合、
+   * coreは `RepresentativeValueSelectionError` を投げる(representative-value.ts)。
+   * 深掘り設定やプラグイン構成が変わると起こりうる。**この1件のせいで
+   * 画面全体が使えなくなることを避けるため、その課題の選択だけを外して再実行し、
+   * 適用できなかったことを警告として残す**(第4版 D-01-3)。
+   *
+   * 再実行はID採番・乱数列を引き継ぐため、値は「壊れた操作が1件ある」入力に対して
+   * 一意に決まる(同じ入力からは同じ結果が出る、という再現性の前提は保たれる)。
+   */
+  const skippedSelections = new Set<string>();
+  let selectionInFlight: string | undefined;
+
+  const valuationOptions = {
     materialIssueIds: promoted.map((d) => d.materialIssueId),
-    deepDiveConfigForMaterialIssue: (materialIssueId) => {
+    deepDiveConfigForMaterialIssue: (materialIssueId: string) => {
       const siteId = siteIdFromMaterialIssueId(materialIssueId);
       if (siteId === "site-042") {
         return {
@@ -196,9 +247,11 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
      * 未選択のまま既定値(代替費用法)を使っている状態を「選択した」と記録しない
      * (選択には理由が必須であり、理由をシステムが捏造しないため)。
      */
-    representativeSelectionForMaterialIssue: (materialIssueId) => {
+    representativeSelectionForMaterialIssue: (materialIssueId: string) => {
+      if (skippedSelections.has(materialIssueId)) return undefined;
       const selection = interactions.representativeSelection.get(materialIssueId);
       if (!selection) return undefined;
+      selectionInFlight = materialIssueId;
       return {
         groupValueConcept: selection.valueConcept,
         selectedMethodId: selection.methodId,
@@ -210,9 +263,42 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     idSequence,
     now: NOW,
     rng,
-  });
+  };
+
+  let valuation: ReturnType<typeof runValuationPipeline>;
+  for (;;) {
+    selectionInFlight = undefined;
+    try {
+      valuation = runValuationPipeline(valuationOptions);
+      break;
+    } catch (error) {
+      const target = selectionInFlight;
+      if (!(error instanceof RepresentativeValueSelectionError) || !target || skippedSelections.has(target)) {
+        throw error;
+      }
+      skippedSelections.add(target);
+      warnings.push({
+        id: `representative-selection-unusable-${target}`,
+        screen: "/valuation",
+        message:
+          "保存されている代表値の選択のうち1件は、現在の算定手法の一覧に無い手法を指しているため適用できませんでした。" +
+          "この課題は既定の代表値で計算しています。もう一度、代表値を選び直してください。",
+      });
+    }
+  }
 
   const allValuationRecords = Object.values(valuation.valuationRecordsByMaterialIssue).flat();
+
+  /**
+   * 算定に使った物理量の実数(第4版 D-05)。ValuationRecordは物理量のIDしか持たないため、
+   * ③の画面が「取水量 45,000 m3/年」のような実数を表示できるよう、深掘り設定から引き写す。
+   */
+  const physicalQuantityByMaterialIssue = Object.fromEntries(
+    Object.keys(valuation.valuationRecordsByMaterialIssue).map((materialIssueId) => {
+      const { input } = valuationOptions.deepDiveConfigForMaterialIssue(materialIssueId);
+      return [materialIssueId, { category: input.category, quantity: input.physicalQuantity, unit: input.unit }];
+    })
+  );
 
   // --- M4:代表値選択(未選択時はreplacement-costをデフォルト代表値とする) ---
   const representativeRecordByMaterialIssue: Record<string, string> = {};
@@ -222,6 +308,20 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     const defaultRecord = records.find((r) => r.methodId === "replacement-cost") ?? records[0];
     const overrideId = interactions.representativeRecordId.get(materialIssueId);
     const overrideRecord = overrideId ? records.find((r) => r.id === overrideId) : undefined;
+    /**
+     * 保存済みの上書きが、現在の算定結果に存在しない行を指している場合(深掘り設定の
+     * 変更などで算定結果の構成が変わったとき)。既定値に戻して計算は続けるが、
+     * **黙って無視せず**適用できなかったことを画面に出す(第4版 D-01-3)。
+     */
+    if (overrideId && !overrideRecord) {
+      warnings.push({
+        id: `representative-record-unresolved-${materialIssueId}`,
+        screen: "/valuation",
+        message:
+          "保存されている代表値の指定のうち1件は、現在の算定結果に無い行を指しているため適用できませんでした。" +
+          "この課題は既定の代表値で計算しています。もう一度、代表値を選び直してください。",
+      });
+    }
     const representative = overrideRecord ?? defaultRecord;
     if (representative) representativeRecordByMaterialIssue[materialIssueId] = representative.id;
     const changeLog = interactions.m4ChangeLog.get(materialIssueId);
@@ -260,6 +360,41 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
 
     const site = assessment.sites.find((s) => s.id === siteId);
     if (!site) return [];
+
+    /**
+     * M6の対策案が参照する「回避できる自然関連コストの出典レコード」。
+     *
+     * 原則は代表値そのもの(M6要件定義書§(D-3):M4で選んだ代表値をそのまま引き継ぐ)。
+     * ただし中心値が0円のレコードは、coreがレンジを按分するときの分母になれない
+     * (`hasUsableUncertaintyRange` のコメント参照)。その場合だけ、同じ拠点の
+     * 交換価値レコードのうちレンジを持つものを出典に使い、**代表値そのもの
+     * (M5の財務接続で使う値)は利用者が選んだままにする。**差し替えたことは
+     * 警告として画面に出す(第4版 D-01)。
+     */
+    const usableExchangeRecords = siteRecords.filter(
+      (r): r is ExchangeValuationRecord => r.valueConcept === "exchange" && hasUsableUncertaintyRange(r as ExchangeValuationRecord)
+    );
+    const costSourceRecord = hasUsableUncertaintyRange(representative) ? representative : usableExchangeRecords[0];
+    if (!costSourceRecord) {
+      warnings.push({
+        id: `countermeasure-source-missing-${siteId}`,
+        screen: "/decision",
+        message:
+          `${site.name}では、試算の幅を持つ交換価値の算定結果がないため、対策案の比較と投資判断への反映を計算できませんでした。` +
+          "詳細評価の入力値(物理量・単価)をご確認ください。",
+      });
+      return [];
+    }
+    if (costSourceRecord.id !== representative.id) {
+      warnings.push({
+        id: `countermeasure-source-fallback-${siteId}`,
+        screen: "/decision",
+        message:
+          `${site.name}で選択中の代表値「${methodLabel(representative.methodId)}」は中心値が0円のため、` +
+          `対策案の効果の幅(P5〜P95)の計算には「${methodLabel(costSourceRecord.methodId)}」の試算の幅を使用しています。` +
+          "自然調整後営業利益など、財務への影響の金額は選択中の代表値のままです。",
+      });
+    }
 
     const isFlagshipSite = siteId === "site-042";
     const isClimateShowcaseSite = siteId === CLIMATE_SITE_ID;
@@ -385,68 +520,142 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
 
     // --- M6:対策案4種を並行して計算し、比較テーブル/散布図に使う ---
     const candidates: CountermeasureCandidate[] = isFlagshipSite
-      ? buildCountermeasureCandidates(representative.id)
+      ? buildCountermeasureCandidates(costSourceRecord.id)
       : isClimateShowcaseSite
-        ? buildClimateCountermeasureCandidates(representative.id)
-        : buildUserCountermeasureCandidates(siteId, representative.id, deepDiveParams);
+        ? buildClimateCountermeasureCandidates(costSourceRecord.id)
+        : buildUserCountermeasureCandidates(siteId, costSourceRecord.id, deepDiveParams);
+
+    /**
+     * coreが `avoidedNatureCost[].sourceValuationRecordId` を解決するための辞書。
+     * 代表値と出典レコードが別になりうる(上記)ため両方を入れる。
+     */
+    const valuationRecordsById: Record<string, ExchangeValuationRecord> = {
+      [representative.id]: representative,
+      [costSourceRecord.id]: costSourceRecord,
+    };
 
     const bindingState = interactions.bindingMechanismState.get(siteId);
     const bindingMechanism: BindingMechanism = bindingState?.mechanism ?? { kind: "weak_reference" };
     const bindingHistory = bindingState?.history ?? [];
     const latestBindingChange = bindingHistory[bindingHistory.length - 1];
 
-    const countermeasureCandidates = candidates.map((candidate) => {
-      const previewDecision = runDecisionPipeline({
-        id: `dr-${siteId}-${candidate.key}-preview`,
+    /**
+     * 第5版レビュー(2026-08-17):「対策を実施せず監視を継続」案は回避コストが0円のため
+     * `avoidedNatureCost: []`で構成される(コスト0=対策なしを正しく表す設計)。
+     * この案のNPVレンジは通常NPVちょうどに退化し(p5=p50=p95)、承認閾値がその値と
+     * 一致する入力だと★判定が「またぐ」になる。`identifyDominantAssumption`
+     * (M6 D-3、packages/core・変更不可)は「参照できるValuationRecordが1つもない」を
+     * エラーとして扱うため、この組み合わせで`runDecisionPipeline`が例外を投げる。
+     *
+     * 以前はこの例外が保存前の検証(D-01-2)を通らないケースでは捕捉されるが、
+     * **保存済みのrunを読み直すだけの経路(`executeAndPersistRun`)では捕捉されず、
+     * ページ全体がクラッシュしていた。**候補1件の計算失敗で画面全体を落とさず、
+     * その候補だけを比較対象から外し、理由を警告として残す(黙って消さない、第4版D-01-3と同じ規律)。
+     */
+    const countermeasureCandidates = candidates.flatMap((candidate) => {
+      try {
+        const previewDecision = runDecisionPipeline({
+          id: `dr-${siteId}-${candidate.key}-preview`,
+          decisionTarget: "investment_approval",
+          decisionMaker: DECISION_MAKER,
+          decisionDate: "2027-02-14",
+          approvalThreshold,
+          relatedValuationRecords: [representative],
+          baselineNpv,
+          countermeasures: [candidate.countermeasure],
+          valuationRecordsById,
+          bindingMechanism,
+          versions: DECISION_VERSIONS,
+          idSequence,
+          now: NOW,
+        });
+        return [
+          {
+            key: candidate.key,
+            label: candidate.label,
+            investmentCost: candidate.countermeasure.investmentCost,
+            avoidedPhysicalQuantity: candidate.avoidedPhysicalQuantity,
+            decisionRecord: previewDecision.decisionRecord,
+          },
+        ];
+      } catch (cause) {
+        /**
+         * ここで捕捉してよいのは`NoContributingRecordError`(M6 D-3)だけに限る。
+         * 承認閾値がちょうど通常NPVと一致し、かつ回避コスト0円の対策(「対策を実施せず
+         * 監視を継続」)が選ばれたときにだけ起こる、構造的に無害な退化ケース。
+         * それ以外の例外(例:評価期間を超えるavoidedNatureCost)は**利用者の入力自体が
+         * 不正である**ことを示す正当なエラーのため、ここで握りつぶさず再送出し、
+         * 呼び出し元(`tryRunAndPersist`の事前検証)で正しく「保存しない」判断をさせる。
+         */
+        if (!(cause instanceof NoContributingRecordError)) throw cause;
+        console.error(`[run-demo-pipeline] 対策案「${candidate.label}」(${siteId})の計算に失敗しました:`, cause);
+        warnings.push({
+          id: `countermeasure-preview-failed-${siteId}-${candidate.key}`,
+          screen: "/decision",
+          message: `${site.name}の対策案「${candidate.label}」は、承認基準がちょうど通常NPVと一致する等の理由で計算できなかったため、比較対象から除いています。`,
+        });
+        return [];
+      }
+    });
+    if (countermeasureCandidates.length === 0) {
+      warnings.push({
+        id: `countermeasure-all-failed-${siteId}`,
+        screen: "/decision",
+        message: `${site.name}では対策案をどれも計算できなかったため、対策と判定を計算できませんでした。承認閾値の入力値をご確認ください。`,
+      });
+      return [];
+    }
+
+    const requestedKey = interactions.selectedCountermeasureKey.get(siteId);
+    const selectedKey = countermeasureCandidates.some((c) => c.key === requestedKey)
+      ? requestedKey!
+      : countermeasureCandidates[0].key;
+    if (requestedKey && requestedKey !== selectedKey) {
+      warnings.push({
+        id: `countermeasure-selection-unavailable-${siteId}`,
+        screen: "/decision",
+        message: `${site.name}で選択されていた対策案は今回計算できなかったため、既定の対策案で計算しています。`,
+      });
+    }
+    const selectedCandidateSource = candidates.find((c) => c.key === selectedKey)!;
+
+    let decision;
+    try {
+      decision = runDecisionPipeline({
+        id: isFlagshipSite ? "dr-site042-2027" : `dr-${siteId}-2027`,
         decisionTarget: "investment_approval",
         decisionMaker: DECISION_MAKER,
         decisionDate: "2027-02-14",
         approvalThreshold,
         relatedValuationRecords: [representative],
         baselineNpv,
-        countermeasures: [candidate.countermeasure],
-        valuationRecordsById: { [representative.id]: representative },
+        countermeasures: [selectedCandidateSource.countermeasure],
+        valuationRecordsById,
         bindingMechanism,
         versions: DECISION_VERSIONS,
+        ...(latestBindingChange
+          ? {
+              bindingMechanismChange: {
+                previousMechanism: latestBindingChange.previousMechanism,
+                reason: latestBindingChange.reason,
+                changedAt: latestBindingChange.changedAt,
+              },
+            }
+          : {}),
         idSequence,
         now: NOW,
       });
-      return {
-        key: candidate.key,
-        label: candidate.label,
-        investmentCost: candidate.countermeasure.investmentCost,
-        avoidedPhysicalQuantity: candidate.avoidedPhysicalQuantity,
-        decisionRecord: previewDecision.decisionRecord,
-      };
-    });
-
-    const selectedKey = interactions.selectedCountermeasureKey.get(siteId) ?? candidates[0].key;
-    const selectedCandidate = candidates.find((c) => c.key === selectedKey) ?? candidates[0];
-
-    const decision = runDecisionPipeline({
-      id: isFlagshipSite ? "dr-site042-2027" : `dr-${siteId}-2027`,
-      decisionTarget: "investment_approval",
-      decisionMaker: DECISION_MAKER,
-      decisionDate: "2027-02-14",
-      approvalThreshold,
-      relatedValuationRecords: [representative],
-      baselineNpv,
-      countermeasures: [selectedCandidate.countermeasure],
-      valuationRecordsById: { [representative.id]: representative },
-      bindingMechanism,
-      versions: DECISION_VERSIONS,
-      ...(latestBindingChange
-        ? {
-            bindingMechanismChange: {
-              previousMechanism: latestBindingChange.previousMechanism,
-              reason: latestBindingChange.reason,
-              changedAt: latestBindingChange.changedAt,
-            },
-          }
-        : {}),
-      idSequence,
-      now: NOW,
-    });
+    } catch (cause) {
+      // 上と同じ理由で、捕捉範囲を`NoContributingRecordError`だけに限る。
+      if (!(cause instanceof NoContributingRecordError)) throw cause;
+      console.error(`[run-demo-pipeline] ${siteId}の判定計算に失敗しました:`, cause);
+      warnings.push({
+        id: `decision-failed-${siteId}`,
+        screen: "/decision",
+        message: `${site.name}の判定を計算できなかったため、対策と判定・財務への影響を表示できませんでした。承認閾値または選択中の対策案をご確認ください。`,
+      });
+      return [];
+    }
     // 直近の変更のみpipelineの標準経路でAssumptionEntryを生成する。それより前の変更は
     // このデモが毎回ゼロから再計算する構成上、当時のAssumptionEntryを再現できないため、
     // bindingMechanismHistory配列にのみ反映する(表示上の履歴としては完全な形にする)。
@@ -616,6 +825,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       ...valuation,
       representativeRecordByMaterialIssue,
       m4ChangeLogByMaterialIssue,
+      physicalQuantityByMaterialIssue,
     },
     decisions,
     disclosure,
@@ -624,6 +834,8 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     recalculationHash,
     assumptionEntries,
     actionLog: interactions.actionLog,
+    /** 適用できなかった操作(第4版 D-01-3)。該当画面が上部に表示する。 */
+    warnings,
   };
 }
 
@@ -648,6 +860,6 @@ export const DEFAULT_RNG_SEED = 42;
  * **結果オブジェクトの形を変えたら必ず上げること。**値の計算方法だけを変えた場合は
  * 上げなくても壊れないが、過去のrunと比較したいなら上げる方が安全。
  */
-export const RESULT_SCHEMA_VERSION = 4;
+export const RESULT_SCHEMA_VERSION = 6;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

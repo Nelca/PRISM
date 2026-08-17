@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getTenantId } from "@/lib/db/client";
-import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
-import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
+import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 import { extractPdfText } from "@/lib/pdf/extract-pdf-text";
 import { extractDisclosureClaims } from "@/lib/ai/extract-disclosure-claims";
 
@@ -56,16 +55,23 @@ export async function extractDisclosurePdfAction(
   }
 
   const tenantId = await getTenantId();
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "disclosure_pdf_extracted",
-    subjectId: file.name,
-    payload: {
-      claims,
-      logMessage: `PDF「${file.name}」からAIが${claims.length}件の主張を抽出`,
-    },
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "PDFからの抽出結果の取り込み",
+    events: [
+      {
+        actor: ACTOR,
+        kind: "disclosure_pdf_extracted",
+        subjectId: file.name,
+        payload: {
+          claims,
+          logMessage: `PDF「${file.name}」からAIが${claims.length}件の主張を抽出`,
+        },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
 
@@ -88,13 +94,20 @@ export async function weakenClaimAction(
   }
 
   const tenantId = await getTenantId();
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "disclosure_claim_override",
-    subjectId: claimId,
-    payload: { text: newText, logMessage: `記載内容を弱める表現に修正(claim: ${claimId})` },
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "記載内容の修正",
+    events: [
+      {
+        actor: ACTOR,
+        kind: "disclosure_claim_override",
+        subjectId: claimId,
+        payload: { text: newText, logMessage: `記載内容を弱める表現に修正(claim: ${claimId})` },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};
@@ -111,16 +124,23 @@ export async function acquireEvidenceAction(
   }
 
   const tenantId = await getTenantId();
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "depth_override",
-    subjectId: `${siteId}-mi-water`,
-    payload: {
-      mode: "promote",
-      logMessage: `開示内容の確認への対応として、${siteId}の評価を詳細評価キューへ追加`,
-    },
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "詳細評価キューへの追加",
+    events: [
+      {
+        actor: ACTOR,
+        kind: "depth_override",
+        subjectId: `${siteId}-mi-water`,
+        payload: {
+          mode: "promote",
+          logMessage: `開示内容の確認への対応として、${siteId}の評価を詳細評価キューへ追加`,
+        },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};
@@ -138,13 +158,20 @@ export async function recordIntentionalDecisionAction(
   }
 
   const tenantId = await getTenantId();
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "intentional_decision",
-    subjectId: claimId,
-    payload: { reason, logMessage: `判断の理由を記録(claim: ${claimId}):${reason}` },
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "判断の理由の記録",
+    events: [
+      {
+        actor: ACTOR,
+        kind: "intentional_decision",
+        subjectId: claimId,
+        payload: { reason, logMessage: `判断の理由を記録(claim: ${claimId}):${reason}` },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};

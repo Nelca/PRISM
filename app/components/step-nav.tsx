@@ -33,25 +33,21 @@ export function StepNav({ current, result }: { current: string; result: DemoPipe
   const prev = index > 0 ? FLOW[index - 1] : null;
   const next = index < FLOW.length - 1 ? FLOW[index + 1] : null;
 
-  // この画面に残っている必須判断。リンク先は現在地そのものなので、リンクは出さず本文だけを出す。
-  const openTasks = deriveOpenTasks(result).filter((task) => task.href === current);
+  /**
+   * 第4版 D-11-1:タスクの一覧は画面ヘッダー直下の頭出しバナー(task-banner.tsx)へ移した。
+   * ここ(画面末尾)は前後リンク+完了/残件の一言だけに簡素化する。同じ一覧を
+   * 上下2箇所に出すと、末尾の一覧のほうが古い習慣で「正」と誤解されるため。
+   */
+  const openTaskCount = deriveOpenTasks(result).filter((task) => task.href === current).length;
   const nextContext = next ? deriveStepContext(result, next.href) : null;
 
   return (
     <div className="step-bar">
       <div className="step-bar__tasks">
-        {openTasks.length > 0 ? (
-          <>
-            <div className="section-label">この画面でやること</div>
-            <div className="task-list">
-              {openTasks.map((task) => (
-                <div key={task.id} className="task-item">
-                  <span className="task-item__mark" aria-hidden="true" />
-                  <span className="task-item__body">{task.text}</span>
-                </div>
-              ))}
-            </div>
-          </>
+        {openTaskCount > 0 ? (
+          <p className="step-bar__done">
+            この画面でやることが{openTaskCount}件残っています(内容は画面上部のバナーへ)。
+          </p>
         ) : (
           <p className="step-bar__done">この画面での操作は完了しています。</p>
         )}

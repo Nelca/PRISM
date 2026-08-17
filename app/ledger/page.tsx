@@ -8,6 +8,7 @@ import { recalculateWithPriorParameters } from "@core/ledger/recalculate-with-pr
 import { Mono, Num, pickYenScale } from "../components/numeric";
 import { Card, ScreenLead, Stat, Tag } from "../components/ui";
 import { verdictLabel } from "../components/labels";
+import { methodLabel, withMethodLabelsInText } from "../components/method-labels";
 import { DataSourceAttribution } from "../components/attribution";
 
 /**
@@ -109,7 +110,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
                       {entry.date.slice(0, 16).replace("T", " ")}
                     </td>
                     <td>{entry.who}</td>
-                    <td>{entry.what}</td>
+                    {/* 第4版 D-03:古い記録に残る手法IDは、記録を書き換えず表示時だけ読める名前にする。 */}
+                    <td>{withMethodLabelsInText(entry.what)}</td>
                   </tr>
                 ))
               )}
@@ -335,7 +337,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
                     );
                     return (
                       <tr key={record.id}>
-                        <td style={{ fontSize: 12 }}>{record.methodId}</td>
+                        {/* 第4版 D-03:生の手法ID(サブ係数付き)を画面に出さない。 */}
+                        <td style={{ fontSize: 12 }}>{methodLabel(record.methodId)}</td>
                         <td className="num">
                           <Num value={current} unit="円" scale={rowScale} />
                         </td>

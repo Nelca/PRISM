@@ -13,8 +13,9 @@ export function Waterfall({ steps }: { steps: WaterfallStepInput[] }) {
   const barW = 84;
   const gap = 26;
   const top = 20;
-  const bottom = 40;
-  const H = 240;
+  /** X軸ラベルを2段に振り分けるため(第4版 D-07:1段では隣と重なって判読できない)、下余白を広げる。 */
+  const bottom = 58;
+  const H = 258;
 
   const vals: { label: string; start: number; end: number; total: boolean; value: number; delta?: number }[] = [];
   let running = steps[0].value;
@@ -52,6 +53,13 @@ export function Waterfall({ steps }: { steps: WaterfallStepInput[] }) {
         const yTop = Math.min(y1, y2);
         const h = Math.abs(y2 - y1) || 2;
         const prevEnd = i > 0 ? y(vals[i - 1].end) : null;
+        /**
+         * ラベルの重なり解消(第4版 D-07):偶数番目を上段・奇数番目を下段に振り分ける。
+         * 1本あたりの実効幅が (barW + gap) × 2 になり、日本語の手法名でも判読できる。
+         * 下段のラベルにはバー中央から短い目印線を下ろし、どのバーのラベルかを保つ。
+         */
+        const lower = i % 2 === 1;
+        const labelY = lower ? H - 10 : H - 28;
         return (
           <g key={i}>
             <rect x={bx} y={yTop} width={barW} height={h} rx={2} fill={color} opacity={v.total ? 1 : 0.82} />
@@ -61,7 +69,10 @@ export function Waterfall({ steps }: { steps: WaterfallStepInput[] }) {
             <text x={bx + barW / 2} y={yTop - 8} fontSize={11.5} fontFamily="var(--font-mono-ui)" textAnchor="middle" fill={color} fontWeight={600}>
               {(!v.total && (v.delta ?? 0) > 0 ? "+" : "") + fmt(v.value)}
             </text>
-            <text x={bx + barW / 2} y={H - 14} fontSize={10} fontFamily="var(--font-body)" textAnchor="middle" fill="#4C5A6E">
+            {lower && (
+              <line x1={bx + barW / 2} x2={bx + barW / 2} y1={H - 40} y2={H - 20} stroke="#C7CBC0" strokeWidth={1} />
+            )}
+            <text x={bx + barW / 2} y={labelY} fontSize={10} fontFamily="var(--font-body)" textAnchor="middle" fill="#4C5A6E">
               {v.label}
             </text>
           </g>

@@ -74,15 +74,15 @@ export function DepthToggle({ materialIssueId, currentDepth }: { materialIssueId
         <p className="form-ok" role="status">
           {applied.mode === "promote" ? (
             <>
-              詳細評価に切り替えました。算定結果は
+              詳細評価に切り替えました。この課題は貨幣価値の算定〜投資判断への反映の対象になります。算定結果は
               <Link href="/valuation">価値の算定と代表値の選択</Link>
               で確認できます →
             </>
           ) : applied.mode === "demote" ? (
             <>
-              概算評価に戻しました。この課題は
+              概算評価に戻しました。この課題は自動の優先度づけまでとなり、
               <Link href="/valuation">価値の算定</Link>
-              の対象から外れます。
+              以降の対象から外れます。
             </>
           ) : (
             <>自動判定に戻しました。優先度の算定結果に従って評価の深さが決まります。</>

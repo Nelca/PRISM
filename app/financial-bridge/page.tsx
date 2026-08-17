@@ -6,11 +6,24 @@ import { deriveOpenTasks } from "@/lib/pipeline/open-tasks";
 import { CompanyFinancialsForm } from "./financials-form";
 import { buildWaterfallSteps } from "@core/financial-bridge/bridge1";
 import { Num, pickYenScale } from "../components/numeric";
-import { Card, GuideBox, GuideButton, KV, ScreenLead, Stat, Tag } from "../components/ui";
+import { Card, GuideBox, GuideButton, KV, ScreenLead, Stat, Tag, Term } from "../components/ui";
+import { financialTermNote } from "../components/labels";
 import { StepNav } from "../components/step-nav";
+import { TaskBanner } from "../components/task-banner";
 import { Waterfall } from "../components/charts/Waterfall";
+import { PipelineWarnings } from "../components/pipeline-warnings";
 
-export default async function FinancialBridgePage() {
+/** D-12:辞書に必ずある用語。辞書から引けなければ用語名をそのままtitleにする(文章を発明しない)。 */
+function term(label: string) {
+  return <Term note={financialTermNote(label) ?? label}>{label}</Term>;
+}
+
+export default async function FinancialBridgePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ site?: string }>;
+}) {
+  const { site: siteParam } = await searchParams;
   const tenantId = await getTenantId();
   const result = await getOrCreateLatestResult(tenantId);
   const { decisions } = result;
@@ -47,6 +60,33 @@ export default async function FinancialBridgePage() {
    */
   const redFlags = deriveOpenTasks(result);
 
+  /**
+   * 第4版 D-11:拠点サマリーに出す1行分の値。詳細カード群と同じ計算をここで1度だけ行い、
+   * サマリー行と展開後の詳細で数値が食い違わないようにする。
+   */
+  const siteRows = decisions.map((entry) => {
+    const { financialBridge, comparisonTargets } = entry;
+    const operatingProfit = financialBridge.bridge1.reportedOperatingProfit as unknown as number;
+    const adjusted = financialBridge.bridge1.natureAdjustedOperatingProfit as unknown as number;
+    return {
+      ...entry,
+      adjustmentRatioPct: ((adjusted - operatingProfit) / operatingProfit) * 100,
+      expectedLoss: financialBridge.natureDebt.totalDebt as unknown as number,
+      impairmentAffected: comparisonTargets.impairmentTestImpact.changesAssumption,
+    };
+  });
+
+  /**
+   * 既定で展開する「最重要拠点」:減損テストの前提に抵触している拠点があればその先頭、
+   * なければ調整幅(絶対値)が最大の拠点。URLの?site=は明示指定として優先する。
+   */
+  const defaultOpenSiteId =
+    siteRows.find((row) => row.impairmentAffected)?.siteId ??
+    [...siteRows].sort((a, b) => Math.abs(b.adjustmentRatioPct) - Math.abs(a.adjustmentRatioPct))[0]?.siteId;
+  const openSiteId = siteRows.some((row) => row.siteId === siteParam) ? siteParam : defaultOpenSiteId;
+
+  const expectedLossScale = pickYenScale(...siteRows.map((row) => row.expectedLoss));
+
   return (
     <div className="screen">
       <div className="screen__head">
@@ -58,128 +98,94 @@ export default async function FinancialBridgePage() {
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         <GuideBox>
           この画面では、選んだ代表値が財務にどう効くかを読み取ります。<b>1.</b>{" "}
-          「自然調整後利益」の右の入力から、自社の財務データ(売上・営業利益など)を登録します → <b>2.</b>{" "}
-          報告利益からの調整幅と「期待損失」を確認します → <b>3.</b>{" "}
-          「比較先」で、その金額が何と比べて大きいのか(営業利益比・減損テストの前提)を確認します → <b>4.</b>{" "}
-          末尾の「重要な論点」に挙がった項目を処理してから「対策と判定」へ進みます。
+          上部の「企業全体の財務データ」から、自社の財務データ(売上・営業利益など)を登録します(全拠点の計算に共通で使われます)
+          → <b>2.</b> 拠点サマリーで、調整幅・自然債務・減損テスト判定を拠点ごとに見比べます → <b>3.</b>{" "}
+          気になる拠点の行から詳細を開き、報告利益からの調整と「期待損失」、比較先(営業利益比・減損テストの前提)を確認します →{" "}
+          <b>4.</b> 「重要な論点」に挙がった項目を処理してから「対策と判定」へ進みます。
           社会全体への影響(開示専用の参考値)は別枠で表示し、利益の試算には加算しません。
           この画面の数値は監査済み財務諸表の数値ではなく、管理会計上の参考値(非GAAP指標)です。
           格付・資本コストへの影響を予測・断定することはしません。
         </GuideBox>
       </div>
 
-      {decisions.map(({ siteId, siteName, financialBridge, comparisonTargets }) => {
-        const waterfallSteps = buildWaterfallSteps(financialBridge.bridge1);
-        const expectedLoss = financialBridge.natureDebt.totalDebt as unknown as number;
-        const operatingProfit = financialBridge.bridge1.reportedOperatingProfit as unknown as number;
-        const uninternalizedCost = financialBridge.internalizationStatus.uninternalizedCost as unknown as number;
-        // 指示09:「期待損失」カード内の未内部化コストと自然債務で単位を揃える(拠点によっては
-        // 一方が百万円台・もう一方が億円台になり、そのまま自動判定すると単位が割れる)。
-        const expectedLossScale = pickYenScale(uninternalizedCost, expectedLoss);
+      {/* D-01-3:保存済みの操作のうち、今回の計算に反映できなかったものを黙って捨てない。 */}
+      <PipelineWarnings warnings={result.warnings} screen="/financial-bridge" />
 
-        return (
-          <div key={siteId} style={{ marginBottom: 28 }}>
-            <h2 style={{ fontSize: 15, marginBottom: 10 }}>{siteName}</h2>
+      {/* D-11-1:残タスクの頭出し(最下部までスクロールしなくても見える)。 */}
+      <TaskBanner current="/financial-bridge" result={result} />
 
-            <Card
-              title="自然調整後利益"
-              subtitle="報告財務からの調整"
-              headExtra={
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span className="nongaap" title="監査済み財務諸表の数値ではありません。社内の管理会計上の参考値です">
-                    非GAAP指標 ・ 管理会計上の参考値
-                  </span>
-                  <CompanyFinancialsForm current={companyFinancials} />
-                </div>
-              }
-              foot={`調整幅:報告営業利益比 ${(
-                (((financialBridge.bridge1.natureAdjustedOperatingProfit as unknown as number) - operatingProfit) / operatingProfit) *
-                100
-              ).toFixed(1)}%`}
-            >
-              <Waterfall steps={waterfallSteps.map((s) => ({ label: s.label, value: s.value as unknown as number, isTotal: s.isTotal }))} />
-            </Card>
+      {/*
+        D-10:companyFinancialsはテナント単位の値なのに、入力ボタンが各拠点のカード内にあり、
+        拠点ごとに入力できるかのような誤解を招いていた。ページ上部の1箇所に移す。
+      */}
+      <Card
+        title="企業全体の財務データ"
+        subtitle="全拠点の計算に共通で使われます"
+        headExtra={<CompanyFinancialsForm current={companyFinancials} />}
+      >
+        <p style={{ margin: 0, fontSize: 12.5, color: "var(--ink-soft)" }}>
+          報告営業利益・内部化済みコスト・減損テストの前提(閾値)・信用指標は企業単位の値です。
+          {companyFinancials
+            ? "入力済みの実データで計算しています。"
+            : "未入力のため、デモの既定値で計算しています(入力するとこの画面全体が再計算されます)。"}
+        </p>
+      </Card>
 
-            <div className="grid-2">
-              <Card title="期待損失">
-                <KV k="未内部化コスト" v={<Num value={uninternalizedCost} unit="円" scale={expectedLossScale} />} />
-                <KV k="内部化率" v={`${(financialBridge.internalizationStatus.internalizationRate * 100).toFixed(1)}%`} />
-                <hr className="rule" />
-                <KV k="自然債務(期待損失)" v={<Num value={expectedLoss} unit="円" scale={expectedLossScale} />} />
-              </Card>
-
-              <Card title="社会全体への影響" subtitle="開示にのみ使用(利益の試算には反映しません)" headExtra={<Tag variant="welfare">投資判断には使用しません</Tag>}>
-                {financialBridge.bridge2 ? (
-                  <>
-                    <Stat label="社会的コスト" value={<Num value={financialBridge.bridge2.socialCost as unknown as number} unit="円/年" />} />
-                    <div style={{ marginTop: 10 }}>
-                      <KV k="対応率" v={`${(financialBridge.bridge2.internalizationRate * 100).toFixed(1)}%`} />
-                    </div>
-                    <p className="tooltip-note">この数値は開示の参考情報としてのみ使用され、上の自然調整後利益には反映されません。</p>
-                  </>
-                ) : (
-                  <p style={{ color: "var(--ink-faint)" }}>この拠点には厚生価値(welfare)のレコードがありません。</p>
-                )}
-              </Card>
-            </div>
-
-            {/*
-              M5の位置づけ:金額を単独で出さず、必ず比較先とセットで出す(build-plan §5.6)。
-              以前は comparisonTargets を算出しながら画面に一切出していなかった(GAP-10)。
-            */}
-            <Card
-              title="比較先"
-              subtitle="この金額が何と比べて大きいのか"
-              headExtra={<span className="nongaap">非GAAP指標</span>}
-              foot="変化後の比率はPRISMが自然債務・自然調整後利益から算術で計算したものです"
-            >
-              <div className="grid-3">
-                <Stat
-                  label="期待損失 ÷ 報告営業利益"
-                  value={`${(comparisonTargets.operatingProfitRatio * 100).toFixed(2)}%`}
-                />
-                <Stat
-                  label="減損テストの前提"
-                  value={comparisonTargets.impairmentTestImpact.changesAssumption ? "見直しが必要" : "範囲内"}
-                />
-                <Stat label="格付・資本コスト" value="定量予測は行いません" />
-              </div>
-
-              <p className="tooltip-note" style={{ marginTop: 10 }}>
-                {comparisonTargets.impairmentTestImpact.details}
-              </p>
-
-              <hr className="rule" />
-              <div className="section-label">信用格付機関が一般的に参照する財務指標</div>
-              {comparisonTargets.ratingCostOfCapitalImpact.ratios.map((change) => (
-                <KV
-                  key={change.label}
-                  k={change.label}
-                  v={
-                    change.before === null || change.after === null ? (
-                      "算出不能(分母が0)"
-                    ) : (
-                      <>
-                        {change.before.toFixed(1)}倍 → {change.after.toFixed(1)}倍(
-                        {change.after - change.before >= 0 ? "+" : ""}
-                        {(change.after - change.before).toFixed(1)}pt)
-                      </>
-                    )
-                  }
-                />
-              ))}
-              <p className="tooltip-note">
-                本システムは、これらの変化が実際の格付・資本コストにどう影響するかを予測・断定するものではありません。
-              </p>
-            </Card>
-          </div>
-        );
-      })}
+      {/*
+        D-11-2:サマリー(やるべきこと)が先、詳細は要求時。
+        1拠点1行のサマリーテーブルを先頭に置き、詳細は下の折りたたみから開く。
+        拠点が100件規模になっても、この表と「重要な論点」までで全体が判断できる。
+      */}
+      <Card
+        id="site-summary"
+        title="拠点サマリー"
+        subtitle="1拠点1行。行の「詳細」から下の拠点別詳細が開きます"
+        padBody={false}
+        foot="調整幅:自然関連コストを織り込んだときの報告営業利益からの変化率(マイナスは利益の下振れ)"
+      >
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>拠点</th>
+              <th>調整幅(営業利益比)</th>
+              <th>{term("自然債務(期待損失)")}</th>
+              <th>{term("減損テストの前提")}</th>
+              <th>重要な論点</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {siteRows.map((row) => (
+              <tr key={row.siteId} style={row.siteId === openSiteId ? { background: "var(--accent-soft)" } : undefined}>
+                <td>
+                  <b>{row.siteName}</b>
+                </td>
+                <td className="num">{`${row.adjustmentRatioPct >= 0 ? "+" : ""}${row.adjustmentRatioPct.toFixed(1)}%`}</td>
+                <td className="num">
+                  <Num value={row.expectedLoss} unit="円" scale={expectedLossScale} />
+                </td>
+                <td>
+                  {row.impairmentAffected ? <Tag variant="warn">見直しが必要</Tag> : <Tag variant="neutral">範囲内</Tag>}
+                </td>
+                <td>{row.impairmentAffected ? <Tag variant="warn">あり</Tag> : "—"}</td>
+                <td>
+                  <Link
+                    href={`/financial-bridge?site=${encodeURIComponent(row.siteId)}#site-${row.siteId}`}
+                    className="pill-btn pill-btn--sm"
+                  >
+                    詳細 →
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
 
       {/*
         T-07:以前はデータに関係なく常に表示される固定文言だった。実データでは
         レッドフラグの信頼性を損なうため、すべて実際の計算結果から導出する。
-        該当がなければ行を出さない。
+        該当がなければ行を出さない。D-11:最下部からサマリー直後(上部)へ移動。
       */}
       <Card title="重要な論点" padBody={false} foot="実際の算定・判定結果から導出しています">
         <table className="data-table">
@@ -208,6 +214,149 @@ export default async function FinancialBridgePage() {
           </tbody>
         </table>
       </Card>
+
+      {/*
+        拠点別詳細(D-11 → 第6版D-23で改稿)。**選択中の1拠点だけを描画する。**
+        以前は全拠点分を`<details>`(既定は閉)でDOMに載せていたが、100拠点では
+        ウォーターフォールSVG・比較テーブル×100がHTMLに含まれ、畳んであっても
+        転送量・描画コストが破綻する。他の拠点はサマリーテーブルの行リンク
+        (?site=...)から開く。中身の既存カード群と並び順は維持。
+      */}
+      {siteRows
+        .filter((row) => row.siteId === openSiteId)
+        .map(({ siteId, siteName, financialBridge, comparisonTargets }) => {
+        const waterfallSteps = buildWaterfallSteps(financialBridge.bridge1);
+        const expectedLoss = financialBridge.natureDebt.totalDebt as unknown as number;
+        const operatingProfit = financialBridge.bridge1.reportedOperatingProfit as unknown as number;
+        const uninternalizedCost = financialBridge.internalizationStatus.uninternalizedCost as unknown as number;
+        // 指示09:「期待損失」カード内の未内部化コストと自然債務で単位を揃える(拠点によっては
+        // 一方が百万円台・もう一方が億円台になり、そのまま自動判定すると単位が割れる)。
+        const lossScale = pickYenScale(uninternalizedCost, expectedLoss);
+
+        return (
+          <details key={siteId} id={`site-${siteId}`} className="collapse" open>
+            <summary>
+              {siteName} の詳細
+              <small>自然調整後利益・期待損失・比較先 ・ 他の拠点の詳細は上の拠点サマリーの行から開けます</small>
+            </summary>
+            <div className="collapse__body">
+              <Card
+                title={term("自然調整後営業利益")}
+                subtitle="報告財務からの調整"
+                headExtra={
+                  <span
+                    className="nongaap"
+                    title="PRISM独自の管理会計指標(非GAAP)です。監査済み財務諸表の数値でも、一般的な会計基準の用語でもありません"
+                  >
+                    非GAAP指標 ・ 管理会計上の参考値
+                  </span>
+                }
+                foot={`調整幅:報告営業利益比 ${(
+                  (((financialBridge.bridge1.natureAdjustedOperatingProfit as unknown as number) - operatingProfit) /
+                    operatingProfit) *
+                  100
+                ).toFixed(1)}%`}
+              >
+                <Waterfall
+                  steps={waterfallSteps.map((s) => ({ label: s.label, value: s.value as unknown as number, isTotal: s.isTotal }))}
+                />
+                {/* D-12:図の中の独自用語はhoverできないため、直下に用語説明を常設する。 */}
+                <p className="tooltip-note">
+                  {term("依存リスク正常化調整")} ・ {term("将来内部化見込みコスト")}
+                  (点線の用語にマウスを載せると説明が出ます)
+                </p>
+              </Card>
+
+              <div className="grid-2">
+                <Card title="期待損失">
+                  <KV k={term("未内部化コスト")} v={<Num value={uninternalizedCost} unit="円" scale={lossScale} />} />
+                  <KV
+                    k={term("内部化率")}
+                    v={`${(financialBridge.internalizationStatus.internalizationRate * 100).toFixed(1)}%`}
+                  />
+                  <hr className="rule" />
+                  <KV k={term("自然債務(期待損失)")} v={<Num value={expectedLoss} unit="円" scale={lossScale} />} />
+                </Card>
+
+                <Card
+                  title="社会全体への影響"
+                  subtitle="開示にのみ使用(利益の試算には反映しません)"
+                  headExtra={<Tag variant="welfare">投資判断には使用しません</Tag>}
+                >
+                  {financialBridge.bridge2 ? (
+                    <>
+                      <Stat
+                        label="社会的コスト"
+                        value={<Num value={financialBridge.bridge2.socialCost as unknown as number} unit="円/年" />}
+                      />
+                      <div style={{ marginTop: 10 }}>
+                        <KV k="対応率" v={`${(financialBridge.bridge2.internalizationRate * 100).toFixed(1)}%`} />
+                      </div>
+                      <p className="tooltip-note">この数値は開示の参考情報としてのみ使用され、上の自然調整後利益には反映されません。</p>
+                    </>
+                  ) : (
+                    <p style={{ color: "var(--ink-faint)" }}>この拠点には厚生価値(welfare)のレコードがありません。</p>
+                  )}
+                </Card>
+              </div>
+
+              {/*
+                M5の位置づけ:金額を単独で出さず、必ず比較先とセットで出す(build-plan §5.6)。
+                以前は comparisonTargets を算出しながら画面に一切出していなかった(GAP-10)。
+              */}
+              <Card
+                title="比較先"
+                subtitle="この金額が何と比べて大きいのか"
+                headExtra={
+                  <span
+                    className="nongaap"
+                    title="PRISM独自の管理会計指標(非GAAP)です。監査済み財務諸表の数値でも、一般的な会計基準の用語でもありません"
+                  >
+                    非GAAP指標
+                  </span>
+                }
+                foot="変化後の比率はPRISMが自然債務・自然調整後利益から算術で計算したものです"
+              >
+                <div className="grid-3">
+                  <Stat label="期待損失 ÷ 報告営業利益" value={`${(comparisonTargets.operatingProfitRatio * 100).toFixed(2)}%`} />
+                  <Stat
+                    label={term("減損テストの前提")}
+                    value={comparisonTargets.impairmentTestImpact.changesAssumption ? "見直しが必要" : "範囲内"}
+                  />
+                  <Stat label={term("格付・資本コスト")} value="定量予測は行いません" />
+                </div>
+
+                <p className="tooltip-note" style={{ marginTop: 10 }}>
+                  {comparisonTargets.impairmentTestImpact.details}
+                </p>
+
+                <hr className="rule" />
+                <div className="section-label">信用格付機関が一般的に参照する財務指標</div>
+                {comparisonTargets.ratingCostOfCapitalImpact.ratios.map((change) => (
+                  <KV
+                    key={change.label}
+                    k={change.label}
+                    v={
+                      change.before === null || change.after === null ? (
+                        "算出不能(分母が0)"
+                      ) : (
+                        <>
+                          {change.before.toFixed(1)}倍 → {change.after.toFixed(1)}倍(
+                          {change.after - change.before >= 0 ? "+" : ""}
+                          {(change.after - change.before).toFixed(1)}pt)
+                        </>
+                      )
+                    }
+                  />
+                ))}
+                <p className="tooltip-note">
+                  本システムは、これらの変化が実際の格付・資本コストにどう影響するかを予測・断定するものではありません。
+                </p>
+              </Card>
+            </div>
+          </details>
+        );
+      })}
 
       <StepNav current="/financial-bridge" result={result} />
     </div>

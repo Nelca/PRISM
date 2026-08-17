@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { buildDisclosureView } from "@core/disclosure/build-disclosure-view";
@@ -8,6 +9,7 @@ import { Num } from "../components/numeric";
 import { StepNav } from "../components/step-nav";
 import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
 import { PdfIntakeForm } from "./pdf-intake-form";
+import { TaskBanner } from "../components/task-banner";
 
 const EXCLUSION_KIND_LABEL: Record<string, string> = {
   not_assessed: "評価対象に入っていない",
@@ -15,9 +17,30 @@ const EXCLUSION_KIND_LABEL: Record<string, string> = {
   criteria_unevaluated: "一部の基準を評価できていない",
 };
 
-export default async function DisclosurePage() {
+/** サマリーテーブルの「記載」列用。全文はtitle属性で読める。 */
+function truncateClaim(text: string | undefined, max = 34): string {
+  if (!text) return "—";
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+export default async function DisclosurePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ finding?: string }>;
+}) {
+  const { finding: findingParam } = await searchParams;
   const result = await getOrCreateLatestResult(await getTenantId());
   const claimsById = new Map(result.disclosureClaims.map((claim) => [claim.id, claim]));
+
+  /**
+   * 第6版 D-22:対応状況の判定はホームの進捗(`countProgress`)と同じソースから導く。
+   * gapTypeがnull=根拠充足(対応不要)、意図的判断の記録があれば「理由記録済み」。
+   */
+  const handledFindingIds = new Set(result.disclosure.intentionalDecisionRecords.map((record) => record.gapFindingId));
+  const findings = result.disclosure.gapFindings;
+  const defaultFindingId = findings.find((f) => f.gapType !== null && !handledFindingIds.has(f.id))?.id ?? findings[0]?.id;
+  const selectedFindingId = findings.some((f) => f.id === findingParam) ? findingParam : defaultFindingId;
+  const selectedFinding = findings.find((f) => f.id === selectedFindingId);
 
   // 出力3層目:自社のレコードから開示文の下書きを組み立てる(GAP-19)
   const { view: disclosureView, unfilledRequirements } = buildDisclosureView(
@@ -43,12 +66,16 @@ export default async function DisclosurePage() {
         <GuideBox>
           この画面では、開示文言と根拠の整合を確認します。<b>1.</b>{" "}
           「PDFから主張を抽出する」で開示物を読み込みます(抽出だけをAIが行い、根拠の十分性判定はAIを使いません) →{" "}
-          <b>2.</b> 記載ごとのカードで、根拠が充足しているか・どの種別の不足かを確認します → <b>3.</b>{" "}
-          不足がある記載では、①記載を弱める・②根拠を追加取得する(詳細評価キューへ追加)・③判断の理由を記録する、の
-          3つから対応を選びます → <b>4.</b> 末尾の「開示文の下書き」で、登録済みのレコードから組み立てた文案を確認します。
+          <b>2.</b> 「指摘の一覧」で、根拠が充足しているか・どの種別の不足か・対応が済んでいるかを全記載分見渡します →{" "}
+          <b>3.</b> 不足がある記載は行の「詳細」を開き、①記載を弱める・②根拠を追加取得する(詳細評価キューへ追加)・
+          ③判断の理由を記録する、の3つから対応を選びます → <b>4.</b>{" "}
+          末尾の「開示文の下書き」で、登録済みのレコードから組み立てた文案を確認します。
           記載の真偽は断定せず、根拠の充足状況だけを示します。材料が足りない項目を文章で埋めることはしません。
         </GuideBox>
       </div>
+
+      {/* D-11-1:残タスクの頭出しバナー(全6画面共通。残タスクがある時だけ出る)。 */}
+      <TaskBanner current="/disclosure" result={result} />
 
       <Card
         title="PDFから主張を抽出する"
@@ -57,14 +84,91 @@ export default async function DisclosurePage() {
         <PdfIntakeForm />
       </Card>
 
-      {result.disclosure.gapFindings.map((finding) => {
+      {/*
+        第6版 D-22:サマリー(一覧)が先、詳細は要求時(第4版D-11と同じ型の適用漏れの解消)。
+        以前は1指摘=1フルカードの縦積みで、指摘が多いと全体を見渡せなかった。
+        1指摘=1行の一覧で全体を確認し、詳細は選択した1件だけを下に描画する。
+      */}
+      {findings.length > 0 && (
+        <Card
+          id="gap-findings"
+          title="指摘の一覧"
+          subtitle="1記載1行。行の「詳細」から下の詳細と対応操作が開きます"
+          padBody={false}
+          foot="記載の真偽は断定せず、根拠の充足状況だけを示します"
+        >
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>記載</th>
+                <th>種別</th>
+                <th>一致した根拠</th>
+                <th>対応状況</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {findings.map((finding) => {
+                const claim = claimsById.get(finding.claimId);
+                return (
+                  <tr
+                    key={finding.id}
+                    style={finding.id === selectedFindingId ? { background: "var(--accent-soft)" } : undefined}
+                  >
+                    <td title={claim?.rawText}>
+                      <b>{truncateClaim(claim?.rawText)}</b>
+                      {claim && (
+                        <span className="id-note">
+                          {claim.sourceDocument} {claim.sourcePageOrSection}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {finding.gapType ? (
+                        <Tag variant="warn">{gapTypeLabel(finding.gapType)}</Tag>
+                      ) : (
+                        <Tag variant="ok">根拠充足</Tag>
+                      )}
+                      {claim?.extractionConfidence === "low" && (
+                        <span className="id-note">AI抽出確信度低・要レビュー</span>
+                      )}
+                    </td>
+                    <td className="num">{finding.evidenceMatch.matchedRecordIds.length}件</td>
+                    <td>
+                      {finding.gapType === null ? (
+                        "—"
+                      ) : handledFindingIds.has(finding.id) ? (
+                        <Tag variant="ok">理由記録済み</Tag>
+                      ) : (
+                        <Tag variant="warn">未対応</Tag>
+                      )}
+                    </td>
+                    <td>
+                      <Link
+                        href={`/disclosure?finding=${encodeURIComponent(finding.id)}#finding-detail`}
+                        className="pill-btn pill-btn--sm"
+                      >
+                        詳細 →
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      {/* 詳細は選択した1件だけを描画する(指摘が100件でもDOMは1件分)。 */}
+      {[selectedFinding].filter((finding) => finding !== undefined).map((finding) => {
         const claim = claimsById.get(finding.claimId);
         const siteId = result.disclosureClaimSiteId[finding.claimId];
         return (
           <Card
             key={finding.id}
+            id="finding-detail"
             title={claim?.rawText}
-            subtitle={claim ? `${claim.sourceDocument} ${claim.sourcePageOrSection}` : undefined}
+            subtitle={claim ? `${claim.sourceDocument} ${claim.sourcePageOrSection} ・ 他の記載は上の一覧から開けます` : undefined}
             headExtra={
               <>
                 {finding.gapType ? <Tag variant="warn">{gapTypeLabel(finding.gapType)}</Tag> : <Tag variant="ok">根拠充足</Tag>}

@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getTenantId } from "@/lib/db/client";
-import { appendInteractionEvent } from "@/lib/db/repositories/interactions";
-import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
+import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 
 const ACTOR = "宮里";
 
@@ -35,22 +34,30 @@ export async function changeRepresentativeRecordAction(
   const tenantId = await getTenantId();
 
   // 選択と変更理由を1つのイベントとして追記する。現在値と履歴が同じ1つの真実から出る(計画B-1)。
-  await appendInteractionEvent(tenantId, {
-    actor: ACTOR,
-    kind: "representative_selection",
-    subjectId: materialIssueId,
-    payload: {
-      recordId,
-      // core側は methodId と価値概念で代表値を受け取る(M4 §7.4)。
-      methodId,
-      valueConcept,
-      fromLabel,
-      toLabel,
-      reason,
-      logMessage: `代表値を「${toLabel}」に変更(理由:${reason})`,
-    },
+  // **先に変更後の状態で計算を試し、成功したときだけ追記する**(第4版 D-01-2)。
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "代表値の変更",
+    events: [
+      {
+        actor: ACTOR,
+        kind: "representative_selection",
+        subjectId: materialIssueId,
+        payload: {
+          recordId,
+          // core側は methodId と価値概念で代表値を受け取る(M4 §7.4)。
+          methodId,
+          valueConcept,
+          fromLabel,
+          toLabel,
+          reason,
+          logMessage: `代表値を「${toLabel}」に変更(理由:${reason})`,
+        },
+      },
+    ],
   });
-  await executeAndPersistRun(tenantId);
+  if (!outcome.ok) {
+    return { error: outcome.message };
+  }
 
   for (const path of REVALIDATE_PATHS) revalidatePath(path);
   return {};
