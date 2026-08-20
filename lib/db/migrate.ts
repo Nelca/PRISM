@@ -13,6 +13,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { Client } from "pg";
+import { sslOption } from "./ssl.ts";
 
 const MIGRATIONS_DIR = path.join(import.meta.dirname, "migrations");
 
@@ -22,7 +23,7 @@ async function main(): Promise<void> {
     throw new Error("DATABASE_URL_MIGRATOR が設定されていません(.env.example を参照)。");
   }
 
-  const client = new Client({ connectionString: url });
+  const client = new Client({ connectionString: url, ssl: sslOption(url) });
   await client.connect();
 
   try {

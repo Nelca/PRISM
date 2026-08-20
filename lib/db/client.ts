@@ -9,27 +9,9 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { headers } from "next/headers";
 import * as schema from "./schema";
+import { sslOption } from "./ssl";
 
 let pool: Pool | undefined;
-
-/**
- * マネージドPostgres(Neon等)はTLS必須なのに、接続URLに `sslmode` が無いと
- * node-postgres は平文で繋ごうとして失敗する。ホスト名がローカルでなければTLSを既定にする。
- * URLに `sslmode` が書かれている場合はそちらを尊重する(node-postgresが解釈する)。
- */
-function sslOption(url: string): boolean | { rejectUnauthorized: boolean } | undefined {
-  if (/[?&]sslmode=/.test(url)) {
-    return undefined;
-  }
-  let hostname: string;
-  try {
-    hostname = new URL(url).hostname;
-  } catch {
-    return undefined;
-  }
-  const isLocal = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "db";
-  return isLocal ? undefined : { rejectUnauthorized: true };
-}
 
 function getPool(): Pool {
   if (!pool) {

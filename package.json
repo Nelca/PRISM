@@ -13,7 +13,8 @@
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:generate": "node node_modules/drizzle-kit/bin.cjs generate",
-    "db:migrate": "node --env-file=.env --experimental-strip-types lib/db/migrate.ts"
+    "db:migrate": "node --env-file=.env --experimental-strip-types lib/db/migrate.ts",
+    "db:migrate:remote": "node --experimental-strip-types lib/db/migrate.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

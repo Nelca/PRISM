@@ -22,12 +22,15 @@ npm run test:db        # 要DB。追記のみの権限と永続化の検証(15�
 このアプリは全画面がPostgresを読み書きするため、**DBを用意して環境変数を設定しないと起動しても500になる**(`Application error: a server-side exception has occurred`)。
 
 1. マネージドPostgres(Neon / Supabase / Vercel Postgres など)を用意する。
-2. スキーマを適用する。手元から本番DBに向けて実行する:
+2. スキーマを適用する(**これを忘れるとテーブルが無いので必ず500になる**)。手元から本番DBに向けて実行する:
 
    ```bash
-   DATABASE_URL_MIGRATOR='postgres://...@host/db?sslmode=require' \
-     node --experimental-strip-types lib/db/migrate.ts
+   DATABASE_URL_MIGRATOR='postgres://...@host/db' npm run db:migrate:remote
    ```
+
+   `db:migrate` は `.env` を読むのでローカルDB用。本番DBには `.env` を読まない
+   `db:migrate:remote` を使う。接続文字列は**プーラー経由ではない直結エンドポイント**にする
+   (DDLを流すため)。`sslmode` を書かなくてもTLSで接続する(`lib/db/ssl.ts`)。
 
    マネージド環境では `prism_app` ロールを作れないことがある。その場合は権限設定
    (append-only の担保)がスキップされ、アプリはオーナーロールで接続する。
