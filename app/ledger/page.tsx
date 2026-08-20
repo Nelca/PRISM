@@ -17,7 +17,7 @@ import { DataSourceAttribution } from "../components/attribution";
  * 業務フローの外にある参照画面。先頭は人が読める2表(変更履歴/係数・パラメータの版)と
  * 判定件数(⑤から移設した従量課金の根拠)。ハッシュ類・レコード単位の照合・旧版係数での
  * 再計算は、日常業務では読む必要がないため「技術的な検証情報」として折りたたむ
- * (第1波が /valuation で使った details.collapse パターンを踏襲)。
+ * (第1波が /valuation で使った details.foldout パターンを踏襲)。
  */
 export default async function LedgerPage({ searchParams }: { searchParams: Promise<{ compareWith?: string }> }) {
   const { compareWith } = await searchParams;
@@ -216,14 +216,14 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       {/*
         技術的な検証情報(指示05)。ハッシュ・レコード単位の照合・旧版係数での再計算は
         監査対応には必要だが日常業務では読む必要がないため、折りたたみに格下げする
-        (第1波が /valuation で使った details.collapse パターンを踏襲)。
+        (第1波が /valuation で使った details.foldout パターンを踏襲)。
       */}
-      <details className="collapse">
+      <details className="foldout">
         <summary>
           技術的な検証情報
           <small>ハッシュ・レコード単位の照合・旧版係数での再計算(監査対応向け)</small>
         </summary>
-        <div className="collapse__body">
+        <div className="foldout__body">
           <Card title="パイプライン全体の版情報" subtitle="RecalculationHash">
             <p>
               <Mono>{result.recalculationHash.hash}</Mono>

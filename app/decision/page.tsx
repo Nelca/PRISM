@@ -239,12 +239,12 @@ export default async function DecisionPage({
         );
 
         return (
-          <details key={siteId} id={`site-${siteId}`} className="collapse" open>
+          <details key={siteId} id={`site-${siteId}`} className="foldout" open>
             <summary>
               {siteName} の詳細
               <small>判定結果・対策案の比較・結果の反映先 ・ 他の拠点の詳細は上の拠点サマリーの行から開けます</small>
             </summary>
-            <div className="collapse__body">
+            <div className="foldout__body">
               {/* (1) 判定結果を先頭・大きく(指示15。プロダクトの価値の中心) */}
               <Card
                 title="判定結果"

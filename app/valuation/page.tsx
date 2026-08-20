@@ -690,12 +690,12 @@ export default async function ValuationPage({
       )}
 
       {/* 代表値を選ぶうえでは補足情報にあたるため、折りたたみに格下げする(指示03)。 */}
-      <details className="collapse">
+      <details className="foldout">
         <summary>
           詳しく見る:試算の幅に影響する要因
           <small>{primaryRecord ? methodLabel(primaryRecord.methodId) : ""}</small>
         </summary>
-        <div className="collapse__body">
+        <div className="foldout__body">
           <Tornado center={tornadoCenter} factors={tornadoFactors} />
           <p className="tooltip-note">
             パラメータ不確実性(層i)と確からしさ由来の移転誤差(層ii)のsigmaを中心値からの近似的な振れ幅として表示しています。
@@ -703,12 +703,12 @@ export default async function ValuationPage({
         </div>
       </details>
 
-      <details className="collapse">
+      <details className="foldout">
         <summary>
           詳しく見る:試算に含めていない項目
           <small>除外した対象は黙って消さず、ここに残します</small>
         </summary>
-        <div className="collapse__body">
+        <div className="foldout__body">
           {primaryRecord?.scopeExclusions.length ? (
             primaryRecord.scopeExclusions.map((ex, i) => <KV key={i} k={ex} v="対象外" />)
           ) : (

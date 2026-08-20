@@ -933,7 +933,9 @@ hr.rule {
 }
 
 /* Collapsed detail block ——「詳しく見る」(指示03) -------------------------*/
-.collapse {
+/* クラス名は .collapse にしないこと:Tailwind の同名ユーティリティ
+   (visibility: collapse)と衝突し、<details>の中身が丸ごと不可視になる。 */
+.foldout {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -941,7 +943,7 @@ hr.rule {
   margin-top: 16px;
   padding: 0 18px;
 }
-.collapse > summary {
+.foldout > summary {
   list-style: none;
   cursor: pointer;
   padding: 15px 0;
@@ -950,17 +952,17 @@ hr.rule {
   font-weight: 600;
   color: var(--ink);
 }
-.collapse > summary::-webkit-details-marker {
+.foldout > summary::-webkit-details-marker {
   display: none;
 }
-.collapse > summary::before {
+.foldout > summary::before {
   content: "▸ ";
   color: var(--ink-faint);
 }
-.collapse[open] > summary::before {
+.foldout[open] > summary::before {
   content: "▾ ";
 }
-.collapse > summary small {
+.foldout > summary small {
   display: block;
   font-family: var(--font-body);
   font-size: 11px;
@@ -968,7 +970,7 @@ hr.rule {
   color: var(--ink-faint);
   margin-top: 2px;
 }
-.collapse__body {
+.foldout__body {
   border-top: 1px solid var(--line-soft);
   padding: 16px 0 18px;
 }

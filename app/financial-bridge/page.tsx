@@ -234,12 +234,12 @@ export default async function FinancialBridgePage({
         const lossScale = pickYenScale(uninternalizedCost, expectedLoss);
 
         return (
-          <details key={siteId} id={`site-${siteId}`} className="collapse" open>
+          <details key={siteId} id={`site-${siteId}`} className="foldout" open>
             <summary>
               {siteName} の詳細
               <small>自然調整後利益・期待損失・比較先 ・ 他の拠点の詳細は上の拠点サマリーの行から開けます</small>
             </summary>
-            <div className="collapse__body">
+            <div className="foldout__body">
               <Card
                 title={term("自然調整後営業利益")}
                 subtitle="報告財務からの調整"
