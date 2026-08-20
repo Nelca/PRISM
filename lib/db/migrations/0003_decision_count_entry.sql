@@ -11,6 +11,13 @@ CREATE TABLE "decision_count_entry" (
 
 -- 追記のみ(M8 D-5と同じ扱い)。判定件数は課金の根拠であり、後から書き換えられてはならない。
 -- 一覧は lib/db/schema.ts の APPEND_ONLY_TABLES と一致させること。
-GRANT SELECT, INSERT ON TABLE "decision_count_entry" TO prism_app;
---> statement-breakpoint
-REVOKE UPDATE, DELETE, TRUNCATE ON TABLE "decision_count_entry" FROM prism_app;
+-- prism_app が存在しない環境(マネージドPostgresでロールを作れない場合)では権限設定を飛ばす。
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'prism_app') THEN
+    RETURN;
+  END IF;
+  GRANT SELECT, INSERT ON TABLE "decision_count_entry" TO prism_app;
+  REVOKE UPDATE, DELETE, TRUNCATE ON TABLE "decision_count_entry" FROM prism_app;
+END
+$$;

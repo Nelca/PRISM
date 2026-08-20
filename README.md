@@ -17,6 +17,38 @@ npm test               # DB不要(298件)
 npm run test:db        # 要DB。追記のみの権限と永続化の検証(15件)
 ```
 
+## デプロイ(Vercel)
+
+このアプリは全画面がPostgresを読み書きするため、**DBを用意して環境変数を設定しないと起動しても500になる**(`Application error: a server-side exception has occurred`)。
+
+1. マネージドPostgres(Neon / Supabase / Vercel Postgres など)を用意する。
+2. スキーマを適用する。手元から本番DBに向けて実行する:
+
+   ```bash
+   DATABASE_URL_MIGRATOR='postgres://...@host/db?sslmode=require' \
+     node --experimental-strip-types lib/db/migrate.ts
+   ```
+
+   マネージド環境では `prism_app` ロールを作れないことがある。その場合は権限設定
+   (append-only の担保)がスキップされ、アプリはオーナーロールで接続する。
+3. Vercel の Project Settings > Environment Variables に設定する:
+
+   | 変数 | 値 |
+   | --- | --- |
+   | `DATABASE_URL` | 本番DBの接続文字列(接続プーラーのエンドポイント推奨) |
+   | `PRISM_DEFAULT_TENANT_ID` | 例 `demo-tenant`。**未設定だと500になる** |
+   | `PRISM_API_KEY` | `/api/pipeline-result` 用のキー |
+   | `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` | Basic認証。下記参照 |
+   | `ANTHROPIC_API_KEY` | PDF読み取りを使う場合のみ |
+
+   `sslmode` を書かない接続文字列でもTLSで接続する(`lib/db/client.ts`)。
+
+## Basic認証
+
+`BASIC_AUTH_USER` と `BASIC_AUTH_PASSWORD` の**両方**を設定すると、`proxy.ts` が
+全ページ・全APIに Basic認証を要求する(トップページを含む。静的アセットは除く)。
+どちらかが未設定なら認証は無効なので、ローカル開発は今までどおり動く。
+
 ## Getting Started
 
 First, run the development server:
