@@ -223,9 +223,9 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
     tasks.push({
       id: "approval-threshold",
       anchor: "site-summary",
-      text: `${scope}承認閾値が未入力のため判定が保留中です(財務・経営企画部門への確認が必要)。`,
+      text: `${scope}投資の承認ラインが未入力のため判定が保留中です(財務・経営企画部門への確認が必要)。`,
       href: "/decision",
-      linkLabel: "閾値を入力する",
+      linkLabel: "承認ラインを入力",
     });
   }
 
@@ -329,7 +329,7 @@ export function deriveStepProgress(result: DemoPipelineResult): StepProgress[] {
     {
       order: 1,
       href: "/sites",
-      label: "データと拠点の登録",
+      label: "拠点データの登録",
       note: `拠点${siteCount}件`,
       done: siteCount > 0,
     },
@@ -343,7 +343,7 @@ export function deriveStepProgress(result: DemoPipelineResult): StepProgress[] {
     {
       order: 3,
       href: "/valuation",
-      label: "価値の算定と代表値の選択",
+      label: "価値の算定",
       note: decompositionCount > 0 ? `代表値の選択 ${selected}/${decompositionCount}件` : "算定結果はまだありません",
       done: decompositionCount > 0 && selected === decompositionCount,
     },
@@ -369,6 +369,93 @@ export function deriveStepProgress(result: DemoPipelineResult): StepProgress[] {
       done: gapCount > 0 && handledGaps === gapCount,
     },
   ];
+}
+
+/**
+ * 3つの成果物(★判定・開示の根拠・監査証跡)の現況(IA-03、docs/information-architecture.md)。
+ *
+ * ホーム冒頭の成果物ブロックが描く。構想書8.1の出力3層(DecisionRecord /
+ * DisclosureView / AssumptionEntry)に対応し、「このプロダクトを使うと何が
+ * 手に入るか」を実データの件数で示すためのサマリー。判定内訳・開示確認の
+ * 数え方は countProgress・deriveStepProgress と同じソースを共有する
+ * (件数の食い違いを作らない)。
+ */
+export interface OutcomeSummary {
+  /** ホームの流れ図の入力ノード:登録済み拠点数。 */
+  siteCount: number;
+  /** ホームの流れ図の変換ノード:算定対象と代表値の選択数。 */
+  valuation: { total: number; selected: number };
+  /** 成果物1:投資判断への判定(★判定)の内訳。 */
+  verdicts: { total: number; crosses: number; doesNotCross: number; pending: number };
+  /** 成果物2:開示文言の根拠確認の進捗。 */
+  disclosure: { total: number; handled: number };
+  /** 成果物3:監査証跡(AssumptionEntry)の件数。 */
+  assumptionEntryCount: number;
+}
+
+/**
+ * 金額でみる評価結果(2026-08-23レビュー第3回:ホームに貨幣価値のサマリーを出す)。
+ *
+ * 1拠点1行の金額サマリー。④(financial-bridge)の拠点サマリーと同じ計算を
+ * ここに集約し、ホームと④で数値が食い違わないようにする(D-02と同じ規律)。
+ * 合算するのは自然債務(交換価値由来)のみ。厚生価値は混ぜない(X7・§8.2)。
+ * 「利益への影響」は比率なので合算しない(拠点ごとの行でのみ示す)。
+ */
+export interface SiteMoneyRow {
+  siteId: string;
+  siteName: string;
+  /** 営業利益(決算値)からの変化率(%)。マイナスは利益の下振れ。 */
+  profitImpactPct: number;
+  /** 自然債務(期待損失)。交換価値由来の円額。 */
+  natureDebt: number;
+  /** 減損の目安額を超えているか(④の減損リスク列と同じ判定)。 */
+  impairmentAffected: boolean;
+  /** ★判定の生値(表示はverdictLabelで)。 */
+  verdict: string;
+}
+
+export interface MoneySummary {
+  rows: SiteMoneyRow[];
+  /** 自然債務(期待損失)の全拠点合計。交換価値由来のみ。 */
+  totalNatureDebt: number;
+}
+
+export function deriveMoneySummary(result: DemoPipelineResult): MoneySummary {
+  const rows: SiteMoneyRow[] = result.decisions.map((entry) => {
+    const { financialBridge, comparisonTargets } = entry;
+    const operatingProfit = financialBridge.bridge1.reportedOperatingProfit as unknown as number;
+    const adjusted = financialBridge.bridge1.natureAdjustedOperatingProfit as unknown as number;
+    return {
+      siteId: entry.siteId,
+      siteName: entry.siteName,
+      profitImpactPct: operatingProfit !== 0 ? ((adjusted - operatingProfit) / operatingProfit) * 100 : 0,
+      natureDebt: financialBridge.natureDebt.totalDebt as unknown as number,
+      impairmentAffected: comparisonTargets.impairmentTestImpact.changesAssumption,
+      verdict: entry.decision.decisionRecord.verdict,
+    };
+  });
+  return {
+    rows,
+    totalNatureDebt: rows.reduce((sum, row) => sum + row.natureDebt, 0),
+  };
+}
+
+export function deriveOutcomeSummary(result: DemoPipelineResult): OutcomeSummary {
+  const { decisions } = result;
+  const { siteCount, decompositionCount, selected, gapCount, handledGaps } = countProgress(result);
+  const verdictOf = (entry: (typeof decisions)[number]) => entry.decision.decisionRecord.verdict;
+  return {
+    siteCount,
+    valuation: { total: decompositionCount, selected },
+    verdicts: {
+      total: decisions.length,
+      crosses: decisions.filter((d) => verdictOf(d) === "crosses").length,
+      doesNotCross: decisions.filter((d) => verdictOf(d) === "does_not_cross").length,
+      pending: decisions.filter((d) => verdictOf(d) === "pending").length,
+    },
+    disclosure: { total: gapCount, handled: handledGaps },
+    assumptionEntryCount: result.assumptionEntries.length,
+  };
 }
 
 /**
@@ -403,7 +490,7 @@ export function deriveStepContext(result: DemoPipelineResult, href: string): str
         : "試算の対象がまだありません。";
     case "/decision":
       return decisionCount > 0
-        ? `${decisionCount}拠点の対策案を比べ、承認基準と照らした判定を確定します(確定済み${confirmed}/${decisionCount}拠点)。`
+        ? `${decisionCount}拠点の対策案を比べ、投資の承認ラインと照らした判定を確定します(確定済み${confirmed}/${decisionCount}拠点)。`
         : "判定の対象がまだありません。";
     case "/disclosure":
       return gapCount > 0
@@ -465,9 +552,9 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
   if (crossing.length > 0) {
     findings.push({
       id: "finding-verdict-crosses",
-      headline: `${joinSiteNames(crossing)}では、選択中の対策を織り込んでも投資判断が承認基準をまたぐ`,
+      headline: `${joinSiteNames(crossing)}では、自然コストを織り込むと投資判断の結論が変わる可能性がある`,
       detail:
-        "自然関連のコストを織り込むと、この投資の結論が変わりうる水準です。対策案と反映先の見直しが必要かどうかを確認してください。",
+        "試算の幅が投資の承認ラインと交差しています。対策案と反映先の見直しが必要かどうかを確認してください。",
       href: "/decision",
       linkLabel: "対策と判定で詳細",
     });
@@ -475,9 +562,9 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
   if (notCrossing.length > 0) {
     findings.push({
       id: "finding-verdict-does-not-cross",
-      headline: `${joinSiteNames(notCrossing)}では、選択中の対策を織り込んでも投資判断は承認基準をまたがない`,
+      headline: `${joinSiteNames(notCrossing)}では、自然コストを織り込んでも投資判断の結論は変わらない`,
       detail:
-        "=この論点は今回の投資判断を変えない、と確定できました。「またがない」ことも、根拠をもって確定した結論です。",
+        "この論点は今回の投資判断を変えない、と根拠をもって確定できました。追加の調査は不要です。",
       href: "/decision",
       linkLabel: "対策と判定で詳細",
     });

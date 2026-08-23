@@ -40,7 +40,7 @@ const INTAKE_FILES = [
     // B-10:「顧客の財務部門への確認が必要」は担当名ではないため分離する。
     owner: "顧客の財務部門",
     ownerNote: "確認が必要" as string | undefined,
-    content: "詳細評価の対象・投資判断の前提(通常時NPV・承認基準)",
+    content: "詳細評価の対象・投資判断の前提(投資価値NPV・承認ライン)",
   },
 ];
 
@@ -75,7 +75,7 @@ export default async function SitesPage() {
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">データと拠点の登録</h1>
+          <h1 className="screen__title">拠点データの登録</h1>
           <GuideButton />
         </div>
         <ScreenLead>拠点データを登録し、評価の対象を確定します</ScreenLead>
@@ -85,7 +85,7 @@ export default async function SitesPage() {
           担当部門に記入を依頼します → <b>2.</b> 「登録する」でCSV3ファイルをまとめて取り込むか、1件ずつ追加します →{" "}
           <b>3.</b> 「拠点一覧」で座標解決の状態を確認します → <b>4.</b> 揃ったら「評価対象の絞り込み」へ進みます。
           登録すると住所は座標に解決され、周辺の自然環境との関係が分析されて
-          <b title="TNFD LEAP L3の5基準のうち該当した数。分母は実際に評価できた基準の数">感応度(自然との関わりの強さ)</b>
+          <b title="TNFDの5基準(水ストレス・生物多様性の重要性など)のうち該当した数。数が多いほど自然への依存・影響が強く、評価の優先度が上がります">自然との関わり(0〜5)</b>
           が算出されます。座標も住所もない行は評価に進めないため、黙って消さず理由付きで下段に残します。
         </GuideBox>
       </div>

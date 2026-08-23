@@ -1441,3 +1441,319 @@ hr.rule {
   line-height: 1.9;
   color: var(--ink);
 }
+
+/* 成果物タイル(IA-02/IA-01、docs/information-architecture.md §3.2)-----------
+   構想書8.1の出力3層(判定・開示・監査証跡)を「得られるもの」として示す。
+   件数に依存しない固定3枚なので、スケール設計原則の監査対象外。 */
+.outcome-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (max-width: 860px) {
+  .outcome-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  background: var(--surface-alt);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.outcome:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.outcome__kicker {
+  font-family: var(--font-mono-ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+.outcome__name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.outcome__desc {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  flex: 1;
+}
+.outcome__status {
+  font-family: var(--font-mono-ui);
+  font-size: 10.5px;
+  color: var(--accent-ink);
+  border-top: 1px dashed var(--line);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+.outcome__link {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  margin-top: 2px;
+}
+
+/* ホームの流れ図(IA-02 → 2026-08-23レビューで図中心に再設計)---------------
+   環境データ → 金額に換算 → 成果物(判定・開示・記録)。件数はバッジで示し、
+   判定・開示の内訳は割合バー(segbar)で示す。件数が増えても形は変わらない。 */
+.pipe {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+.pipe__node {
+  flex: 0 0 148px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  background: var(--surface-alt);
+  border-radius: var(--radius-md);
+  padding: 14px 10px;
+  color: var(--ink);
+}
+.pipe__node:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.pipe__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  flex: 0 0 auto;
+}
+.pipe__icon--accent {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.pipe__label {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.pipe__num {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  line-height: 1.1;
+}
+.pipe__num small {
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-left: 3px;
+  font-weight: 400;
+}
+.pipe__arrow {
+  flex: 0 0 34px;
+  position: relative;
+  align-self: center;
+  height: 20px;
+}
+.pipe__arrow::after {
+  content: "→";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  font-size: 17px;
+}
+.pipe__outs {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.pipe__out {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  background: var(--surface-alt);
+  border-radius: var(--radius-md);
+  padding: 9px 14px;
+  color: var(--ink);
+}
+.pipe__out:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.pipe__out-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pipe__out-name {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.pipe__out-sub {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+.pipe__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--ink-soft);
+  margin-top: 1px;
+}
+.pipe__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+@media (max-width: 860px) {
+  .pipe {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pipe__node {
+    flex: 1 1 auto;
+  }
+  .pipe__arrow {
+    height: 22px;
+    flex-basis: 22px;
+  }
+  .pipe__arrow::after {
+    content: "↓";
+  }
+}
+
+/* 割合バー(判定・開示の内訳)。 */
+.segbar {
+  display: flex;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--line-soft);
+  margin-top: 3px;
+}
+.segbar__seg {
+  display: block;
+  height: 100%;
+}
+.segbar__seg--ok,
+.segdot--ok {
+  background: var(--accent-mid);
+}
+.segbar__seg--warn,
+.segdot--warn {
+  background: var(--gold);
+}
+.segbar__seg--neutral,
+.segdot--neutral {
+  background: #c3c8bf;
+}
+.segdot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+/* ホームの金額サマリーの「利益への影響」バー(2026-08-23レビュー第3回)------
+   中央線を0として、マイナスは左へ赤系・プラスは右へ緑系に伸びる。
+   幅は同一バッチ内の最大絶対値を基準にした割合(件数が増えても形は不変)。 */
+.impact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.impact__bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 8px;
+  background: var(--line-soft);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.impact__bar::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--ink-faint);
+  opacity: 0.55;
+}
+.impact__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.impact__fill--neg {
+  right: 50%;
+  background: var(--brick);
+}
+.impact__fill--pos {
+  left: 50%;
+  background: var(--accent-mid);
+}
+.impact__pct {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  min-width: 46px;
+  text-align: right;
+}
+
+/* ロゴのリンク化(2026-08-23レビュー)。aになっても見た目は従来のまま。 */
+a.brand {
+  text-decoration: none;
+  color: inherit;
+}
+a.brand:hover .brand__name {
+  color: #ffffff;
+}
+
+/* はじめに(/guide)の流れ表のリンク(IA-01)。 */
+.guide-flow-link {
+  text-decoration: none;
+  color: var(--ink);
+}
+.guide-flow-link:hover b {
+  color: var(--accent-ink);
+  text-decoration: underline;
+}
+
+/* ナビ下部の区切り(IA-04:ホーム・はじめにを1行に並べる)。 */
+.nav__foot-sep {
+  color: #5c6e82;
+  margin: 0 2px;
+}
+.nav__foot a.nav__foot-active {
+  color: #f2f4f0;
+}

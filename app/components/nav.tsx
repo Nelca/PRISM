@@ -14,16 +14,16 @@ const NAV = [
   {
     group: "評価する",
     items: [
-      { href: "/sites", label: "データと拠点の登録", sub: "CSV一括または1件ずつ" },
+      { href: "/sites", label: "拠点データの登録", sub: "CSV一括または1件ずつ" },
       { href: "/assessment", label: "評価対象の絞り込み", sub: "詳細評価に進む課題を決める" },
-      { href: "/valuation", label: "価値の算定と代表値の選択", sub: "複数の方法を比べて1つ選ぶ" },
+      { href: "/valuation", label: "価値の算定", sub: "複数の方法を比べて代表値を選ぶ" },
     ],
   },
   {
     group: "判断する",
     items: [
       { href: "/financial-bridge", label: "財務への影響", sub: "利益・リスクへの反映" },
-      { href: "/decision", label: "対策と判定", sub: "承認基準をまたぐかを確認" },
+      { href: "/decision", label: "対策と判定", sub: "投資の結論が変わるかを確認" },
     ],
   },
   {
@@ -77,8 +77,16 @@ export function Nav({ needsAttentionHrefs }: NavProps) {
       {item(REFERENCE)}
 
       <div className="nav__divider" />
+      {/* IA-04:オリエンテーション層(/guide)への再訪導線。初見者の主導線はホーム冒頭の
+          リンクが担うため、ここは参照層としてホームと並べて置くだけに留める。 */}
       <div className="nav__foot">
         <Link href="/">ホーム</Link>
+        <span className="nav__foot-sep" aria-hidden="true">
+          ・
+        </span>
+        <Link href="/guide" className={pathname === "/guide" ? "nav__foot-active" : undefined}>
+          はじめに(使い方)
+        </Link>
       </div>
     </div>
   );

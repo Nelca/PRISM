@@ -21,7 +21,7 @@ const tierColor = (tier: TransferFitnessTier) =>
   tier === "A" ? "#2F5D50" : tier === "B" ? "#9B7233" : tier === "C" ? "#8B8F86" : "#5A6E86";
 
 const tierCaption = (tier: TransferFitnessTier) =>
-  tier === "not_applicable" ? "移転なし(適合度の判定対象外)" : `Tier ${tier}`;
+  tier === "not_applicable" ? "直接算定(等級の対象外)" : `Tier ${tier}`;
 
 export function Football({ methods, threshold, thresholdLabel }: { methods: FootballMethodInput[]; threshold?: number; thresholdLabel?: string }) {
   if (methods.length === 0) return null;
@@ -76,7 +76,7 @@ export function Football({ methods, threshold, thresholdLabel }: { methods: Foot
         <g>
           <line x1={x(threshold)} x2={x(threshold)} y1={top - 14} y2={H - 24} stroke="#953F35" strokeWidth={1.4} strokeDasharray="4 3" />
           <text x={x(threshold)} y={top - 16} fontSize={10} fontFamily="var(--font-mono-ui)" textAnchor="middle" fill="#953F35">
-            {thresholdLabel || "承認閾値"}
+            {thresholdLabel || "投資の承認ライン"}
           </text>
         </g>
       )}

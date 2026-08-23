@@ -115,7 +115,7 @@ export default async function ValuationPage({
       <div className="screen">
         <div className="screen__head">
           <div className="screen__title-row">
-            <h1 className="screen__title">価値の算定と代表値の選択</h1>
+            <h1 className="screen__title">価値の算定</h1>
           </div>
           <ScreenLead>差の理由を確認し、投資判断に使う代表値を1つ選びます</ScreenLead>
         </div>
@@ -263,7 +263,7 @@ export default async function ValuationPage({
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">価値の算定と代表値の選択</h1>
+          <h1 className="screen__title">価値の算定</h1>
           <GuideButton />
         </div>
         <ScreenLead>差の理由を確認し、投資判断に使う代表値を1つ選びます</ScreenLead>
@@ -307,7 +307,7 @@ export default async function ValuationPage({
       */}
       <Card title="算定の対象" subtitle={labelForIssueId(selectedIssueId)}>
         <div className="grid-3">
-          <Stat label="感応度" value={issue ? `${issue.sensitivityScore}/5` : "—"} />
+          <Stat label={<span title="TNFDの5基準のうち該当した数。数が多いほど自然への依存・影響が強い">自然との関わり</span>} value={issue ? `${issue.sensitivityScore}/5` : "—"} />
           <Stat
             label={physicalQuantity?.category === "climate" ? "GHG排出量(年間)" : "取水量(年間)"}
             value={
@@ -337,7 +337,7 @@ export default async function ValuationPage({
             <tr>
               <th>方法</th>
               <th>価値の性質</th>
-              <th title="算定の確からしさ。A=現地評価に近い/B=補正付きで実務利用可/C=桁の把握のみ">確からしさ</th>
+              <th title="算定の確からしさ。A=現地評価に近い/B=補正付きで実務利用可/C=桁の把握のみ/直接算定=他地域の研究値を借りていないため等級の対象外">確からしさ</th>
               <th>中心値</th>
               <th>幅(P5〜P95)</th>
             </tr>

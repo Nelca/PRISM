@@ -53,7 +53,7 @@ function SiteFormModal({ entry }: { entry?: UserSiteEntry }) {
                 <p>
                   {editing
                     ? "保存すると再計算され、変更の内容は記録に残ります"
-                    : "登録すると、周辺環境との関係を確認し感応度を算定します"}
+                    : "登録すると、周辺環境との関係を確認し「自然との関わり」を算定します"}
                 </p>
               </div>
               <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setOpen(false)}>
@@ -198,7 +198,7 @@ function SiteFormModal({ entry }: { entry?: UserSiteEntry }) {
                     </div>
                     <div className="field-row">
                       <div className="field">
-                        <label htmlFor={fieldId("baselineNpvValue")}>通常時NPV(円)</label>
+                        <label htmlFor={fieldId("baselineNpvValue")}>投資価値NPV(円)・自然コストを含まない値</label>
                         <input
                           id={fieldId("baselineNpvValue")}
                           name="baselineNpvValue"
@@ -209,7 +209,7 @@ function SiteFormModal({ entry }: { entry?: UserSiteEntry }) {
                         />
                       </div>
                       <div className="field">
-                        <label htmlFor={fieldId("approvalThresholdValue")}>承認閾値(円)</label>
+                        <label htmlFor={fieldId("approvalThresholdValue")}>投資の承認ライン(円)</label>
                         <input
                           id={fieldId("approvalThresholdValue")}
                           name="approvalThresholdValue"
@@ -221,7 +221,7 @@ function SiteFormModal({ entry }: { entry?: UserSiteEntry }) {
                       </div>
                     </div>
                     <div className="field">
-                      <label htmlFor={fieldId("disclosureClaimText")}>開示claim文(任意。空欄なら自動生成)</label>
+                      <label htmlFor={fieldId("disclosureClaimText")}>開示の記載文(任意。空欄なら自動生成)</label>
                       <input
                         id={fieldId("disclosureClaimText")}
                         name="disclosureClaimText"

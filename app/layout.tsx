@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Shippori_Mincho, Noto_Sans_JP, JetBrains_Mono } from "next/font/google";
 import { COMPANY_NAME } from "@/lib/demo/company";
 import { getTenantId } from "@/lib/db/client";
@@ -71,7 +72,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           */}
           <div className="demo-banner">デモデータ(架空企業)を表示中 — 実在の企業・実データではありません</div>
 
-          <div className="brand">
+          {/* 2026-08-23レビュー:ロゴのクリックでホームに戻れるようにする(一般的な期待動作)。 */}
+          <Link href="/" className="brand" aria-label="ホームへ戻る">
             <div className="brand__mark">
               <svg viewBox="0 0 24 24" fill="none">
                 <path d="M12 1.5L22.5 12L12 22.5L1.5 12L12 1.5Z" stroke="#7FA694" strokeWidth="1.4" />
@@ -86,7 +88,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               <div className="brand__name">PRISM</div>
               <div className="brand__tag">自然資本の意思決定レイヤー</div>
             </div>
-          </div>
+          </Link>
 
           <div className="topbar">
             <div className="topbar__left">

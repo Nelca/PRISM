@@ -601,7 +601,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       warnings.push({
         id: `countermeasure-all-failed-${siteId}`,
         screen: "/decision",
-        message: `${site.name}では対策案をどれも計算できなかったため、対策と判定を計算できませんでした。承認閾値の入力値をご確認ください。`,
+        message: `${site.name}では対策案をどれも計算できなかったため、対策と判定を計算できませんでした。投資の承認ラインの入力値をご確認ください。`,
       });
       return [];
     }
@@ -652,7 +652,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       warnings.push({
         id: `decision-failed-${siteId}`,
         screen: "/decision",
-        message: `${site.name}の判定を計算できなかったため、対策と判定・財務への影響を表示できませんでした。承認閾値または選択中の対策案をご確認ください。`,
+        message: `${site.name}の判定を計算できなかったため、対策と判定・財務への影響を表示できませんでした。投資の承認ラインまたは選択中の対策案をご確認ください。`,
       });
       return [];
     }

@@ -180,7 +180,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
         title="判定件数"
         subtitle="従量課金の根拠"
         padBody={false}
-        foot="判定が確定した時点で1件。結論の向き(またぐ/またがない)は課金に影響しません。未確定(pending)は数えません"
+        foot="判定が確定した時点で1件。判定の内容(結論が変わるか変わらないか)は課金に影響しません。未確定(保留)は数えません"
       >
         <div style={{ padding: "12px 18px" }}>
           <Stat label="確定した判定" value={`${decisionCounts.length}件`} />

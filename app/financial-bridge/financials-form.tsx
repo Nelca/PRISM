@@ -7,9 +7,9 @@ import type { CompanyFinancialsInput } from "@/lib/demo/interaction-state";
 const initialState: CompanyFinancialsFormState = {};
 
 const FIELDS: { name: keyof CompanyFinancialsInput; label: string; hint?: string }[] = [
-  { name: "reportedOperatingProfit", label: "報告営業利益(円)", hint: "監査済みの値。PRISMは検証しません" },
+  { name: "reportedOperatingProfit", label: "営業利益・決算値(円)", hint: "決算書(監査済み)の営業利益。PRISMは検証しません" },
   { name: "currentlyInternalizedCost", label: "内部化済みコスト(円)", hint: "炭素税・水利用料等として既に支払っている額" },
-  { name: "existingImpairmentThreshold", label: "減損テスト前提の閾値(円)" },
+  { name: "existingImpairmentThreshold", label: "減損の目安額(円)", hint: "既存の減損テストで前提としている金額。自然関連の損失見込みがこれを超えると前提の見直しが必要になりえます" },
   { name: "netDebt", label: "純有利子負債(円)" },
   { name: "ebitda", label: "EBITDA(円)" },
   { name: "interestExpense", label: "支払利息(円)" },

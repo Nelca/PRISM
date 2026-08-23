@@ -40,7 +40,7 @@ export async function saveDecisionParametersAction(
   }
 
   const required: { name: string; label: string }[] = [
-    { name: "baselineNpvValue", label: "通常NPV" },
+    { name: "baselineNpvValue", label: "投資価値(NPV)" },
     { name: "discountRate", label: "割引率" },
     { name: "horizon", label: "評価期間" },
   ];
@@ -64,7 +64,7 @@ export async function saveDecisionParametersAction(
   if (thresholdRaw !== "") {
     const parsed = Number(thresholdRaw);
     if (Number.isNaN(parsed)) {
-      return { error: "承認閾値は数値で入力してください(未定の場合は空欄のままにしてください)。" };
+      return { error: "投資の承認ラインは数値で入力してください(未定の場合は空欄のままにしてください)。" };
     }
     approvalThresholdValue = parsed;
   }
@@ -86,8 +86,8 @@ export async function saveDecisionParametersAction(
           },
           logMessage:
             approvalThresholdValue === null
-              ? `${siteId}の投資判断の前提を更新(承認閾値は未入力のため判定は保留)`
-              : `${siteId}の投資判断の前提と承認閾値を更新`,
+              ? `${siteId}の投資判断の前提を更新(承認ラインは未入力のため判定は保留)`
+              : `${siteId}の投資判断の前提と承認ラインを更新`,
         },
       },
     ],

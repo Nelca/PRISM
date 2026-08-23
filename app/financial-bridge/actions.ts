@@ -14,7 +14,7 @@ export interface CompanyFinancialsFormState {
 }
 
 const FIELDS: { name: keyof CompanyFinancialsInput; label: string }[] = [
-  { name: "reportedOperatingProfit", label: "報告営業利益" },
+  { name: "reportedOperatingProfit", label: "営業利益(決算値)" },
   { name: "currentlyInternalizedCost", label: "内部化済みコスト" },
   { name: "existingImpairmentThreshold", label: "減損テスト前提の閾値" },
   { name: "netDebt", label: "純有利子負債" },

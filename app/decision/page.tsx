@@ -27,7 +27,7 @@ function verdictMeaningSentence(verdict: string): string | null {
   if (verdict === "does_not_cross")
     return "自然関連コストを織り込んでも投資判断の結論は変わらない、と確定できました。この課題の追加調査は不要です。";
   if (verdict === "crosses")
-    return "自然関連コストを織り込むと、承認基準を上回るか下回るかが変わる可能性があります。結論を確定するには、レンジを支配する前提の詳細調査が必要です。";
+    return "自然関連コストを織り込むと、投資の承認ラインを上回るか下回るかが変わる可能性があります。結論を確定するには、幅を支配する前提の詳細調査が必要です。";
   return null;
 }
 
@@ -71,7 +71,7 @@ export default async function DecisionPage({
           <div className="screen__title-row">
             <h1 className="screen__title">対策と判定</h1>
           </div>
-          <ScreenLead>対策を選び、承認基準と照らした判定を確定します</ScreenLead>
+          <ScreenLead>対策を選び、投資の結論が変わるかの判定を確定します</ScreenLead>
         </div>
         {/* 空状態の3点セット(指示11):いま何がない/なぜないか/どこで何をするか+リンク */}
         <Card title="対策案を比較する対象がまだありません">
@@ -95,7 +95,7 @@ export default async function DecisionPage({
     const record = entry.decision.decisionRecord;
     const alerts = reassessmentAlerts.filter((alert) => alert.decisionRecordId === record.id);
     const remaining: string[] = [];
-    if (record.verdict === "pending") remaining.push("承認閾値の入力");
+    if (record.verdict === "pending") remaining.push("承認ラインの入力");
     if (record.bindingMechanism.kind === "weak_reference") remaining.push("反映先の決定");
     if (alerts.some((alert) => alert.level === "verdict_changed")) remaining.push("判定の見直し");
     return {
@@ -122,19 +122,19 @@ export default async function DecisionPage({
           <h1 className="screen__title">対策と判定</h1>
           <GuideButton />
         </div>
-        <ScreenLead>対策を選び、承認基準と照らした判定を確定します</ScreenLead>
+        <ScreenLead>対策を選び、投資の結論が変わるかの判定を確定します</ScreenLead>
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         <GuideBox>
-          この画面では、承認基準と照らした判定を確定させます。<b>1.</b>{" "}
+          この画面では、投資の承認ラインと照らした判定を確定させます。<b>1.</b>{" "}
           拠点サマリーで判定と残タスクを確認し、対象拠点の詳細を開きます → <b>2.</b>{" "}
-          「投資判断の前提」で通常NPV・割引率・承認閾値(稟議の承認ライン)を入力します → <b>3.</b>{" "}
+          「投資判断の前提」で投資価値(NPV)・割引率・投資の承認ラインを入力します → <b>3.</b>{" "}
           「対策案の比較」で対策を1つ選ぶと、投資対効果が自然への影響を加味して再計算されます → <b>4.</b>{" "}
           「この結果の反映先」で、この結果を社内のどの仕組みで使うかを決めます(変更には理由の入力が必須です) →{" "}
           <b>5.</b> 確定したら「開示への反映」へ進みます。
           {/* D-13:3値の読み方。投資可否は断定しない(「結論が変わるか」の言い回しに徹する)。 */}
-          判定は3値です:「またがない」=自然関連コストを織り込んでも投資判断の結論は変わらないと確定/
-          「またぐ」=承認基準を上回るか下回るかが変わる可能性があり、前提の詳細調査が必要/
-          「保留」=承認閾値が未入力のため未確定。承認閾値が未入力の間は、仮の値を置かず判定を保留にします。
+          判定は3値です:「結論は変わらない」=自然関連コストを織り込んでも投資判断の結論は変わらないと確定/
+          「結論が変わる可能性」=承認ラインを上回るか下回るかが変わりうるため、前提の詳細調査が必要/
+          「保留」=承認ラインが未入力のため未確定。未入力の間は、仮の値を置かず判定を保留にします。
           保留を解くには財務・経営企画部門への確認が必要です。
         </GuideBox>
       </div>
@@ -171,7 +171,7 @@ export default async function DecisionPage({
                 </td>
                 <td>
                   <Tag variant={verdictTagVariant(row.record.verdict)}>
-                    {row.record.verdict === "pending" ? "保留中" : `承認${verdictLabel(row.record.verdict)}`}
+                    {row.record.verdict === "pending" ? "保留中" : verdictLabel(row.record.verdict)}
                   </Tag>
                 </td>
                 <td>{row.selectedLabel}</td>
@@ -252,7 +252,7 @@ export default async function DecisionPage({
                 headExtra={
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <Tag variant={verdictTagVariant(record.verdict)}>
-                      {record.verdict === "pending" ? "判定は保留中" : `承認${verdictLabel(record.verdict)}`}
+                      {record.verdict === "pending" ? "判定は保留中" : verdictLabel(record.verdict)}
                     </Tag>
                     {/*
                       C-06:保留中は本文先頭の主要ボタンが主導線になるため、ここには出さない
@@ -274,8 +274,8 @@ export default async function DecisionPage({
                 {record.verdict === "pending" ? (
                   <div className="first-action">
                     <p className="first-action__text">
-                      まず投資判断の承認基準(閾値)を入力してください(財務・経営企画部門への確認が必要です)。
-                      入力すると判定が確定します。閾値が分かるまで、判定は保留のままです(仮の閾値は置きません)。
+                      まず投資の承認ライン(社内で投資が承認される基準の金額)を入力してください(財務・経営企画部門への確認が必要です)。
+                      入力すると判定が確定します。分かるまで判定は保留のままです(仮の値は置きません)。
                       保留の間はこの判定を件数に計上しません。
                     </p>
                     <DecisionParametersForm siteId={siteId} current={decisionParameters.get(siteId)} emphasis />
@@ -286,9 +286,9 @@ export default async function DecisionPage({
                   )
                 )}
                 <div className="grid-3">
-                  <Stat label="承認基準" value={threshold !== null ? <Num value={threshold} unit="円" /> : "未入力"} />
+                  <Stat label="投資の承認ライン" value={threshold !== null ? <Num value={threshold} unit="円" /> : "未入力"} />
                   <Stat
-                    label={<span title="自然関連のコスト・便益を加味した正味現在価値">投資対効果(NPV)の幅</span>}
+                    label={<span title="投資価値(NPV)に自然関連のコスト・便益を加えた値。この幅が承認ラインと交差するかで判定が決まります">投資価値の幅(自然コスト反映後)</span>}
                     value={
                       <>
                         <Num value={record.natureAdjustedNpv.quantileRange.p5} /> 〜{" "}
@@ -347,7 +347,7 @@ export default async function DecisionPage({
               {/* (2) 対策案の比較:表→散布図の順(指示15) */}
               <Card
                 title="対策案の比較"
-                foot="縦軸:投資1億円あたりの回避物理量 ・ 横軸:投資1億円あたりの増分NPV(通常NPVからの純増)。「対策を実施しない」案は追加投資も追加効果もないため原点付近になります"
+                foot="縦軸:投資1億円あたりの回避物理量 ・ 横軸:投資1億円あたりの追加リターン(投資価値の純増)。「対策を実施しない」案は追加投資も追加効果もないため原点付近になります"
               >
                 <table className="data-table" style={{ margin: "0 0 16px" }}>
                   <thead>
@@ -355,7 +355,7 @@ export default async function DecisionPage({
                       <th>対策</th>
                       <th>投資額</th>
                       <th>回避物理量/年</th>
-                      <th>投資対効果(NPV、★判定)</th>
+                      <th title="投資価値(NPV)に自然関連のコスト・便益を加えた値と、その判定">投資価値(反映後)と判定</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -394,7 +394,7 @@ export default async function DecisionPage({
                     label: c.label,
                     color: c.key === selectedCountermeasureKey ? "#33564A" : "#8B8F86",
                   }))}
-                  xLabel="投資1億円あたりの増分NPV"
+                  xLabel="投資1億円あたりの追加リターン"
                   yLabel="投資1億円あたりの回避物理量"
                 />
               </Card>

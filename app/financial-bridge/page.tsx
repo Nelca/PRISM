@@ -2,12 +2,12 @@ import Link from "next/link";
 import { getTenantId } from "@/lib/db/client";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
-import { deriveOpenTasks } from "@/lib/pipeline/open-tasks";
+import { deriveMoneySummary, deriveOpenTasks } from "@/lib/pipeline/open-tasks";
 import { CompanyFinancialsForm } from "./financials-form";
 import { buildWaterfallSteps } from "@core/financial-bridge/bridge1";
 import { Num, pickYenScale } from "../components/numeric";
 import { Card, GuideBox, GuideButton, KV, ScreenLead, Stat, Tag, Term } from "../components/ui";
-import { financialTermNote } from "../components/labels";
+import { financialDisplayLabel, financialTermNote } from "../components/labels";
 import { StepNav } from "../components/step-nav";
 import { TaskBanner } from "../components/task-banner";
 import { Waterfall } from "../components/charts/Waterfall";
@@ -61,18 +61,17 @@ export default async function FinancialBridgePage({
   const redFlags = deriveOpenTasks(result);
 
   /**
-   * 第4版 D-11:拠点サマリーに出す1行分の値。詳細カード群と同じ計算をここで1度だけ行い、
-   * サマリー行と展開後の詳細で数値が食い違わないようにする。
+   * 第4版 D-11:拠点サマリーに出す1行分の値。金額の計算は deriveMoneySummary に集約し、
+   * ホームの「金額でみる評価結果」とこの画面のサマリー行で数値が食い違わないようにする。
    */
+  const moneyRowBySite = new Map(deriveMoneySummary(result).rows.map((row) => [row.siteId, row]));
   const siteRows = decisions.map((entry) => {
-    const { financialBridge, comparisonTargets } = entry;
-    const operatingProfit = financialBridge.bridge1.reportedOperatingProfit as unknown as number;
-    const adjusted = financialBridge.bridge1.natureAdjustedOperatingProfit as unknown as number;
+    const money = moneyRowBySite.get(entry.siteId);
     return {
       ...entry,
-      adjustmentRatioPct: ((adjusted - operatingProfit) / operatingProfit) * 100,
-      expectedLoss: financialBridge.natureDebt.totalDebt as unknown as number,
-      impairmentAffected: comparisonTargets.impairmentTestImpact.changesAssumption,
+      adjustmentRatioPct: money?.profitImpactPct ?? 0,
+      expectedLoss: money?.natureDebt ?? 0,
+      impairmentAffected: money?.impairmentAffected ?? false,
     };
   });
 
@@ -99,11 +98,11 @@ export default async function FinancialBridgePage({
         <GuideBox>
           この画面では、選んだ代表値が財務にどう効くかを読み取ります。<b>1.</b>{" "}
           上部の「企業全体の財務データ」から、自社の財務データ(売上・営業利益など)を登録します(全拠点の計算に共通で使われます)
-          → <b>2.</b> 拠点サマリーで、調整幅・自然債務・減損テスト判定を拠点ごとに見比べます → <b>3.</b>{" "}
-          気になる拠点の行から詳細を開き、報告利益からの調整と「期待損失」、比較先(営業利益比・減損テストの前提)を確認します →{" "}
+          → <b>2.</b> 拠点サマリーで、利益への影響・自然債務・減損リスクを拠点ごとに見比べます → <b>3.</b>{" "}
+          気になる拠点の行から詳細を開き、決算値の利益からの調整と「期待損失」、比較先(営業利益比・減損リスク)を確認します →{" "}
           <b>4.</b> 「重要な論点」に挙がった項目を処理してから「対策と判定」へ進みます。
           社会全体への影響(開示専用の参考値)は別枠で表示し、利益の試算には加算しません。
-          この画面の数値は監査済み財務諸表の数値ではなく、管理会計上の参考値(非GAAP指標)です。
+          この画面の数値は決算書の数値ではなく、社内試算値(参考値)です。
           格付・資本コストへの影響を予測・断定することはしません。
         </GuideBox>
       </div>
@@ -124,7 +123,7 @@ export default async function FinancialBridgePage({
         headExtra={<CompanyFinancialsForm current={companyFinancials} />}
       >
         <p style={{ margin: 0, fontSize: 12.5, color: "var(--ink-soft)" }}>
-          報告営業利益・内部化済みコスト・減損テストの前提(閾値)・信用指標は企業単位の値です。
+          営業利益(決算値)・内部化済みコスト・減損の目安額・信用指標は企業単位の値です。
           {companyFinancials
             ? "入力済みの実データで計算しています。"
             : "未入力のため、デモの既定値で計算しています(入力するとこの画面全体が再計算されます)。"}
@@ -141,15 +140,15 @@ export default async function FinancialBridgePage({
         title="拠点サマリー"
         subtitle="1拠点1行。行の「詳細」から下の拠点別詳細が開きます"
         padBody={false}
-        foot="調整幅:自然関連コストを織り込んだときの報告営業利益からの変化率(マイナスは利益の下振れ)"
+        foot="利益への影響:自然関連コストを織り込んだときの、営業利益(決算値)からの変化率(マイナスは利益の下振れ)"
       >
         <table className="data-table">
           <thead>
             <tr>
               <th>拠点</th>
-              <th>調整幅(営業利益比)</th>
+              <th>{term("利益への影響")}</th>
               <th>{term("自然債務(期待損失)")}</th>
-              <th>{term("減損テストの前提")}</th>
+              <th>{term("減損リスク")}</th>
               <th>重要な論点</th>
               <th></th>
             </tr>
@@ -237,28 +236,28 @@ export default async function FinancialBridgePage({
           <details key={siteId} id={`site-${siteId}`} className="foldout" open>
             <summary>
               {siteName} の詳細
-              <small>自然調整後利益・期待損失・比較先 ・ 他の拠点の詳細は上の拠点サマリーの行から開けます</small>
+              <small>自然コスト反映後の利益・期待損失・比較先 ・ 他の拠点の詳細は上の拠点サマリーの行から開けます</small>
             </summary>
             <div className="foldout__body">
               <Card
-                title={term("自然調整後営業利益")}
+                title={term("自然コスト反映後の営業利益")}
                 subtitle="報告財務からの調整"
                 headExtra={
                   <span
                     className="nongaap"
-                    title="PRISM独自の管理会計指標(非GAAP)です。監査済み財務諸表の数値でも、一般的な会計基準の用語でもありません"
+                    title="監査済みの決算書の数値ではなく、PRISMが算出した参考値です(いわゆる非GAAP指標)"
                   >
-                    非GAAP指標 ・ 管理会計上の参考値
+                    社内試算値(決算数値ではありません)
                   </span>
                 }
-                foot={`調整幅:報告営業利益比 ${(
+                foot={`利益への影響:営業利益(決算値)比 ${(
                   (((financialBridge.bridge1.natureAdjustedOperatingProfit as unknown as number) - operatingProfit) /
                     operatingProfit) *
                   100
                 ).toFixed(1)}%`}
               >
                 <Waterfall
-                  steps={waterfallSteps.map((s) => ({ label: s.label, value: s.value as unknown as number, isTotal: s.isTotal }))}
+                  steps={waterfallSteps.map((s) => ({ label: financialDisplayLabel(s.label), value: s.value as unknown as number, isTotal: s.isTotal }))}
                 />
                 {/* D-12:図の中の独自用語はhoverできないため、直下に用語説明を常設する。 */}
                 <p className="tooltip-note">
@@ -292,7 +291,7 @@ export default async function FinancialBridgePage({
                       <div style={{ marginTop: 10 }}>
                         <KV k="対応率" v={`${(financialBridge.bridge2.internalizationRate * 100).toFixed(1)}%`} />
                       </div>
-                      <p className="tooltip-note">この数値は開示の参考情報としてのみ使用され、上の自然調整後利益には反映されません。</p>
+                      <p className="tooltip-note">この数値は開示の参考情報としてのみ使用され、上の利益の試算には反映されません。</p>
                     </>
                   ) : (
                     <p style={{ color: "var(--ink-faint)" }}>この拠点には厚生価値(welfare)のレコードがありません。</p>
@@ -310,17 +309,17 @@ export default async function FinancialBridgePage({
                 headExtra={
                   <span
                     className="nongaap"
-                    title="PRISM独自の管理会計指標(非GAAP)です。監査済み財務諸表の数値でも、一般的な会計基準の用語でもありません"
+                    title="監査済みの決算書の数値ではなく、PRISMが算出した参考値です(いわゆる非GAAP指標)"
                   >
-                    非GAAP指標
+                    社内試算値
                   </span>
                 }
-                foot="変化後の比率はPRISMが自然債務・自然調整後利益から算術で計算したものです"
+                foot="変化後の比率はPRISMが自然債務・自然コスト反映後の利益から算術で計算したものです"
               >
                 <div className="grid-3">
-                  <Stat label="期待損失 ÷ 報告営業利益" value={`${(comparisonTargets.operatingProfitRatio * 100).toFixed(2)}%`} />
+                  <Stat label="期待損失 ÷ 営業利益(決算値)" value={`${(comparisonTargets.operatingProfitRatio * 100).toFixed(2)}%`} />
                   <Stat
-                    label={term("減損テストの前提")}
+                    label={term("減損リスク")}
                     value={comparisonTargets.impairmentTestImpact.changesAssumption ? "見直しが必要" : "範囲内"}
                   />
                   <Stat label={term("格付・資本コスト")} value="定量予測は行いません" />

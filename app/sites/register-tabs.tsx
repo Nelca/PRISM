@@ -42,7 +42,7 @@ export function RegisterTabs() {
         <div>
           <p style={{ margin: "0 0 12px", fontSize: 12.5, color: "var(--ink-soft)" }}>
             拠点を1件だけ足す場合はこちら。CSVを用意しなくても、拠点名・業種・所在地だけで登録できます。
-            登録すると周辺環境との関係を確認し、感応度を算定します。
+            登録すると周辺環境との関係を確認し、「自然との関わり」を算定します。
           </p>
           <AddSiteForm />
         </div>

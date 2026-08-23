@@ -23,7 +23,19 @@ export function tierTagVariant(tier: TransferFitnessTier): TagVariant {
   return "neutral";
 }
 
-/** 画面に出す短いラベル。`not_applicable` をそのまま表示しない。 */
+/**
+ * 画面に出す短いラベル。`not_applicable` をそのまま表示しない。
+ * 2026-08-23レビュー:「移転なし」は便益移転という専門概念を知らないと読めないため、
+ * 意味している状態(他地域の研究値を借りずに算定している)を指す「直接算定」に変更。
+ */
 export function tierLabel(tier: TransferFitnessTier): string {
-  return tier === "not_applicable" ? "移転なし" : tier;
+  return tier === "not_applicable" ? "直接算定" : tier;
+}
+
+/** ティアの一行説明(title属性用)。A/B/Cと「直接算定」の意味を初見者に伝える。 */
+export function tierNote(tier: TransferFitnessTier): string {
+  if (tier === "A") return "A:現地評価に近い確からしさ";
+  if (tier === "B") return "B:補正付きで実務利用できる確からしさ";
+  if (tier === "C") return "C:桁の把握のみ(参考程度)";
+  return "直接算定:他地域の研究値を借りずに算定しているため、借用誤差の等級(A〜C)の対象外です";
 }

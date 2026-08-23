@@ -5,6 +5,7 @@ import type { InteractionState } from "@/lib/demo/interaction-state";
 import {
   decompositionForMaterialIssue,
   deriveFindings,
+  deriveMoneySummary,
   deriveOpenTasks,
   deriveStepProgress,
   hasRepresentativeSelection,
@@ -40,12 +41,12 @@ describe("deriveOpenTasks", () => {
     expect(tasks.every((task) => task.href.startsWith("/") && task.linkLabel.length > 0)).toBe(true);
   });
 
-  test("承認閾値が未入力なら、誰に聞けばよいかまで書いたタスクを出す", () => {
+  test("投資の承認ラインが未入力なら、誰に聞けばよいかまで書いたタスクを出す", () => {
     const tasks = deriveOpenTasks(run(withPendingThreshold()));
     const pending = tasks.find((task) => task.id === "approval-threshold");
 
     expect(pending).toBeDefined();
-    expect(pending!.text).toContain("承認閾値が未入力のため判定が保留中です(財務・経営企画部門への確認が必要)");
+    expect(pending!.text).toContain("投資の承認ラインが未入力のため判定が保留中です(財務・経営企画部門への確認が必要)");
     expect(pending!.href).toBe("/decision");
   });
 });
@@ -71,12 +72,12 @@ describe("deriveStepProgress", () => {
 });
 
 describe("deriveFindings", () => {
-  test("「またがない」も確定した結論として出す", () => {
+  test("「結論は変わらない」も確定した結論として出す", () => {
     const findings = deriveFindings(run());
     const notCrossing = findings.find((finding) => finding.id === "finding-verdict-does-not-cross");
 
     expect(notCrossing).toBeDefined();
-    expect(notCrossing!.headline).toContain("承認基準をまたがない");
+    expect(notCrossing!.headline).toContain("投資判断の結論は変わらない");
     expect(notCrossing!.detail).toContain("この論点は今回の投資判断を変えない");
   });
 
@@ -162,5 +163,18 @@ describe("代表値の選択状況の判定(D-02)", () => {
       expect(decompositionForMaterialIssue(result, materialIssueId)).toBeDefined();
     }
     expect(decompositionForMaterialIssue(result, "存在しない課題")).toBeUndefined();
+  });
+});
+
+describe("deriveMoneySummary", () => {
+  test("1拠点1行の金額サマリーを返し、自然債務のみを合算する", () => {
+    const summary = deriveMoneySummary(run());
+
+    expect(summary.rows.length).toBeGreaterThan(0);
+    // 合計は行の自然債務の総和と厳密に一致する(交換価値のみ。比率は合算しない)。
+    const total = summary.rows.reduce((sum, row) => sum + row.natureDebt, 0);
+    expect(summary.totalNatureDebt).toBe(total);
+    // 利益への影響は有限の比率として算出される(分母0でもNaN/Infinityにしない)。
+    expect(summary.rows.every((row) => Number.isFinite(row.profitImpactPct))).toBe(true);
   });
 });

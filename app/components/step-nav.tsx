@@ -18,9 +18,9 @@ import { deriveOpenTasks, deriveStepContext } from "@/lib/pipeline/open-tasks";
 
 /** 業務順の6ステップ。ナビ(nav.tsx)の並びと同じ順序を保つこと。 */
 const FLOW = [
-  { href: "/sites", label: "データと拠点の登録" },
+  { href: "/sites", label: "拠点データの登録" },
   { href: "/assessment", label: "評価対象の絞り込み" },
-  { href: "/valuation", label: "価値の算定と代表値の選択" },
+  { href: "/valuation", label: "価値の算定" },
   { href: "/financial-bridge", label: "財務への影響" },
   { href: "/decision", label: "対策と判定" },
   { href: "/disclosure", label: "開示への反映" },
