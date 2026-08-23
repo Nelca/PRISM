@@ -156,6 +156,9 @@ export async function recordIntentionalDecisionAction(
   if (!claimId || !reason) {
     return { error: "判断の理由を入力してください。" };
   }
+  if (reason.length < 8) {
+    return { error: "判断の理由が短すぎます。監査証跡として第三者が選択の根拠を理解できるように記入してください(8文字以上)。" };
+  }
 
   const tenantId = await getTenantId();
   const outcome = await tryRunAndPersist(tenantId, {

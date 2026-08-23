@@ -580,7 +580,20 @@ export default async function ValuationPage({
                   <tr key={r.id} style={selected ? { background: "var(--accent-soft)" } : undefined}>
                     <td>
                       {selected ? (
-                        <Tag variant="ok">選択中</Tag>
+                        <>
+                          <Tag variant="ok">選択中</Tag>
+                          {/*
+                            2026-08-23レビュー第3回:中心値0円の手法が代表値に選ばれていると、
+                            未内部化コストが負になり④の利益への影響がプラスに反転する
+                            (自然コストの織り込みによる改善ではない)。選択中表示の直下で
+                            気づけるようにする。
+                          */}
+                          {(r.centralValue as unknown as number) === 0 && (
+                            <p className="tooltip-note" style={{ marginTop: 4 }}>
+                              この手法の中心値は0円です(係数が0のため物理量に関わらず0円になります)。投資判断の代表値として妥当か確認してください。
+                            </p>
+                          )}
+                        </>
                       ) : (
                         <RepresentativeSelector
                           materialIssueId={selectedIssueId}

@@ -46,6 +46,36 @@ describe("computeComparisonTargets", () => {
     expect(result.impairmentTestImpact.details).toContain("範囲内");
   });
 
+  it("自然債務が負値(損失を負で持つ符号規約)でも、絶対額が閾値を上回ればchangesAssumption=true", () => {
+    // 未内部化コスト=中心値−既内部化コストが負になる経路(2026-08-23レビューで発見)。
+    const negativeDebt = computeNatureDebt(
+      exchangeAmount(-1_000_000),
+      [{ scenario: "ngfs_net_zero_2050_gcam", probability: 1, period: 0 }],
+      0.05
+    );
+    const result = computeComparisonTargets(
+      input({ natureDebt: negativeDebt, existingImpairmentThreshold: exchangeAmount(500_000) })
+    );
+
+    expect(result.impairmentTestImpact.changesAssumption).toBe(true);
+    // 表示は絶対額で行う(負値と正の閾値をそのまま並べると比較が読めないため)。
+    expect(result.impairmentTestImpact.details).toContain("1,000,000円");
+  });
+
+  it("負の自然債務でも、絶対額が閾値以下なら範囲内のまま", () => {
+    const negativeDebt = computeNatureDebt(
+      exchangeAmount(-1_000_000),
+      [{ scenario: "ngfs_net_zero_2050_gcam", probability: 1, period: 0 }],
+      0.05
+    );
+    const result = computeComparisonTargets(
+      input({ natureDebt: negativeDebt, existingImpairmentThreshold: exchangeAmount(5_000_000) })
+    );
+
+    expect(result.impairmentTestImpact.changesAssumption).toBe(false);
+    expect(result.impairmentTestImpact.details).toContain("範囲内");
+  });
+
   describe("信用指標の変化(D-5.2:PRISMが算術で計算する)", () => {
     it("レバレッジ比率の変化後は、自然債務を有利子負債に上乗せして算出する", () => {
       const [leverage] = computeComparisonTargets(input()).ratingCostOfCapitalImpact.ratios;
@@ -77,8 +107,8 @@ describe("computeComparisonTargets", () => {
     it("格付・資本コストの定性記述はD-5.2の固定テンプレート通りに数値を機械的に埋め込む", () => {
       const note = computeComparisonTargets(input()).ratingCostOfCapitalImpact.qualitativeNote;
 
-      expect(note).toContain("2.1倍 → 2.2倍(+0.1pt)");
-      expect(note).toContain("10.0倍 → 9.0倍(-1.0pt)");
+      expect(note).toContain("2.1倍 → 2.2倍(+0.1倍)");
+      expect(note).toContain("10.0倍 → 9.0倍(-1.0倍)");
       expect(note).toContain("予測・断定");
       expect(note).toContain("[非GAAP指標]");
     });

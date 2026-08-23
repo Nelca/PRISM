@@ -48,6 +48,37 @@ function formatYenExact(value: number): string {
   return `${new Intl.NumberFormat("ja-JP").format(Math.round(value))}円`;
 }
 
+/**
+ * 金額レンジの表示(2026-08-23レビュー第3回:単位混在の解消)。
+ *
+ * `formatYen(low)`〜`formatYen(high)`のように両端を別々にautoYenScaleすると、
+ * 「年57,761円〜12.6百万円」のように片方だけスケールされたレンジになり、
+ * どちらが大きいのか一読で分からない。`pickYenScale(low, high)`で決めた
+ * 共通スケール1つを両端に必ず適用する。
+ *
+ * 共通スケールを小さい側に適用すると小数1桁では"0.0"に潰れて読めなくなることがある
+ * (例:百万円スケールで57,761円は0.06百万円)。その値だけ小数2桁に上げて読める形にする
+ * (両端が同じ位取りで揃っていることが目的なので、桁数が両端で揃っていなくても問題ない)。
+ */
+export function formatCompactYenRange(low: number, high: number): string {
+  const scale = pickYenScale(low, high);
+  if (scale === "none") {
+    return `${formatYen(low, scale)}〜${formatYen(high, scale)}`;
+  }
+  const divisor = scale === "oku" ? OKU : MILLION_YEN;
+  const label = scale === "oku" ? "億円" : "百万円";
+  const formatAt = (value: number, digits: number) =>
+    new Intl.NumberFormat("ja-JP", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(
+      value / divisor
+    );
+  const formatOne = (value: number) => {
+    // 小数1桁で0.0に潰れる(値そのものは0ではない)場合だけ小数2桁にする。
+    const digits = value !== 0 && Math.abs(value) / divisor < 0.05 ? 2 : 1;
+    return `${formatAt(value, digits)}${label}`;
+  };
+  return `${formatOne(low)}〜${formatOne(high)}`;
+}
+
 export function Num({
   value,
   unit,

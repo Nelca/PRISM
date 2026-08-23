@@ -38,6 +38,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# git worktree(サブエージェント用の使い捨て・UI/UX指示書ワークフロー用の常設、いずれも
+# 同一リポジトリのチェックアウトであり埋め込みリポジトリとしてmainに含めるべきではない。
+# 過去に誤ってgitlinkとしてコミットされていたため明示的にuntrack済み)
+.claude/worktrees/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -21,7 +21,7 @@ import {
   gapTypeLabel,
   materialIssueLabel,
 } from "@/app/components/labels";
-import { formatYen } from "@/app/components/numeric";
+import { formatCompactYenRange, formatYen } from "@/app/components/numeric";
 
 /** 未完了の必須判断。ホームのチェックリストと④の「重要な論点」が同じ配列を描く。 */
 export interface OpenTask {
@@ -99,6 +99,65 @@ export function materialIssueIdsWithoutRepresentativeSelection(result: DemoPipel
   );
 }
 
+/**
+ * 選択中の代表値レコードの中心値(2026-08-23レビュー:縮退代表値の検知)。
+ *
+ * 引き当ての経路は `lib/demo/run-demo-pipeline.ts` の `representativeRecordForSite`
+ * (④の財務接続が実際に使う代表値)と同じ:`representativeRecordByMaterialIssue` が指す
+ * レコードIDを `valuationRecordsByMaterialIssue` から引く。未選択(既定値運用中)でも
+ * デフォルト代表値(replacement-costまたは先頭)のIDが入っているため、この関数は常に
+ * 「現在計算に使われている値」を返す。
+ */
+export function representativeCentralValueForMaterialIssue(
+  result: DemoPipelineResult,
+  materialIssueId: string
+): number | undefined {
+  const records = result.valuation.valuationRecordsByMaterialIssue[materialIssueId];
+  const recordId = result.valuation.representativeRecordByMaterialIssue[materialIssueId];
+  const record = records?.find((r) => r.id === recordId);
+  return record ? (record.centralValue as unknown as number) : undefined;
+}
+
+/**
+ * 選択中の代表値が縮退している(中心値0円)拠点かどうか(D-02と同じ規律:判定はここに集約)。
+ * 1拠点に複数の課題がある場合、いずれか1つでも縮退していれば該当とする。
+ */
+export function hasDegenerateRepresentative(result: DemoPipelineResult, siteId: string): boolean {
+  return result.assessment.materialIssues
+    .filter((issue) => issue.siteId === siteId)
+    .some((issue) => representativeCentralValueForMaterialIssue(result, issue.id) === 0);
+}
+
+/**
+ * 縮退した代表値(中心値0円)が財務指標を有利方向に反転させている拠点(2026-08-23レビュー第3回で発見)。
+ *
+ * IFVIの水ストレス係数のように、代表値の中心値が構造的に0円になる手法があり、それが選択されると
+ * `computeInternalizationStatus`(packages/core、変更不可)の `uninternalizedCost` が
+ * 「0 - 既内部化コスト」で負になる。その結果、自然コストの織り込みが利益を押し上げたかのように
+ * 表示される(自然調整後営業利益が報告営業利益を上回る)。**これは改善ではなく代表値選択の問題**
+ * なので、ホームの発見・④の重要な論点・④の警告カードが同じ1つの判定を共有する。
+ */
+export function sitesWithDegenerateRepresentative(
+  result: DemoPipelineResult
+): { siteId: string; siteName: string; uninternalizedCost: number; zeroRepresentative: boolean }[] {
+  return result.decisions
+    .filter((d) => {
+      const uninternalizedCost = d.financialBridge.internalizationStatus.uninternalizedCost as unknown as number;
+      return uninternalizedCost < 0 || hasDegenerateRepresentative(result, d.siteId);
+    })
+    .map((d) => ({
+      siteId: d.siteId,
+      siteName: d.siteName,
+      uninternalizedCost: d.financialBridge.internalizationStatus.uninternalizedCost as unknown as number,
+      /**
+       * true=中心値0円の代表値が選択されている拠点。false=中心値は非ゼロだが
+       * 既内部化コストが試算値を上回り未内部化コストが負になっている拠点。
+       * タスク文言が両者を区別するために持つ(2026-08-23レビュー指摘2)。
+       */
+      zeroRepresentative: hasDegenerateRepresentative(result, d.siteId),
+    }));
+}
+
 /** 手法間の差が「何倍」かを示す倍率。比が1未満のときは逆数を取る(向きは問わない)。 */
 export function pairDivergenceRatio(pair: PairwiseDecomposition): number | null {
   const ratio = pair.ratio;
@@ -170,7 +229,7 @@ function dominantFactorLabel(pair: PairwiseDecomposition): string {
 }
 
 /** 拠点名の列挙(多すぎる場合は先頭2件+「ほか◯拠点」)。 */
-function joinSiteNames(names: string[]): string {
+export function joinSiteNames(names: string[]): string {
   if (names.length <= 2) return names.join("・");
   return `${names.slice(0, 2).join("・")}ほか${names.length - 2}拠点`;
 }
@@ -207,6 +266,43 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
       text: `${unselected}件の課題で、投資判断に使う代表値がまだ選択されていない(既定値を使用中)。`,
       href: "/valuation",
       linkLabel: "代表値を選ぶ",
+    });
+  }
+
+  /**
+   * ③④ 縮退した代表値(中心値0円)が未内部化コストを負にし、利益への影響がプラス方向に
+   * 反転している拠点(2026-08-23レビュー第3回で発見)。判定は `sitesWithDegenerateRepresentative`
+   * に集約し、ホームの発見・④の警告カードと同じ関数を参照する。
+   */
+  const degenerate = sitesWithDegenerateRepresentative(result);
+  if (degenerate.length > 0) {
+    /**
+     * 原因は2種類あり、文言で区別する(2026-08-23レビュー指摘2):
+     * ①中心値0円の代表値が選択されている拠点、②中心値は非ゼロだが既内部化コストが
+     * 試算値を上回る拠点。①だけの文で②の拠点まで括ると不正確になる。
+     */
+    const zeroSites = degenerate.filter((d) => d.zeroRepresentative);
+    const belowPaidSites = degenerate.filter((d) => !d.zeroRepresentative);
+    const causeParts: string[] = [];
+    if (zeroSites.length > 0) {
+      causeParts.push(`「${joinSiteNames(zeroSites.map((d) => d.siteName))}」で選択中の代表値の中心値が0円`);
+    }
+    if (belowPaidSites.length > 0) {
+      causeParts.push(`「${joinSiteNames(belowPaidSites.map((d) => d.siteName))}」で試算値(代表値)が内部化済みコストを下回っている`);
+    }
+    const cause = causeParts.join("、また");
+    const totalNegativeCost = degenerate.reduce((sum, d) => sum + Math.min(0, d.uninternalizedCost), 0);
+    tasks.push({
+      id: "degenerate-representative",
+      anchor: "representative-selection",
+      text:
+        totalNegativeCost < 0
+          ? `${cause}ため、未内部化コストが負(${formatCompactYen(
+              totalNegativeCost
+            )})になり、利益への影響がプラス方向に算出されています。代表値の選択が妥当か確認してください。`
+          : `${cause}ため、利益への影響の算出が実態と逆方向になっている可能性があります。代表値の選択が妥当か確認してください。`,
+      href: "/valuation",
+      linkLabel: "確認する",
     });
   }
 
@@ -536,9 +632,12 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
         : "これは投資判断に使う交換価値どうしの比較です。";
     findings.push({
       id: "finding-divergence",
-      headline: `${issueLabelForDecomposition(result, widest.decomposition)}の試算は、算定方法によって年${formatCompactYen(
-        low
-      )}〜${formatCompactYen(high)}(最大${widest.ratio.toFixed(1)}倍)の幅がある`,
+      // 指示B:両端を別々にformatCompactYenすると単位が混在する(「57,761円〜12.6百万円」)。
+      // 共通スケールを1つ選ぶformatCompactYenRangeで両端の単位を揃える。
+      headline: `${issueLabelForDecomposition(result, widest.decomposition)}の試算は、算定方法によって年${formatCompactYenRange(
+        low,
+        high
+      )}(最大${widest.ratio.toFixed(1)}倍)の幅がある`,
       detail: `差の主因は${dominantFactorLabel(widest.pair)}で、精度の問題ではありません。${conceptNote}`,
       exact: `${formatExactYen(low)} 〜 ${formatExactYen(high)}`,
       href: "/valuation",

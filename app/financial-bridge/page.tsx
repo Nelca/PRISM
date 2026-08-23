@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTenantId } from "@/lib/db/client";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
-import { deriveMoneySummary, deriveOpenTasks } from "@/lib/pipeline/open-tasks";
+import { deriveMoneySummary, deriveOpenTasks, joinSiteNames, sitesWithDegenerateRepresentative } from "@/lib/pipeline/open-tasks";
 import { CompanyFinancialsForm } from "./financials-form";
 import { buildWaterfallSteps } from "@core/financial-bridge/bridge1";
 import { Num, pickYenScale } from "../components/numeric";
@@ -86,6 +86,13 @@ export default async function FinancialBridgePage({
 
   const expectedLossScale = pickYenScale(...siteRows.map((row) => row.expectedLoss));
 
+  /**
+   * 縮退した代表値(中心値0円)が利益への影響をプラス方向に反転させている拠点
+   * (2026-08-23レビュー第3回)。判定は `sitesWithDegenerateRepresentative` に集約し、
+   * ホームの発見・重要な論点(deriveOpenTasks)と同じ関数を参照する。
+   */
+  const degenerateSites = sitesWithDegenerateRepresentative(result);
+
   return (
     <div className="screen">
       <div className="screen__head">
@@ -129,6 +136,24 @@ export default async function FinancialBridgePage({
             : "未入力のため、デモの既定値で計算しています(入力するとこの画面全体が再計算されます)。"}
         </p>
       </Card>
+
+      {/*
+        2026-08-23レビュー第3回:代表値の中心値が0円(IFVIの水ストレス係数など)だと、
+        未内部化コストが負になり、下の拠点サマリーの「利益への影響」がプラス(改善方向)に
+        反転して表示される。これは自然コストの織り込みによる改善ではなく代表値選択の問題
+        なので、サマリーを読む前に気づけるよう直上に警告を出す。判定は
+        `sitesWithDegenerateRepresentative` を⑤の重要な論点(redFlags)と共有する。
+      */}
+      {degenerateSites.length > 0 && (
+        <div className="pipeline-warning" role="status">
+          <div className="pipeline-warning__title">利益への影響がプラスに出ている拠点があります</div>
+          <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--ink)" }}>
+            該当:{joinSiteNames(degenerateSites.map((s) => s.siteName))}。代表値の中心値が0円(または試算値が内部化済みコストを下回る)ためで、
+            自然コストの織り込みによる利益改善を意味しません。{" "}
+            <Link href="/valuation#representative-selection">価値の算定で代表値を確認してください →</Link>
+          </p>
+        </div>
+      )}
 
       {/*
         D-11-2:サマリー(やるべきこと)が先、詳細は要求時。
@@ -342,7 +367,7 @@ export default async function FinancialBridgePage({
                         <>
                           {change.before.toFixed(1)}倍 → {change.after.toFixed(1)}倍(
                           {change.after - change.before >= 0 ? "+" : ""}
-                          {(change.after - change.before).toFixed(1)}pt)
+                          {(change.after - change.before).toFixed(1)}倍)
                         </>
                       )
                     }

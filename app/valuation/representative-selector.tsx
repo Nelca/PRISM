@@ -32,7 +32,7 @@ export function RepresentativeSelector({
     >
       <div className="field">
         <label htmlFor="reason">変更理由(必須)</label>
-        <textarea id="reason" name="reason" rows={4} />
+        <textarea id="reason" name="reason" rows={4} minLength={8} placeholder="監査証跡に残ります。第三者が根拠を理解できる内容を記入してください(8文字以上)。" />
         <div className="field-hint">この理由は記録され、変更履歴でいつでも確認できます。</div>
       </div>
     </ModalForm>

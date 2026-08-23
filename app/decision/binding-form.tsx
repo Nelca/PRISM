@@ -49,7 +49,7 @@ export function BindingForm({ siteId, currentKind }: { siteId: string; currentKi
       {kind !== currentKind && (
         <div className="field" style={{ marginTop: 12 }}>
           <label htmlFor="reason">反映先の変更理由(必須)</label>
-          <textarea id="reason" name="reason" rows={3} />
+          <textarea id="reason" name="reason" rows={3} minLength={8} placeholder="監査証跡に残ります。第三者が根拠を理解できる内容を記入してください(8文字以上)。" />
         </div>
       )}
 

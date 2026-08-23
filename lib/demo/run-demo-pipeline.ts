@@ -860,6 +860,8 @@ export const DEFAULT_RNG_SEED = 42;
  * **結果オブジェクトの形を変えたら必ず上げること。**値の計算方法だけを変えた場合は
  * 上げなくても壊れないが、過去のrunと比較したいなら上げる方が安全。
  */
-export const RESULT_SCHEMA_VERSION = 6;
+// 7: 減損判定を自然債務の絶対額比較に修正・比率差分の単位をptから倍に変更(2026-08-23、
+//    comparison-targets.ts)。形は同じだが保存済みrunの判定・文言を新計算で作り直すために上げる。
+export const RESULT_SCHEMA_VERSION = 7;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

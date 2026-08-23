@@ -60,7 +60,9 @@ function formatRatioChange(change: CreditRatioChange): string {
   }
   const delta = change.after - change.before;
   const sign = delta >= 0 ? "+" : "";
-  return `${change.before.toFixed(1)}倍 → ${change.after.toFixed(1)}倍(${sign}${delta.toFixed(1)}pt)`;
+  // 差分の単位は比率本体と同じ「倍」。「pt」は%表示の指標のための単位であり、倍率には使わない
+  // (2026-08-23レビュー、D-5.2の表示例も同時に更新済み)。
+  return `${change.before.toFixed(1)}倍 → ${change.after.toFixed(1)}倍(${sign}${delta.toFixed(1)}倍)`;
 }
 
 export function computeComparisonTargets(input: ComparisonTargetsInput): ComparisonTargets {
@@ -74,10 +76,18 @@ export function computeComparisonTargets(input: ComparisonTargetsInput): Compari
   // (0除算を避ける構造的な既定値であり、ドメイン上の推定ではない)。
   const operatingProfitRatio = reportedOperatingProfit === 0 ? 0 : totalDebt / reportedOperatingProfit;
 
-  const changesAssumption = totalDebt > threshold;
+  /**
+   * 減損テスト前提との比較は自然債務の**絶対額**で行う(2026-08-23レビュー、D-5補足)。
+   * 呼び出し側の符号規約では損失を負値で持つ経路がある(未内部化コスト=中心値−既内部化コスト
+   * が負になるケース)ため、符号付きのまま `totalDebt > threshold` と比較すると、損失見込みが
+   * どれだけ大きくても負値である限り「範囲内」になってしまう。閾値の意味は
+   * 「自然関連の損失見込みがこれを超えると前提の見直しが必要」(④の財務データ入力のヒント)
+   * なので、損失の大きさ(絶対額)と閾値を比べる。
+   */
+  const changesAssumption = Math.abs(totalDebt) > threshold;
   const details = changesAssumption
-    ? `自然債務(${yen(totalDebt)})が、既存の減損テスト前提の閾値(${yen(threshold)})を上回るため、減損テストの前提を見直す必要があります。`
-    : `自然債務(${yen(totalDebt)})は、既存の減損テスト前提の閾値(${yen(threshold)})の範囲内であり、前提を変える結果にはなっていません。`;
+    ? `自然債務の絶対額(${yen(Math.abs(totalDebt))})が、既存の減損テスト前提の閾値(${yen(threshold)})を上回るため、減損テストの前提を見直す必要があります。`
+    : `自然債務の絶対額(${yen(Math.abs(totalDebt))})は、既存の減損テスト前提の閾値(${yen(threshold)})の範囲内であり、前提を変える結果にはなっていません。`;
 
   const ratios: CreditRatioChange[] = [
     {
