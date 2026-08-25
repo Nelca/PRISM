@@ -28,26 +28,22 @@ import type { ExchangeValuationRecord, WelfareValuationRecord } from "@core/type
 import type { DisclosureClaim } from "@core/types/disclosure";
 import type { EvidenceCandidate } from "@core/disclosure/evidence-match";
 import type { IntentionalDecisionInput } from "@core/pipeline/disclosure-pipeline";
-import type { BaselineNpvInput, CarbonPriceScenario } from "@core/types/financial-bridge";
-import type { ApprovalThreshold, BindingMechanism } from "@core/types/decision";
+import type { CarbonPriceScenario } from "@core/types/financial-bridge";
+import type { BindingMechanism } from "@core/types/decision";
 import { convertNgfsPriceToJpy, lookupNgfsCarbonPrice } from "@core/financial-bridge/carbon-price-trajectory";
 import {
-  BASELINE_NPV,
   buildClimateCountermeasureCandidates,
   buildCountermeasureCandidates,
-  CLIMATE_BASELINE_NPV,
   CLIMATE_DEEP_DIVE_CALIBRATION,
   CLIMATE_DEEP_DIVE_CONFIG,
   CLIMATE_DEEP_DIVE_INPUT,
   CLIMATE_DEEP_DIVE_PHYSICAL_QUANTITY_ID,
-  CLIMATE_FINANCIALS,
   COMPANY_NAME,
   DEEP_DIVE_CALIBRATION,
   DEEP_DIVE_CONFIG,
   DEEP_DIVE_INPUT,
   DEEP_DIVE_PHYSICAL_QUANTITY_ID,
   DISCLOSURE_CLAIM,
-  FLAGSHIP_FINANCIALS,
   PRIOR_YEAR_METHOD_BY_MATERIAL_ISSUE,
 } from "./company";
 import type { CountermeasureCandidate } from "./company";
@@ -59,11 +55,9 @@ import type { CountermeasureCandidate } from "./company";
 const CLIMATE_SITE_ID = "site-070";
 import type { UserSiteEntry } from "./site-entry";
 import {
-  buildUserBaselineNpv,
   buildUserCountermeasureCandidates,
   buildUserDeepDiveConfig,
   buildUserDisclosureClaim,
-  buildUserFinancials,
   DEFAULT_DEEP_DIVE_PARAMS,
 } from "./user-site-defaults";
 import { emptyInteractionState } from "./interaction-state";
@@ -72,6 +66,7 @@ import { methodLabel } from "@/app/components/method-labels";
 import { buildDisclosureExclusions } from "./build-disclosure-exclusions";
 import { buildDemoRecalculationHash } from "./build-recalculation-hash";
 import { runDemoAssessment } from "./run-demo-assessment";
+import { buildDecisionInputs } from "./build-decision-inputs";
 
 /**
  * 「保存済みの操作のうち、今回の計算にそのまま適用できなかったもの」の記録(第4版 D-01-3)。
@@ -376,54 +371,12 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
      * **承認閾値が未入力なら "pending" を渡す。**業界標準値で仮置きしない(D-10のC案却下理由)。
      * 未入力でも自然調整後NPVのレンジ・自然関連コストは通常どおり算出される(段階的開示)。
      */
-    const enteredParameters = interactions.decisionParameters.get(siteId);
-    const baselineNpv: BaselineNpvInput = enteredParameters
-      ? {
-          value: enteredParameters.baselineNpvValue,
-          discountRate: enteredParameters.discountRate,
-          horizon: enteredParameters.horizon,
-          source: "manual_entry",
-        }
-      : isFlagshipSite
-        ? BASELINE_NPV
-        : isClimateShowcaseSite
-          ? CLIMATE_BASELINE_NPV
-          : buildUserBaselineNpv(deepDiveParams);
-
-    const approvalThreshold: ApprovalThreshold | "pending" = enteredParameters
-      ? enteredParameters.approvalThresholdValue === null
-        ? "pending"
-        : { value: exchangeAmount(enteredParameters.approvalThresholdValue), source: "manual_entry" }
-      : {
-          value: exchangeAmount(
-            isFlagshipSite
-              ? BASELINE_NPV.value + 25_000_000
-              : isClimateShowcaseSite
-                ? CLIMATE_BASELINE_NPV.value + 10_000_000
-                : deepDiveParams.approvalThresholdValue
-          ),
-          source: "manual_entry",
-        };
-
-    // --- M5:財務接続(パイプライン層経由。以前はデモ層が各関数を直接呼んでいた、GAP-10)---
-    // 画面から入力された財務データがあればそれを使う(M5 D-1:企業提供・PRISMは検証しない)。
-    const entered = interactions.companyFinancials;
-    const companyFinancials = entered
-      ? {
-          reportedOperatingProfit: exchangeAmount(entered.reportedOperatingProfit),
-          currentlyInternalizedCost: exchangeAmount(entered.currentlyInternalizedCost),
-          existingImpairmentThreshold: exchangeAmount(entered.existingImpairmentThreshold),
-          creditMetrics: {
-            netDebt: entered.netDebt,
-            ebitda: entered.ebitda,
-            interestExpense: entered.interestExpense,
-          },
-        }
-      : isFlagshipSite
-        ? FLAGSHIP_FINANCIALS
-        : isClimateShowcaseSite
-          ? CLIMATE_FINANCIALS
-          : buildUserFinancials(deepDiveParams);
+    const { baselineNpv, approvalThreshold, companyFinancials } = buildDecisionInputs({
+      siteKind: isFlagshipSite ? "flagship" : isClimateShowcaseSite ? "climate" : "user",
+      deepDiveParams,
+      decisionParameters: interactions.decisionParameters.get(siteId),
+      companyFinancials: interactions.companyFinancials,
+    });
 
     /**
      * GAP-11(D-127・D-128):気候カテゴリの拠点(site-070)だけ、NGFSのシナリオ別炭素価格軌道を
