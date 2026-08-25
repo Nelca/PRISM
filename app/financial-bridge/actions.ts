@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getTenantId } from "@/lib/db/client";
 import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 import type { CompanyFinancialsInput } from "@/lib/demo/interaction-state";
+import { parseRequiredNumber } from "@/lib/forms/number";
 
 const REVALIDATE_PATHS = ["/", "/financial-bridge", "/decision", "/ledger"];
 const ACTOR = "宮里";
@@ -35,15 +36,9 @@ export async function saveCompanyFinancialsAction(
   const values = {} as CompanyFinancialsInput;
 
   for (const field of FIELDS) {
-    const raw = String(formData.get(field.name) ?? "").trim();
-    if (raw === "") {
-      return { error: `${field.label}を入力してください(未入力を0として扱いません)。` };
-    }
-    const value = Number(raw);
-    if (Number.isNaN(value)) {
-      return { error: `${field.label}は数値で入力してください。` };
-    }
-    values[field.name] = value;
+    const parsed = parseRequiredNumber(formData.get(field.name), { label: field.label });
+    if ("error" in parsed) return parsed;
+    values[field.name] = parsed.value;
   }
 
   const tenantId = await getTenantId();

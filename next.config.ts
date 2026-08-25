@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      // PDF本体10MBにmultipartの境界・ヘッダー分の余裕を加える。
+      bodySizeLimit: "10.1mb",
+    },
+  },
   /**
    * 画面統合(指示02・03)で消えたルートを、生き残ったルートへ恒久的に転送する。
    *

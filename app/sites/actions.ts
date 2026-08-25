@@ -17,6 +17,7 @@ import { industrySectorLabel, siteTypeLabel } from "../components/labels";
 import type { UserSiteDeepDiveParams } from "@/lib/demo/site-entry";
 import type { SiteRow } from "@core/site/ingest";
 import type { SiteType } from "@core/types/site";
+import { parseRequiredNumber } from "@/lib/forms/number";
 
 /** 拠点の登録は全画面の入力なので、取込・手入力のどちらでも同じ範囲を無効化する。 */
 const REVALIDATE_PATHS = [
@@ -38,12 +39,16 @@ export interface AddSiteFormState {
 
 const VALID_SITE_TYPES: SiteType[] = ["own_site", "supplier_site"];
 
-function optionalNumber(value: FormDataEntryValue | null, fallback: number): number {
-  if (value === null) return fallback;
-  const str = String(value).trim();
-  if (str === "") return fallback;
-  const num = Number(str);
-  return Number.isNaN(num) ? fallback : num;
+function numberOrFallback(
+  formData: FormData,
+  name: string,
+  label: string,
+  fallback: number,
+  min?: number
+): { value: number } | { error: string } {
+  const raw = formData.get(name);
+  if (raw === null || String(raw).trim() === "") return { value: fallback };
+  return parseRequiredNumber(raw, { label, min });
 }
 
 interface ParsedSiteForm {
@@ -77,31 +82,39 @@ function parseSiteForm(formData: FormData, deepDiveFallback: UserSiteDeepDivePar
     return { error: "業種を入力してください。" };
   }
 
+  const numericFields = {
+    physicalQuantity: numberOrFallback(formData, "physicalQuantity", "物理量", deepDiveFallback.physicalQuantity, 0),
+    unitReplacementCost: numberOrFallback(formData, "unitReplacementCost", "単位代替原価", deepDiveFallback.unitReplacementCost, 0),
+    investmentCostInitial: numberOrFallback(formData, "investmentCostInitial", "初期投資額", deepDiveFallback.investmentCostInitial, 0),
+    investmentCostRecurring: numberOrFallback(formData, "investmentCostRecurring", "継続投資額", deepDiveFallback.investmentCostRecurring, 0),
+    baselineNpvValue: numberOrFallback(formData, "baselineNpvValue", "通常NPV", deepDiveFallback.baselineNpvValue),
+    approvalThresholdValue: numberOrFallback(formData, "approvalThresholdValue", "承認閾値", deepDiveFallback.approvalThresholdValue),
+  };
+  if ("error" in numericFields.physicalQuantity) return numericFields.physicalQuantity;
+  if ("error" in numericFields.unitReplacementCost) return numericFields.unitReplacementCost;
+  if ("error" in numericFields.investmentCostInitial) return numericFields.investmentCostInitial;
+  if ("error" in numericFields.investmentCostRecurring) return numericFields.investmentCostRecurring;
+  if ("error" in numericFields.baselineNpvValue) return numericFields.baselineNpvValue;
+  if ("error" in numericFields.approvalThresholdValue) return numericFields.approvalThresholdValue;
+
   const deepDive: UserSiteDeepDiveParams = {
-    physicalQuantity: optionalNumber(formData.get("physicalQuantity"), deepDiveFallback.physicalQuantity),
+    physicalQuantity: numericFields.physicalQuantity.value,
     unit: String(formData.get("unit") ?? "").trim() || deepDiveFallback.unit,
-    unitReplacementCost: optionalNumber(formData.get("unitReplacementCost"), deepDiveFallback.unitReplacementCost),
-    investmentCostInitial: optionalNumber(formData.get("investmentCostInitial"), deepDiveFallback.investmentCostInitial),
-    investmentCostRecurring: optionalNumber(
-      formData.get("investmentCostRecurring"),
-      deepDiveFallback.investmentCostRecurring
-    ),
-    baselineNpvValue: optionalNumber(formData.get("baselineNpvValue"), deepDiveFallback.baselineNpvValue),
-    approvalThresholdValue: optionalNumber(
-      formData.get("approvalThresholdValue"),
-      deepDiveFallback.approvalThresholdValue
-    ),
+    unitReplacementCost: numericFields.unitReplacementCost.value,
+    investmentCostInitial: numericFields.investmentCostInitial.value,
+    investmentCostRecurring: numericFields.investmentCostRecurring.value,
+    baselineNpvValue: numericFields.baselineNpvValue.value,
+    approvalThresholdValue: numericFields.approvalThresholdValue.value,
     forcePromote: formData.get("forcePromote") === "on",
     disclosureClaimText: String(formData.get("disclosureClaimText") ?? "").trim() || undefined,
   };
 
   if (locationKind === "coordinates") {
-    const latValue = Number(lat);
-    const lngValue = Number(lng);
-    if (lat === null || lng === null || Number.isNaN(latValue) || Number.isNaN(lngValue)) {
-      return { error: "緯度・経度を数値で入力してください。" };
-    }
-    return { row: { name, siteType, industrySector, lat: latValue, lng: lngValue }, deepDive };
+    const latitude = parseRequiredNumber(lat, { label: "緯度", min: -90, max: 90 });
+    if ("error" in latitude) return latitude;
+    const longitude = parseRequiredNumber(lng, { label: "経度", min: -180, max: 180 });
+    if ("error" in longitude) return longitude;
+    return { row: { name, siteType, industrySector, lat: latitude.value, lng: longitude.value }, deepDive };
   }
 
   if (!address) {

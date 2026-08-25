@@ -9,6 +9,7 @@ import { extractDisclosureClaims } from "@/lib/ai/extract-disclosure-claims";
 const REVALIDATE_PATHS = ["/", "/sites", "/assessment", "/disclosure", "/ledger"];
 
 const ACTOR = "宮里";
+const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 export interface DisclosureActionFormState {
   error?: string;
@@ -32,6 +33,12 @@ export async function extractDisclosurePdfAction(
   const file = formData.get("disclosurePdf");
   if (!(file instanceof File) || file.size === 0) {
     return { error: "PDFファイルが選択されていません。" };
+  }
+  if (file.size > MAX_PDF_BYTES) {
+    return { error: "PDFファイルは10MB以下にしてください。" };
+  }
+  if (file.type && file.type !== "application/pdf") {
+    return { error: "PDF形式のファイルを選択してください。" };
   }
 
   const data = new Uint8Array(await file.arrayBuffer());

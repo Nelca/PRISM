@@ -6,6 +6,7 @@ import type { BindingMechanism, CountermeasureType } from "@core/types/decision"
 import { getTenantId } from "@/lib/db/client";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
+import { parseOptionalNumber, parseRequiredNumber } from "@/lib/forms/number";
 
 const REVALIDATE_PATHS = ["/", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
 
@@ -17,6 +18,11 @@ const BINDING_LABELS: Record<BindingMechanism["kind"], string> = {
   budget_allocation: "拠点の予算に実際に反映する",
   procurement_contract_clause: "調達契約の更新条件に組み込む",
 };
+const COUNTERMEASURE_TYPES: CountermeasureType[] = ["reduction", "transfer", "avoidance", "acceptance"];
+
+function isBindingKind(value: string): value is BindingMechanism["kind"] {
+  return Object.hasOwn(BINDING_LABELS, value);
+}
 
 export interface DecisionParametersFormState {
   error?: string;
@@ -47,27 +53,18 @@ export async function saveDecisionParametersAction(
 
   const values: Record<string, number> = {};
   for (const field of required) {
-    const raw = String(formData.get(field.name) ?? "").trim();
-    if (raw === "") {
-      return { error: `${field.label}を入力してください。` };
-    }
-    const value = Number(raw);
-    if (Number.isNaN(value)) {
-      return { error: `${field.label}は数値で入力してください。` };
-    }
-    values[field.name] = value;
+    const parsed = parseRequiredNumber(formData.get(field.name), {
+      label: field.label,
+      ...(field.name === "horizon" ? { integer: true, min: 1 } : {}),
+    });
+    if ("error" in parsed) return parsed;
+    values[field.name] = parsed.value;
   }
 
   // 承認閾値だけは空欄を許す(段階的開示。未入力は "pending" として扱う)
-  const thresholdRaw = String(formData.get("approvalThresholdValue") ?? "").trim();
-  let approvalThresholdValue: number | null = null;
-  if (thresholdRaw !== "") {
-    const parsed = Number(thresholdRaw);
-    if (Number.isNaN(parsed)) {
-      return { error: "投資の承認ラインは数値で入力してください(未定の場合は空欄のままにしてください)。" };
-    }
-    approvalThresholdValue = parsed;
-  }
+  const threshold = parseOptionalNumber(formData.get("approvalThresholdValue"), { label: "投資の承認ライン" });
+  if ("error" in threshold) return threshold;
+  const approvalThresholdValue = threshold.value;
 
   const tenantId = await getTenantId();
   const outcome = await tryRunAndPersist(tenantId, {
@@ -109,14 +106,14 @@ export async function selectCountermeasureAction(
   formData: FormData
 ): Promise<SelectCountermeasureFormState> {
   const siteId = String(formData.get("siteId") ?? "");
-  const key = String(formData.get("key") ?? "") as CountermeasureType;
-  if (!siteId || !key) {
+  const key = String(formData.get("key") ?? "");
+  if (!siteId || !COUNTERMEASURE_TYPES.includes(key as CountermeasureType)) {
     return { error: "対策案を指定してください。" };
   }
   const tenantId = await getTenantId();
   const outcome = await tryRunAndPersist(tenantId, {
     label: "対策案の選択",
-    events: [{ actor: ACTOR, kind: "countermeasure_selection", subjectId: siteId, payload: { key } }],
+    events: [{ actor: ACTOR, kind: "countermeasure_selection", subjectId: siteId, payload: { key: key as CountermeasureType } }],
   });
   if (!outcome.ok) {
     return { error: outcome.message };
@@ -135,22 +132,20 @@ export async function recordDecisionAction(
   formData: FormData
 ): Promise<RecordDecisionFormState> {
   const siteId = String(formData.get("siteId") ?? "");
-  const kind = String(formData.get("bindingKind") ?? "") as BindingMechanism["kind"];
+  const kind = String(formData.get("bindingKind") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
   const budgetAmount = formData.get("budgetAmount");
   const clauseText = String(formData.get("clauseText") ?? "").trim();
 
-  if (!siteId || !kind) {
+  if (!siteId || !isBindingKind(kind)) {
     return { error: "反映先を選択してください。" };
   }
 
   let mechanism: BindingMechanism;
   if (kind === "budget_allocation") {
-    const amount = Number(budgetAmount);
-    if (Number.isNaN(amount)) {
-      return { error: "予算反映額を数値で入力してください。" };
-    }
-    mechanism = { kind, targetSiteId: siteId, amount: exchangeAmount(amount) };
+    const amount = parseRequiredNumber(budgetAmount, { label: "予算反映額", min: 0 });
+    if ("error" in amount) return amount;
+    mechanism = { kind, targetSiteId: siteId, amount: exchangeAmount(amount.value) };
   } else if (kind === "procurement_contract_clause") {
     if (!clauseText) {
       return { error: "契約条項の内容を入力してください。" };
