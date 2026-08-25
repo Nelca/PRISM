@@ -22,6 +22,8 @@ import {
   materialIssueLabel,
 } from "@/app/components/labels";
 import { formatCompactYenRange, formatYen } from "@/app/components/numeric";
+export { deriveMoneySummary } from "./money-summary";
+export type { MoneySummary, SiteMoneyRow } from "./money-summary";
 
 /** 未完了の必須判断。ホームのチェックリストと④の「重要な論点」が同じ配列を描く。 */
 export interface OpenTask {
@@ -497,45 +499,6 @@ export interface OutcomeSummary {
  * 合算するのは自然債務(交換価値由来)のみ。厚生価値は混ぜない(X7・§8.2)。
  * 「利益への影響」は比率なので合算しない(拠点ごとの行でのみ示す)。
  */
-export interface SiteMoneyRow {
-  siteId: string;
-  siteName: string;
-  /** 営業利益(決算値)からの変化率(%)。マイナスは利益の下振れ。 */
-  profitImpactPct: number;
-  /** 自然債務(期待損失)。交換価値由来の円額。 */
-  natureDebt: number;
-  /** 減損の目安額を超えているか(④の減損リスク列と同じ判定)。 */
-  impairmentAffected: boolean;
-  /** ★判定の生値(表示はverdictLabelで)。 */
-  verdict: string;
-}
-
-export interface MoneySummary {
-  rows: SiteMoneyRow[];
-  /** 自然債務(期待損失)の全拠点合計。交換価値由来のみ。 */
-  totalNatureDebt: number;
-}
-
-export function deriveMoneySummary(result: DemoPipelineResult): MoneySummary {
-  const rows: SiteMoneyRow[] = result.decisions.map((entry) => {
-    const { financialBridge, comparisonTargets } = entry;
-    const operatingProfit = financialBridge.bridge1.reportedOperatingProfit as unknown as number;
-    const adjusted = financialBridge.bridge1.natureAdjustedOperatingProfit as unknown as number;
-    return {
-      siteId: entry.siteId,
-      siteName: entry.siteName,
-      profitImpactPct: operatingProfit !== 0 ? ((adjusted - operatingProfit) / operatingProfit) * 100 : 0,
-      natureDebt: financialBridge.natureDebt.totalDebt as unknown as number,
-      impairmentAffected: comparisonTargets.impairmentTestImpact.changesAssumption,
-      verdict: entry.decision.decisionRecord.verdict,
-    };
-  });
-  return {
-    rows,
-    totalNatureDebt: rows.reduce((sum, row) => sum + row.natureDebt, 0),
-  };
-}
-
 export function deriveOutcomeSummary(result: DemoPipelineResult): OutcomeSummary {
   const { decisions } = result;
   const { siteCount, decompositionCount, selected, gapCount, handledGaps } = countProgress(result);
