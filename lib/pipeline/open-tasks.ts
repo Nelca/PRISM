@@ -24,6 +24,24 @@ import {
 import { formatCompactYenRange, formatYen } from "@/app/components/numeric";
 export { deriveMoneySummary } from "./money-summary";
 export type { MoneySummary, SiteMoneyRow } from "./money-summary";
+export {
+  decompositionForMaterialIssue,
+  hasDegenerateRepresentative,
+  hasRepresentativeSelection,
+  materialIssueIdsWithoutRepresentativeSelection,
+  maxDivergenceRatio,
+  pairDivergenceRatio,
+  representativeCentralValueForMaterialIssue,
+  sitesWithDegenerateRepresentative,
+} from "./valuation-insights";
+export { deriveOutcomeSummary, deriveStepContext, deriveStepProgress } from "./pipeline-progress";
+export type { OutcomeSummary, StepProgress } from "./pipeline-progress";
+import {
+  materialIssueIdsWithoutRepresentativeSelection,
+  maxDivergenceRatio,
+  pairDivergenceRatio,
+  sitesWithDegenerateRepresentative,
+} from "./valuation-insights";
 
 /** 未完了の必須判断。ホームのチェックリストと④の「重要な論点」が同じ配列を描く。 */
 export interface OpenTask {
@@ -39,16 +57,6 @@ export interface OpenTask {
   anchor?: string;
 }
 
-/** 6ステップの工程と完了状態(ホームの進捗ブロックだけが描く。常設ナビには出さない)。 */
-export interface StepProgress {
-  order: number;
-  href: string;
-  label: string;
-  /** 件数など、その工程の現状を1行で示す補足。 */
-  note: string;
-  done: boolean;
-}
-
 /** 実データから導出した発見。結論(headline)を先に書き、理由(detail)を添える。 */
 export interface Finding {
   id: string;
@@ -58,121 +66,6 @@ export interface Finding {
   exact?: string;
   href: string;
   linkLabel: string;
-}
-
-/* --------------------------------------------------------------------------
-   代表値の選択状況(第4版 D-02)
-   -------------------------------------------------------------------------- */
-
-/**
- * 課題(MaterialIssue)に対応する乖離分解を引く。
- *
- * `runValuationPipeline` は分解のIDを `dd-${materialIssueId}` で作る
- * (packages/core/src/pipeline/valuation-pipeline.ts)。以前は③の画面が
- * 「レコードの物理量ID」経由で引き当てており、④・ホームの `deriveOpenTasks` とは
- * 別経路だった。**同じ課題を指しているのに判定が食い違う余地があったため、
- * 引き当ても判定もこの1箇所に集約する。**
- */
-export function decompositionForMaterialIssue(
-  result: DemoPipelineResult,
-  materialIssueId: string
-): DivergenceDecomposition | undefined {
-  return result.valuation.divergenceDecompositions.find((d) => d.id === `dd-${materialIssueId}`);
-}
-
-/**
- * 「利用者が代表値を明示的に選んだ」課題かどうか。
- *
- * `representativeValueSelection` は、利用者が理由付きで手法を選んだときにだけ
- * coreが載せる(M4 §7.4)。**既定の代表値(代替費用法)のまま運用している課題とは
- * 明確に区別する。**未選択の課題にドットや案内リンクを出す判定は、③の画面も
- * ホーム/④の未完了タスクも、必ずこの関数を通す。
- */
-export function hasRepresentativeSelection(result: DemoPipelineResult, materialIssueId: string): boolean {
-  return decompositionForMaterialIssue(result, materialIssueId)?.representativeValueSelection !== undefined;
-}
-
-/** まだ代表値を選んでいない(既定値のまま運用中の)課題のID。 */
-export function materialIssueIdsWithoutRepresentativeSelection(result: DemoPipelineResult): string[] {
-  return Object.keys(result.valuation.valuationRecordsByMaterialIssue).filter(
-    (materialIssueId) =>
-      decompositionForMaterialIssue(result, materialIssueId) !== undefined &&
-      !hasRepresentativeSelection(result, materialIssueId)
-  );
-}
-
-/**
- * 選択中の代表値レコードの中心値(2026-08-23レビュー:縮退代表値の検知)。
- *
- * 引き当ての経路は `lib/demo/run-demo-pipeline.ts` の `representativeRecordForSite`
- * (④の財務接続が実際に使う代表値)と同じ:`representativeRecordByMaterialIssue` が指す
- * レコードIDを `valuationRecordsByMaterialIssue` から引く。未選択(既定値運用中)でも
- * デフォルト代表値(replacement-costまたは先頭)のIDが入っているため、この関数は常に
- * 「現在計算に使われている値」を返す。
- */
-export function representativeCentralValueForMaterialIssue(
-  result: DemoPipelineResult,
-  materialIssueId: string
-): number | undefined {
-  const records = result.valuation.valuationRecordsByMaterialIssue[materialIssueId];
-  const recordId = result.valuation.representativeRecordByMaterialIssue[materialIssueId];
-  const record = records?.find((r) => r.id === recordId);
-  return record ? (record.centralValue as unknown as number) : undefined;
-}
-
-/**
- * 選択中の代表値が縮退している(中心値0円)拠点かどうか(D-02と同じ規律:判定はここに集約)。
- * 1拠点に複数の課題がある場合、いずれか1つでも縮退していれば該当とする。
- */
-export function hasDegenerateRepresentative(result: DemoPipelineResult, siteId: string): boolean {
-  return result.assessment.materialIssues
-    .filter((issue) => issue.siteId === siteId)
-    .some((issue) => representativeCentralValueForMaterialIssue(result, issue.id) === 0);
-}
-
-/**
- * 縮退した代表値(中心値0円)が財務指標を有利方向に反転させている拠点(2026-08-23レビュー第3回で発見)。
- *
- * IFVIの水ストレス係数のように、代表値の中心値が構造的に0円になる手法があり、それが選択されると
- * `computeInternalizationStatus`(packages/core、変更不可)の `uninternalizedCost` が
- * 「0 - 既内部化コスト」で負になる。その結果、自然コストの織り込みが利益を押し上げたかのように
- * 表示される(自然調整後営業利益が報告営業利益を上回る)。**これは改善ではなく代表値選択の問題**
- * なので、ホームの発見・④の重要な論点・④の警告カードが同じ1つの判定を共有する。
- */
-export function sitesWithDegenerateRepresentative(
-  result: DemoPipelineResult
-): { siteId: string; siteName: string; uninternalizedCost: number; zeroRepresentative: boolean }[] {
-  return result.decisions
-    .filter((d) => {
-      const uninternalizedCost = d.financialBridge.internalizationStatus.uninternalizedCost as unknown as number;
-      return uninternalizedCost < 0 || hasDegenerateRepresentative(result, d.siteId);
-    })
-    .map((d) => ({
-      siteId: d.siteId,
-      siteName: d.siteName,
-      uninternalizedCost: d.financialBridge.internalizationStatus.uninternalizedCost as unknown as number,
-      /**
-       * true=中心値0円の代表値が選択されている拠点。false=中心値は非ゼロだが
-       * 既内部化コストが試算値を上回り未内部化コストが負になっている拠点。
-       * タスク文言が両者を区別するために持つ(2026-08-23レビュー指摘2)。
-       */
-      zeroRepresentative: hasDegenerateRepresentative(result, d.siteId),
-    }));
-}
-
-/** 手法間の差が「何倍」かを示す倍率。比が1未満のときは逆数を取る(向きは問わない)。 */
-export function pairDivergenceRatio(pair: PairwiseDecomposition): number | null {
-  const ratio = pair.ratio;
-  if (ratio === null || !Number.isFinite(ratio) || ratio <= 0) return null;
-  return ratio >= 1 ? ratio : 1 / ratio;
-}
-
-/** 1つの分解結果のなかで最も大きい手法間の倍率。比較できるペアが無ければ null。 */
-export function maxDivergenceRatio(decomposition: DivergenceDecomposition): number | null {
-  const ratios = decomposition.groups
-    .flatMap((group) => group.pairwiseDecompositions.map(pairDivergenceRatio))
-    .filter((ratio): ratio is number => ratio !== null);
-  return ratios.length > 0 ? Math.max(...ratios) : null;
 }
 
 /** 手法間の差が「気になる大きさ」かどうかの閾値(従来の④のレッドフラグと同じ1.5倍)。 */
@@ -364,200 +257,6 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
   }
 
   return tasks;
-}
-
-/**
- * 各工程の件数。工程の進捗(deriveStepProgress)と、画面末尾の文脈文
- * (deriveStepContext)が同じ数え方を共有するための内部ヘルパー。
- * 「ホームの進捗」と「画面末尾の次リンク」で件数が食い違わないようにする。
- */
-interface ProgressCounts {
-  siteCount: number;
-  issueCount: number;
-  promoted: number;
-  decompositionCount: number;
-  selected: number;
-  decisionCount: number;
-  confirmed: number;
-  gapCount: number;
-  handledGaps: number;
-}
-
-function countProgress(result: DemoPipelineResult): ProgressCounts {
-  const { assessment, decisions, disclosure, valuation } = result;
-  const decompositions = valuation.divergenceDecompositions;
-  const gapFindings = disclosure.gapFindings;
-
-  return {
-    siteCount: assessment.sites.length,
-    issueCount: assessment.priorityScores.length,
-    promoted: assessment.depthDecisions.filter((d) => d.depth === "deep_dive").length,
-    decompositionCount: decompositions.length,
-    // 「選択済み◯/◯件」も③の画面と同じ判定から数える(D-02)。
-    selected: decompositions.length - materialIssueIdsWithoutRepresentativeSelection(result).length,
-    decisionCount: decisions.length,
-    confirmed: decisions.filter((d) => d.decision.decisionRecord.verdict !== "pending").length,
-    gapCount: gapFindings.length,
-    handledGaps: gapFindings.filter(
-      (finding) =>
-        finding.gapType === null ||
-        disclosure.intentionalDecisionRecords.some((record) => record.gapFindingId === finding.id)
-    ).length,
-  };
-}
-
-/**
- * 6ステップの工程と完了状態(指示04(a))。
- * 完了判定はすべてパイプライン結果から導く。件数Statはここに吸収する。
- */
-export function deriveStepProgress(result: DemoPipelineResult): StepProgress[] {
-  const {
-    siteCount,
-    issueCount,
-    promoted,
-    decompositionCount,
-    selected,
-    decisionCount,
-    confirmed,
-    gapCount,
-    handledGaps,
-  } = countProgress(result);
-
-  return [
-    {
-      order: 1,
-      href: "/sites",
-      label: "拠点データの登録",
-      note: `拠点${siteCount}件`,
-      done: siteCount > 0,
-    },
-    {
-      order: 2,
-      href: "/assessment",
-      label: "評価対象の絞り込み",
-      note: `評価対象${issueCount}件・詳細評価${promoted}件`,
-      done: issueCount > 0,
-    },
-    {
-      order: 3,
-      href: "/valuation",
-      label: "価値の算定",
-      note: decompositionCount > 0 ? `代表値の選択 ${selected}/${decompositionCount}件` : "算定結果はまだありません",
-      done: decompositionCount > 0 && selected === decompositionCount,
-    },
-    {
-      order: 4,
-      href: "/financial-bridge",
-      label: "財務への影響",
-      note: decisionCount > 0 ? `${decisionCount}拠点で試算済み` : "試算対象がまだありません",
-      done: decisionCount > 0,
-    },
-    {
-      order: 5,
-      href: "/decision",
-      label: "対策と判定",
-      note: decisionCount > 0 ? `判定確定 ${confirmed}/${decisionCount}件` : "判定対象がまだありません",
-      done: decisionCount > 0 && confirmed === decisionCount,
-    },
-    {
-      order: 6,
-      href: "/disclosure",
-      label: "開示への反映",
-      note: gapCount > 0 ? `確認済み ${handledGaps}/${gapCount}件` : "確認対象の記載がありません",
-      done: gapCount > 0 && handledGaps === gapCount,
-    },
-  ];
-}
-
-/**
- * 3つの成果物(★判定・開示の根拠・監査証跡)の現況(IA-03、docs/information-architecture.md)。
- *
- * ホーム冒頭の成果物ブロックが描く。構想書8.1の出力3層(DecisionRecord /
- * DisclosureView / AssumptionEntry)に対応し、「このプロダクトを使うと何が
- * 手に入るか」を実データの件数で示すためのサマリー。判定内訳・開示確認の
- * 数え方は countProgress・deriveStepProgress と同じソースを共有する
- * (件数の食い違いを作らない)。
- */
-export interface OutcomeSummary {
-  /** ホームの流れ図の入力ノード:登録済み拠点数。 */
-  siteCount: number;
-  /** ホームの流れ図の変換ノード:算定対象と代表値の選択数。 */
-  valuation: { total: number; selected: number };
-  /** 成果物1:投資判断への判定(★判定)の内訳。 */
-  verdicts: { total: number; crosses: number; doesNotCross: number; pending: number };
-  /** 成果物2:開示文言の根拠確認の進捗。 */
-  disclosure: { total: number; handled: number };
-  /** 成果物3:監査証跡(AssumptionEntry)の件数。 */
-  assumptionEntryCount: number;
-}
-
-/**
- * 金額でみる評価結果(2026-08-23レビュー第3回:ホームに貨幣価値のサマリーを出す)。
- *
- * 1拠点1行の金額サマリー。④(financial-bridge)の拠点サマリーと同じ計算を
- * ここに集約し、ホームと④で数値が食い違わないようにする(D-02と同じ規律)。
- * 合算するのは自然債務(交換価値由来)のみ。厚生価値は混ぜない(X7・§8.2)。
- * 「利益への影響」は比率なので合算しない(拠点ごとの行でのみ示す)。
- */
-export function deriveOutcomeSummary(result: DemoPipelineResult): OutcomeSummary {
-  const { decisions } = result;
-  const { siteCount, decompositionCount, selected, gapCount, handledGaps } = countProgress(result);
-  const verdictOf = (entry: (typeof decisions)[number]) => entry.decision.decisionRecord.verdict;
-  return {
-    siteCount,
-    valuation: { total: decompositionCount, selected },
-    verdicts: {
-      total: decisions.length,
-      crosses: decisions.filter((d) => verdictOf(d) === "crosses").length,
-      doesNotCross: decisions.filter((d) => verdictOf(d) === "does_not_cross").length,
-      pending: decisions.filter((d) => verdictOf(d) === "pending").length,
-    },
-    disclosure: { total: gapCount, handled: handledGaps },
-    assumptionEntryCount: result.assumptionEntries.length,
-  };
-}
-
-/**
- * その画面に入ると何が待っているかを、実データの件数で1行にする(第3版 C-03-2)。
- *
- * 画面末尾の StepNav が「次:◯◯ →」に添える文脈文。工程の件数は
- * `deriveStepProgress`(ホームの進捗)と同じ `countProgress` から取るため、
- * ホームと各画面で数が食い違うことがない。
- *
- * **文言はテンプレート+件数の機械的な埋め込みのみ。**推奨も予測もしない。
- */
-export function deriveStepContext(result: DemoPipelineResult, href: string): string | null {
-  const { siteCount, issueCount, promoted, decompositionCount, selected, decisionCount, confirmed, gapCount, handledGaps } =
-    countProgress(result);
-
-  switch (href) {
-    case "/sites":
-      return siteCount > 0
-        ? `登録済みの拠点${siteCount}件を確認し、必要なら追加・修正します。`
-        : "評価の対象になる拠点をまず登録します。";
-    case "/assessment":
-      return issueCount > 0
-        ? `評価対象${issueCount}件の優先度を確認し、詳細評価に進める課題を指定します(現在${promoted}件)。`
-        : "評価対象がまだありません。拠点を登録すると優先度が算定されます。";
-    case "/valuation":
-      return promoted > 0
-        ? `詳細評価に指定した${promoted}件の算定結果を確認し、代表値を選びます(選択済み${selected}/${decompositionCount}件)。`
-        : "詳細評価に指定した課題がないため、算定結果はまだありません。";
-    case "/financial-bridge":
-      return decisionCount > 0
-        ? `${decisionCount}拠点について、選んだ代表値が利益・リスクにどう効くかを確認します。`
-        : "試算の対象がまだありません。";
-    case "/decision":
-      return decisionCount > 0
-        ? `${decisionCount}拠点の対策案を比べ、投資の承認ラインと照らした判定を確定します(確定済み${confirmed}/${decisionCount}拠点)。`
-        : "判定の対象がまだありません。";
-    case "/disclosure":
-      return gapCount > 0
-        ? `開示文言${gapCount}件について、記載と根拠の整合を確認します(確認済み${handledGaps}/${gapCount}件)。`
-        : "確認対象の開示文言がまだありません。";
-    default:
-      return null;
-  }
 }
 
 /**
