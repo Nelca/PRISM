@@ -13,7 +13,6 @@
  * 任意の入力で呼べる。
  */
 
-import { runAssessmentPipeline } from "@core/pipeline/assessment-pipeline";
 import { runValuationPipeline } from "@core/pipeline/valuation-pipeline";
 import { RepresentativeValueSelectionError } from "@core/divergence/representative-value";
 import { runDecisionPipeline } from "@core/pipeline/decision-pipeline";
@@ -47,15 +46,9 @@ import {
   DEEP_DIVE_CONFIG,
   DEEP_DIVE_INPUT,
   DEEP_DIVE_PHYSICAL_QUANTITY_ID,
-  demoGeocode,
   DISCLOSURE_CLAIM,
-  excludedCategoriesForSite,
   FLAGSHIP_FINANCIALS,
-  interfacesByCategoryForSite,
   PRIOR_YEAR_METHOD_BY_MATERIAL_ISSUE,
-  resolveCriterionForDemo,
-  screeningValuationForMaterialIssue,
-  SITE_ROWS,
 } from "./company";
 import type { CountermeasureCandidate } from "./company";
 
@@ -78,6 +71,7 @@ import type { InteractionState } from "./interaction-state";
 import { methodLabel } from "@/app/components/method-labels";
 import { buildDisclosureExclusions } from "./build-disclosure-exclusions";
 import { buildDemoRecalculationHash } from "./build-recalculation-hash";
+import { runDemoAssessment } from "./run-demo-assessment";
 
 /**
  * 「保存済みの操作のうち、今回の計算にそのまま適用できなかったもの」の記録(第4版 D-01-3)。
@@ -162,29 +156,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
    * 外れてしまうことが分かった(D-128で発見)。**flagshipのデモ拠点(site-042)は
    * 常に深掘りを見せる前提のため、site-070と同様に明示的な手動昇格に切り替える。**
    */
-  const manualOverrides = new Set([
-    ...userSiteEntries.filter((entry) => entry.deepDive.forcePromote).map((entry) => `${entry.row.id}-mi-water`),
-    "site-042-mi-water",
-    // 気候カテゴリ実証用の拠点は自然な優先度順位に委ねず、確実にdeep_diveへ昇格させる(D-128)。
-    `${CLIMATE_SITE_ID}-mi-climate`,
-  ]);
-  const manualDemotions = new Set<string>();
-  for (const [materialIssueId, mode] of interactions.depthOverrides) {
-    if (mode === "promote") manualOverrides.add(materialIssueId);
-    else manualDemotions.add(materialIssueId);
-  }
-
-  const assessment = runAssessmentPipeline({
-    rows: [...SITE_ROWS, ...userSiteEntries.map((entry) => entry.row)],
-    geocode: demoGeocode,
-    interfacesByCategoryForSite,
-    excludedCategoriesForSite,
-    resolveCriterion: resolveCriterionForDemo,
-    screeningValuationForMaterialIssue: (issue) => screeningValuationForMaterialIssue(issue.siteId, issue.impactCategory),
-    promotionOptions: { manualOverrides, manualDemotions },
-    idSequence,
-    now: NOW,
-  });
+  const assessment = runDemoAssessment(userSiteEntries, interactions, idSequence, NOW);
 
   const promoted = assessment.depthDecisions.filter((d) => d.depth === "deep_dive");
 
