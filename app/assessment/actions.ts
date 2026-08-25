@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getTenantId } from "@/lib/db/client";
 import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { hasMaterialIssue } from "@/lib/pipeline/action-targets";
 
 const ACTOR = "宮里";
 
@@ -37,6 +39,9 @@ export async function setDepthOverrideAction(
 
   const label = mode === "promote" ? "詳細評価" : mode === "demote" ? "概算評価" : "自動判定";
   const tenantId = await getTenantId();
+  if (!hasMaterialIssue(await getOrCreateLatestResult(tenantId), materialIssueId)) {
+    return { error: "対象の課題が見つかりません。画面を更新してください。" };
+  }
 
   const outcome = await tryRunAndPersist(tenantId, {
     label: `評価の深さの${label}への切替`,

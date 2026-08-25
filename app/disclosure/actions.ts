@@ -5,6 +5,8 @@ import { getTenantId } from "@/lib/db/client";
 import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 import { extractPdfText } from "@/lib/pdf/extract-pdf-text";
 import { extractDisclosureClaims } from "@/lib/ai/extract-disclosure-claims";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { hasDisclosureClaim, hasMaterialIssue } from "@/lib/pipeline/action-targets";
 
 const REVALIDATE_PATHS = ["/", "/sites", "/assessment", "/disclosure", "/ledger"];
 
@@ -101,6 +103,9 @@ export async function weakenClaimAction(
   }
 
   const tenantId = await getTenantId();
+  if (!hasDisclosureClaim(await getOrCreateLatestResult(tenantId), claimId)) {
+    return { error: "対象の開示文言が見つかりません。画面を更新してください。" };
+  }
   const outcome = await tryRunAndPersist(tenantId, {
     label: "記載内容の修正",
     events: [
@@ -131,6 +136,9 @@ export async function acquireEvidenceAction(
   }
 
   const tenantId = await getTenantId();
+  if (!hasMaterialIssue(await getOrCreateLatestResult(tenantId), `${siteId}-mi-water`)) {
+    return { error: "対象拠点の水課題が見つかりません。画面を更新してください。" };
+  }
   const outcome = await tryRunAndPersist(tenantId, {
     label: "詳細評価キューへの追加",
     events: [
@@ -168,6 +176,9 @@ export async function recordIntentionalDecisionAction(
   }
 
   const tenantId = await getTenantId();
+  if (!hasDisclosureClaim(await getOrCreateLatestResult(tenantId), claimId)) {
+    return { error: "対象の開示文言が見つかりません。画面を更新してください。" };
+  }
   const outcome = await tryRunAndPersist(tenantId, {
     label: "判断の理由の記録",
     events: [

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getTenantId } from "@/lib/db/client";
 import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { hasValuationSelection } from "@/lib/pipeline/action-targets";
 
 const ACTOR = "宮里";
 
@@ -35,6 +37,9 @@ export async function changeRepresentativeRecordAction(
   }
 
   const tenantId = await getTenantId();
+  if (!hasValuationSelection(await getOrCreateLatestResult(tenantId), materialIssueId, recordId, methodId)) {
+    return { error: "対象の算定結果が見つかりません。画面を更新してから選び直してください。" };
+  }
 
   // 選択と変更理由を1つのイベントとして追記する。現在値と履歴が同じ1つの真実から出る(計画B-1)。
   // **先に変更後の状態で計算を試し、成功したときだけ追記する**(第4版 D-01-2)。
