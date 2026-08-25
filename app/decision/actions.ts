@@ -7,6 +7,7 @@ import { getTenantId } from "@/lib/db/client";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 import { parseOptionalNumber, parseRequiredNumber } from "@/lib/forms/number";
+import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 
 const REVALIDATE_PATHS = ["/", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
 
@@ -22,6 +23,10 @@ const COUNTERMEASURE_TYPES: CountermeasureType[] = ["reduction", "transfer", "av
 
 function isBindingKind(value: string): value is BindingMechanism["kind"] {
   return Object.hasOwn(BINDING_LABELS, value);
+}
+
+async function decisionSiteExists(tenantId: string, siteId: string): Promise<boolean> {
+  return (await getOrCreateLatestResult(tenantId)).decisions.some((decision) => decision.siteId === siteId);
 }
 
 export interface DecisionParametersFormState {
@@ -67,6 +72,7 @@ export async function saveDecisionParametersAction(
   const approvalThresholdValue = threshold.value;
 
   const tenantId = await getTenantId();
+  if (!(await decisionSiteExists(tenantId, siteId))) return { error: "対象拠点が見つかりません。" };
   const outcome = await tryRunAndPersist(tenantId, {
     label: "投資判断の前提の入力",
     events: [
@@ -111,6 +117,7 @@ export async function selectCountermeasureAction(
     return { error: "対策案を指定してください。" };
   }
   const tenantId = await getTenantId();
+  if (!(await decisionSiteExists(tenantId, siteId))) return { error: "対象拠点が見つかりません。" };
   const outcome = await tryRunAndPersist(tenantId, {
     label: "対策案の選択",
     events: [{ actor: ACTOR, kind: "countermeasure_selection", subjectId: siteId, payload: { key: key as CountermeasureType } }],
@@ -156,6 +163,7 @@ export async function recordDecisionAction(
   }
 
   const tenantId = await getTenantId();
+  if (!(await decisionSiteExists(tenantId, siteId))) return { error: "対象拠点が見つかりません。" };
   const state = await loadInteractionState(tenantId);
   const current = state.bindingMechanismState.get(siteId);
   const previousMechanism = current?.mechanism ?? { kind: "weak_reference" };

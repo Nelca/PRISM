@@ -13,11 +13,7 @@ import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 import { loadCompanyDataset } from "@/lib/intake/load-company-dataset";
 import { toSiteEntries } from "@/lib/intake/to-site-entries";
 import { DEFAULT_DEEP_DIVE_PARAMS } from "@/lib/demo/user-site-defaults";
-import { industrySectorLabel, siteTypeLabel } from "../components/labels";
-import type { UserSiteDeepDiveParams } from "@/lib/demo/site-entry";
-import type { SiteRow } from "@core/site/ingest";
-import type { SiteType } from "@core/types/site";
-import { parseRequiredNumber } from "@/lib/forms/number";
+import { describeSiteChanges, parseSiteForm } from "./site-form";
 
 /** 拠点の登録は全画面の入力なので、取込・手入力のどちらでも同じ範囲を無効化する。 */
 const REVALIDATE_PATHS = [
@@ -35,131 +31,6 @@ const ACTOR = "宮里";
 
 export interface AddSiteFormState {
   error?: string;
-}
-
-const VALID_SITE_TYPES: SiteType[] = ["own_site", "supplier_site"];
-
-function numberOrFallback(
-  formData: FormData,
-  name: string,
-  label: string,
-  fallback: number,
-  min?: number
-): { value: number } | { error: string } {
-  const raw = formData.get(name);
-  if (raw === null || String(raw).trim() === "") return { value: fallback };
-  return parseRequiredNumber(raw, { label, min });
-}
-
-interface ParsedSiteForm {
-  row: Omit<SiteRow, "id">;
-  deepDive: UserSiteDeepDiveParams;
-}
-
-/**
- * 拠点フォーム(追加・編集で同じ入力欄を使う)の検証と変換。
- *
- * 未入力の詳細設定を何で埋めるかは呼び出し側が決める。追加時はデモの既定値、
- * 編集時は**その拠点の現在値**を渡す。編集で既定値に戻してしまうと、
- * 「触っていない項目が黙って変わる」ことになるため(D-15の趣旨)。
- */
-function parseSiteForm(formData: FormData, deepDiveFallback: UserSiteDeepDiveParams): ParsedSiteForm | { error: string } {
-  const name = String(formData.get("name") ?? "").trim();
-  const siteType = String(formData.get("siteType") ?? "");
-  const industrySector = String(formData.get("industrySector") ?? "").trim();
-  const locationKind = String(formData.get("locationKind") ?? "");
-  const lat = formData.get("lat");
-  const lng = formData.get("lng");
-  const address = String(formData.get("address") ?? "").trim();
-
-  if (!name) {
-    return { error: "拠点名を入力してください。" };
-  }
-  if (!VALID_SITE_TYPES.includes(siteType as SiteType)) {
-    return { error: "種別を選択してください。" };
-  }
-  if (!industrySector) {
-    return { error: "業種を入力してください。" };
-  }
-
-  const numericFields = {
-    physicalQuantity: numberOrFallback(formData, "physicalQuantity", "物理量", deepDiveFallback.physicalQuantity, 0),
-    unitReplacementCost: numberOrFallback(formData, "unitReplacementCost", "単位代替原価", deepDiveFallback.unitReplacementCost, 0),
-    investmentCostInitial: numberOrFallback(formData, "investmentCostInitial", "初期投資額", deepDiveFallback.investmentCostInitial, 0),
-    investmentCostRecurring: numberOrFallback(formData, "investmentCostRecurring", "継続投資額", deepDiveFallback.investmentCostRecurring, 0),
-    baselineNpvValue: numberOrFallback(formData, "baselineNpvValue", "通常NPV", deepDiveFallback.baselineNpvValue),
-    approvalThresholdValue: numberOrFallback(formData, "approvalThresholdValue", "承認閾値", deepDiveFallback.approvalThresholdValue),
-  };
-  if ("error" in numericFields.physicalQuantity) return numericFields.physicalQuantity;
-  if ("error" in numericFields.unitReplacementCost) return numericFields.unitReplacementCost;
-  if ("error" in numericFields.investmentCostInitial) return numericFields.investmentCostInitial;
-  if ("error" in numericFields.investmentCostRecurring) return numericFields.investmentCostRecurring;
-  if ("error" in numericFields.baselineNpvValue) return numericFields.baselineNpvValue;
-  if ("error" in numericFields.approvalThresholdValue) return numericFields.approvalThresholdValue;
-
-  const deepDive: UserSiteDeepDiveParams = {
-    physicalQuantity: numericFields.physicalQuantity.value,
-    unit: String(formData.get("unit") ?? "").trim() || deepDiveFallback.unit,
-    unitReplacementCost: numericFields.unitReplacementCost.value,
-    investmentCostInitial: numericFields.investmentCostInitial.value,
-    investmentCostRecurring: numericFields.investmentCostRecurring.value,
-    baselineNpvValue: numericFields.baselineNpvValue.value,
-    approvalThresholdValue: numericFields.approvalThresholdValue.value,
-    forcePromote: formData.get("forcePromote") === "on",
-    disclosureClaimText: String(formData.get("disclosureClaimText") ?? "").trim() || undefined,
-  };
-
-  if (locationKind === "coordinates") {
-    const latitude = parseRequiredNumber(lat, { label: "緯度", min: -90, max: 90 });
-    if ("error" in latitude) return latitude;
-    const longitude = parseRequiredNumber(lng, { label: "経度", min: -180, max: 180 });
-    if ("error" in longitude) return longitude;
-    return { row: { name, siteType, industrySector, lat: latitude.value, lng: longitude.value }, deepDive };
-  }
-
-  if (!address) {
-    return { error: "住所を入力してください。" };
-  }
-  return { row: { name, siteType, industrySector, address }, deepDive };
-}
-
-/** 所在地を人が読める1文にする(緯度経度も住所も、記録では同じ「所在地」として扱う)。 */
-function locationText(row: Omit<SiteRow, "id">): string {
-  if (row.lat !== undefined && row.lng !== undefined) {
-    return `緯度${row.lat}・経度${row.lng}`;
-  }
-  return row.address ?? "未設定";
-}
-
-/**
- * 変更点を人が読める形にする(/ledger の変更履歴に出る文)。
- * 「編集した」だけでは監査で何も分からないため、何が何に変わったかを残す。
- */
-function describeSiteChanges(
-  before: ParsedSiteForm,
-  after: ParsedSiteForm
-): string[] {
-  const changes: string[] = [];
-  if (before.row.name !== after.row.name) {
-    changes.push(`拠点名「${before.row.name}」→「${after.row.name}」`);
-  }
-  if (before.row.siteType !== after.row.siteType) {
-    changes.push(`種別「${siteTypeLabel(before.row.siteType)}」→「${siteTypeLabel(after.row.siteType)}」`);
-  }
-  if (before.row.industrySector !== after.row.industrySector) {
-    changes.push(
-      `業種「${industrySectorLabel(before.row.industrySector)}」→「${industrySectorLabel(after.row.industrySector)}」`
-    );
-  }
-  const beforeLocation = locationText(before.row);
-  const afterLocation = locationText(after.row);
-  if (beforeLocation !== afterLocation) {
-    changes.push(`所在地「${beforeLocation}」→「${afterLocation}」`);
-  }
-  if (JSON.stringify(before.deepDive) !== JSON.stringify(after.deepDive)) {
-    changes.push("詳細設定(詳細評価・意思決定・開示の前提)");
-  }
-  return changes;
 }
 
 function errorMessage(cause: unknown): string {
