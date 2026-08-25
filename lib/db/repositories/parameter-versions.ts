@@ -15,6 +15,7 @@ import { asc, eq } from "drizzle-orm";
 import type { VersionedParameterSet } from "@core/types/ledger";
 import { ChangeReasonRequiredError } from "@core/ledger/versioned-parameter-set";
 import { getDb } from "../client";
+import type { DbExecutor } from "../client";
 import { versionedParameterSet } from "../schema";
 
 export async function listParameterVersions(tenantId: string): Promise<VersionedParameterSet[]> {
@@ -103,13 +104,14 @@ export async function registerParameterVersion(input: RegisterParameterVersionIn
 export async function recordObservedVersions(
   tenantId: string,
   observedAt: string,
-  versions: { setId: string; version: string }[]
+  versions: { setId: string; version: string }[],
+  db: DbExecutor = getDb()
 ): Promise<void> {
   if (versions.length === 0) {
     return;
   }
 
-  await getDb()
+  await db
     .insert(versionedParameterSet)
     .values(
       versions.map((v) => ({

@@ -8,6 +8,7 @@
 
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "../client";
+import type { DbExecutor } from "../client";
 import { interactionEvent } from "../schema";
 import { projectInteractionState } from "@/lib/demo/interaction-state";
 import type { InteractionEvent, InteractionKind, InteractionState } from "@/lib/demo/interaction-state";
@@ -17,14 +18,20 @@ export interface AppendInteractionInput {
   kind: InteractionKind;
   subjectId: string;
   payload: Record<string, unknown>;
+  createdAt?: Date;
 }
 
-export async function appendInteractionEvent(tenantId: string, input: AppendInteractionInput): Promise<void> {
-  await getDb()
+export async function appendInteractionEvent(
+  tenantId: string,
+  input: AppendInteractionInput,
+  db: DbExecutor = getDb()
+): Promise<void> {
+  await db
     .insert(interactionEvent)
     .values({
       id: `ie-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       tenantId,
+      createdAt: input.createdAt,
       actor: input.actor,
       kind: input.kind,
       subjectId: input.subjectId,
@@ -32,8 +39,11 @@ export async function appendInteractionEvent(tenantId: string, input: AppendInte
     });
 }
 
-export async function listInteractionEvents(tenantId: string): Promise<InteractionEvent[]> {
-  const rows = await getDb()
+export async function listInteractionEvents(
+  tenantId: string,
+  db: DbExecutor = getDb()
+): Promise<InteractionEvent[]> {
+  const rows = await db
     .select()
     .from(interactionEvent)
     .where(eq(interactionEvent.tenantId, tenantId))
@@ -50,6 +60,6 @@ export async function listInteractionEvents(tenantId: string): Promise<Interacti
 }
 
 /** 追記イベントを畳み込んで現在値を得る(計画B-1:現在値を保存しない)。 */
-export async function loadInteractionState(tenantId: string): Promise<InteractionState> {
-  return projectInteractionState(await listInteractionEvents(tenantId));
+export async function loadInteractionState(tenantId: string, db: DbExecutor = getDb()): Promise<InteractionState> {
+  return projectInteractionState(await listInteractionEvents(tenantId, db));
 }

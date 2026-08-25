@@ -170,8 +170,8 @@ export async function addSiteAction(_prevState: AddSiteFormState, formData: Form
     label: "拠点の追加",
     userSites: (current) => [...current, { row: { ...parsed.row, id: "site-user-pending" }, deepDive: parsed.deepDive }],
     // 入力が変わったので新しいrunを1回だけ作る。ページ側は再計算しない(計画B-2)。
-    commit: async () => {
-      await addSiteEntry(tenantId, parsed.row, parsed.deepDive);
+    commit: async (db) => {
+      await addSiteEntry(tenantId, parsed.row, parsed.deepDive, db);
     },
   });
   if (!outcome.ok) {
@@ -215,9 +215,9 @@ export async function updateSiteAction(_prevState: AddSiteFormState, formData: F
       current.map((entry) =>
         entry.row.id === siteId ? { row: { ...parsed.row, id: siteId }, deepDive: parsed.deepDive } : entry
       ),
-    commit: async () => {
+    commit: async (db) => {
       try {
-        await updateSiteEntry(tenantId, siteId, parsed.row, parsed.deepDive);
+        await updateSiteEntry(tenantId, siteId, parsed.row, parsed.deepDive, db);
       } catch (cause) {
         updateError = errorMessage(cause);
         throw cause;
@@ -273,9 +273,9 @@ export async function removeSiteAction(_prevState: AddSiteFormState, formData: F
   const outcome = await tryRunAndPersist(tenantId, {
     label: "拠点の削除",
     userSites: (current) => current.filter((entry) => entry.row.id !== siteId),
-    commit: async () => {
+    commit: async (db) => {
       try {
-        await removeSiteEntry(tenantId, siteId);
+        await removeSiteEntry(tenantId, siteId, db);
       } catch (cause) {
         removeError = errorMessage(cause);
         throw cause;
@@ -354,8 +354,8 @@ export async function importCompanyDatasetAction(
   const outcome = await tryRunAndPersist(tenantId, {
     label: "実データの取り込み",
     userSites: () => entries,
-    commit: async () => {
-      await replaceSiteEntries(tenantId, entries);
+    commit: async (db) => {
+      await replaceSiteEntries(tenantId, entries, db);
     },
     events: [
       {

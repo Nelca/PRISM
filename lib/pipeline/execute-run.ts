@@ -14,6 +14,7 @@ import { listSiteEntries } from "@/lib/db/repositories/sites";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { getLatestRun, persistRun } from "@/lib/db/repositories/runs";
 import { observedVersionsFromHashInputs, recordObservedVersions } from "@/lib/db/repositories/parameter-versions";
+import type { DbExecutor } from "@/lib/db/client";
 
 /** 入力を読み直してパイプラインを実行し、新しいrunとして永続化する。 */
 export async function executeAndPersistRun(tenantId: string): Promise<DemoPipelineResult> {
@@ -31,15 +32,20 @@ export async function executeAndPersistRun(tenantId: string): Promise<DemoPipeli
  * 保存するために使う。パイプラインの実行と永続化を分けておくことで、
  * **成功した計算だけを保存する**という順序を呼び出し側が守れる。
  */
-export async function persistComputedRun(tenantId: string, result: DemoPipelineResult): Promise<DemoPipelineResult> {
-  await persistRun({ tenantId, rngSeed: DEFAULT_RNG_SEED, result });
+export async function persistComputedRun(
+  tenantId: string,
+  result: DemoPipelineResult,
+  db?: DbExecutor
+): Promise<DemoPipelineResult> {
+  await persistRun({ tenantId, rngSeed: DEFAULT_RNG_SEED, result }, db);
 
   // 実際に使われた版を台帳に取り込む(M8「後から手で入力する設計にしない」)。
   // 変更理由は付けない(自動検出では分からないため。画面が未記録として人間に促す)。
   await recordObservedVersions(
     tenantId,
     new Date().toISOString(),
-    observedVersionsFromHashInputs(result.recalculationHash.inputs)
+    observedVersionsFromHashInputs(result.recalculationHash.inputs),
+    db
   );
 
   return result;

@@ -22,7 +22,10 @@ import type { UserSiteEntry } from "@/lib/demo/site-entry";
 import { listSiteEntries } from "@/lib/db/repositories/sites";
 import { appendInteractionEvent, listInteractionEvents } from "@/lib/db/repositories/interactions";
 import type { AppendInteractionInput } from "@/lib/db/repositories/interactions";
-import { executeAndPersistRun, persistComputedRun } from "./execute-run";
+import { persistComputedRun } from "./execute-run";
+import { getDb } from "@/lib/db/client";
+import type { DbTransaction } from "@/lib/db/client";
+import { sql } from "drizzle-orm";
 
 export interface TryRunInput {
   /** 追記しようとしている操作イベント。検証に通るまでDBには書かない。 */
@@ -37,7 +40,7 @@ export interface TryRunInput {
    * これが指定された場合は、採番されたIDなどDB側で決まる値を取り込むため、
    * commit後にもう一度パイプラインを実行して保存する。
    */
-  commit?: () => Promise<void>;
+  commit?: (db: DbTransaction) => Promise<void>;
   /**
    * 失敗時にFormStateへ返す文の主語。「◯◯を適用できませんでした。」の◯◯。
    * 内部IDや例外文言を含めない、利用者の言葉で書く。
@@ -65,43 +68,40 @@ function logFailure(label: string, cause: unknown): void {
  * 失敗しても**DBには何も書かない**ため、失敗した操作が以後の全操作を巻き込むことがない。
  */
 export async function tryRunAndPersist(tenantId: string, input: TryRunInput): Promise<TryRunResult> {
-  const [currentSites, currentEvents] = await Promise.all([listSiteEntries(tenantId), listInteractionEvents(tenantId)]);
-
-  const now = new Date().toISOString();
-  const pendingEvents: InteractionEvent[] = (input.events ?? []).map((event, index) => ({
-    id: `pending-${index}`,
-    createdAt: now,
-    actor: event.actor,
-    kind: event.kind,
-    subjectId: event.subjectId,
-    payload: event.payload,
-  }));
-
-  const userSites = input.userSites ? input.userSites(currentSites) : currentSites;
-  const interactions = projectInteractionState([...currentEvents, ...pendingEvents]);
-
-  let verified;
   try {
-    verified = runDemoPipeline({ userSites, interactions, rngSeed: DEFAULT_RNG_SEED });
-  } catch (cause) {
-    logFailure(input.label, cause);
-    return { ok: false, message: failureMessage(input.label) };
-  }
+    await getDb().transaction(async (tx) => {
+      // 同じテナントの「読取→計算→追記」を直列化し、古い状態から作ったrunの後勝ちを防ぐ。
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}))`);
 
-  try {
-    if (input.commit) {
-      await input.commit();
-    }
-    for (const event of input.events ?? []) {
-      await appendInteractionEvent(tenantId, event);
-    }
-    if (input.commit) {
-      // 拠点IDの採番などDB側で決まる値があるため、書き込み後の実データで作り直す。
-      await executeAndPersistRun(tenantId);
-    } else {
-      // 検証に使ったものと同じ状態なので、検証済みの結果をそのまま保存する(二重実行しない)。
-      await persistComputedRun(tenantId, verified);
-    }
+      const [currentSites, currentEvents] = await Promise.all([
+        listSiteEntries(tenantId, tx),
+        listInteractionEvents(tenantId, tx),
+      ]);
+      const now = new Date().toISOString();
+      const pendingEvents: InteractionEvent[] = (input.events ?? []).map((event, index) => ({
+        id: `pending-${index}`,
+        createdAt: now,
+        actor: event.actor,
+        kind: event.kind,
+        subjectId: event.subjectId,
+        payload: event.payload,
+      }));
+      const interactions = projectInteractionState([...currentEvents, ...pendingEvents]);
+      const candidateSites = input.userSites ? input.userSites(currentSites) : currentSites;
+
+      // 書込前に検証する。例外ならトランザクションはロールバックされる。
+      let result = runDemoPipeline({ userSites: candidateSites, interactions, rngSeed: DEFAULT_RNG_SEED });
+      if (input.commit) {
+        await input.commit(tx);
+        // UUIDなどDBへ実際に保存された識別子を結果へ反映する。
+        const committedSites = await listSiteEntries(tenantId, tx);
+        result = runDemoPipeline({ userSites: committedSites, interactions, rngSeed: DEFAULT_RNG_SEED });
+      }
+      for (const [index, event] of (input.events ?? []).entries()) {
+        await appendInteractionEvent(tenantId, { ...event, createdAt: new Date(Date.now() + index) }, tx);
+      }
+      await persistComputedRun(tenantId, result, tx);
+    });
   } catch (cause) {
     logFailure(input.label, cause);
     return { ok: false, message: failureMessage(input.label) };

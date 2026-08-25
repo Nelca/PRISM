@@ -15,7 +15,9 @@ import { afterAll, describe, expect, it } from "vitest";
 import { closeDb } from "@/lib/db/client";
 import { listInteractionEvents } from "@/lib/db/repositories/interactions";
 import { getLatestRun } from "@/lib/db/repositories/runs";
-import { replaceSiteEntries } from "@/lib/db/repositories/sites";
+import { addSiteEntry, listSiteEntries, replaceSiteEntries } from "@/lib/db/repositories/sites";
+import { projectInteractionState } from "@/lib/demo/interaction-state";
+import { runDemoPipeline, DEFAULT_RNG_SEED } from "@/lib/demo/run-demo-pipeline";
 import { tryRunAndPersist } from "./try-run-with-interaction";
 
 const TENANT = "try-run-with-interaction-test";
@@ -96,5 +98,43 @@ describe("検証してから永続化する(D-01-2)", () => {
     const latest = await getLatestRun(TENANT);
     const record = latest!.result.decisions.find((d) => d.siteId === SITE_ID)!.decision.decisionRecord;
     expect(record.baselineNpv.horizon).toBe(8);
+  });
+
+  it("commit後に例外が起きてもsiteを含む全変更をロールバックする", async () => {
+    await replaceSiteEntries(TENANT, []);
+    const outcome = await tryRunAndPersist(TENANT, {
+      label: "拠点の追加",
+      userSites: (sites) => sites,
+      commit: async (db) => {
+        await addSiteEntry(
+          TENANT,
+          { name: "ロールバック対象", siteType: "own_site", industrySector: "chemicals", address: "東京" },
+          { physicalQuantity: 1, unit: "m3", unitReplacementCost: 1, investmentCostInitial: 1,
+            investmentCostRecurring: 1, baselineNpvValue: 1, approvalThresholdValue: 1, forcePromote: false },
+          db
+        );
+        throw new Error("commit後の擬似障害");
+      },
+    });
+    expect(outcome.ok).toBe(false);
+    expect(await listSiteEntries(TENANT)).toEqual([]);
+  });
+
+  it("同時操作後の最新runは、保存された全イベントから再計算した結果と一致する", async () => {
+    await replaceSiteEntries(TENANT, []);
+    const before = (await listInteractionEvents(TENANT)).length;
+    await Promise.all([
+      tryRunAndPersist(TENANT, { label: "操作A", events: [decisionParametersEvent(7)] }),
+      tryRunAndPersist(TENANT, { label: "操作B", events: [decisionParametersEvent(9)] }),
+    ]);
+
+    const events = await listInteractionEvents(TENANT);
+    expect(events).toHaveLength(before + 2);
+    const expected = runDemoPipeline({
+      userSites: await listSiteEntries(TENANT),
+      interactions: projectInteractionState(events),
+      rngSeed: DEFAULT_RNG_SEED,
+    });
+    expect((await getLatestRun(TENANT))?.result.recalculationHash.hash).toBe(expected.recalculationHash.hash);
   });
 });

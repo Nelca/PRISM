@@ -5,6 +5,7 @@
 
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../client";
+import type { DbExecutor } from "../client";
 import { site } from "../schema";
 import type { UserSiteDeepDiveParams, UserSiteEntry } from "@/lib/demo/site-entry";
 import type { SiteRow } from "@core/site/ingest";
@@ -44,14 +45,14 @@ function toEntry(row: typeof site.$inferSelect): UserSiteEntry {
   return { row: siteRow, deepDive: row.deepDiveParams as UserSiteDeepDiveParams };
 }
 
-export async function listSiteEntries(tenantId: string): Promise<UserSiteEntry[]> {
-  const rows = await getDb().select().from(site).where(eq(site.tenantId, tenantId)).orderBy(asc(site.createdAt));
+export async function listSiteEntries(tenantId: string, db: DbExecutor = getDb()): Promise<UserSiteEntry[]> {
+  const rows = await db.select().from(site).where(eq(site.tenantId, tenantId)).orderBy(asc(site.createdAt));
   return rows.map(toEntry);
 }
 
 /** 1件だけ読む(編集フォームのプリフィル・更新時の既定値の引き継ぎに使う)。 */
-export async function getSiteEntry(tenantId: string, id: string): Promise<UserSiteEntry | null> {
-  const rows = await getDb()
+export async function getSiteEntry(tenantId: string, id: string, db: DbExecutor = getDb()): Promise<UserSiteEntry | null> {
+  const rows = await db
     .select()
     .from(site)
     .where(and(eq(site.tenantId, tenantId), eq(site.id, id)))
@@ -67,48 +68,39 @@ export async function getSiteEntry(tenantId: string, id: string): Promise<UserSi
  * **過去のrun・台帳・判定件数は消えない。**それらは追記のみで、拠点を入れ替えても
  * 「その時点で何を根拠に何を判定したか」の記録は残る。
  */
-export async function replaceSiteEntries(tenantId: string, entries: UserSiteEntry[]): Promise<void> {
-  const db = getDb();
-  await db.transaction(async (tx) => {
-    await tx.delete(site).where(eq(site.tenantId, tenantId));
-    if (entries.length === 0) {
-      return;
-    }
-    await tx.insert(site).values(
-      entries.map((entry) => ({
-        tenantId,
-        id: entry.row.id,
-        name: entry.row.name,
-        siteType: entry.row.siteType,
-        industrySector: entry.row.industrySector,
-        lat: entry.row.lat ?? null,
-        lng: entry.row.lng ?? null,
-        address: entry.row.address ?? null,
-        deepDiveParams: entry.deepDive,
-      }))
-    );
-  });
+export async function replaceSiteEntries(
+  tenantId: string,
+  entries: UserSiteEntry[],
+  db?: DbExecutor
+): Promise<void> {
+  const replace = async (executor: DbExecutor) => {
+    await executor.delete(site).where(eq(site.tenantId, tenantId));
+    if (entries.length === 0) return;
+    await executor.insert(site).values(entries.map((entry) => ({
+      tenantId,
+      id: entry.row.id,
+      name: entry.row.name,
+      siteType: entry.row.siteType,
+      industrySector: entry.row.industrySector,
+      lat: entry.row.lat ?? null,
+      lng: entry.row.lng ?? null,
+      address: entry.row.address ?? null,
+      deepDiveParams: entry.deepDive,
+    })));
+  };
+  if (db) await replace(db);
+  else await getDb().transaction(replace);
 }
 
 export async function addSiteEntry(
   tenantId: string,
   row: Omit<SiteRow, "id">,
-  deepDive: UserSiteDeepDiveParams
+  deepDive: UserSiteDeepDiveParams,
+  db: DbExecutor = getDb()
 ): Promise<SiteRow> {
-  const db = getDb();
-  /*
-   * IDはプロセス内カウンタではなく既存行から採番する(再起動でIDが巻き戻らないようにするため)。
-   * **件数ではなく最大の連番+1で採番する。**削除(removeSiteEntry)ができるようになったため、
-   * 件数で採番すると「site-user-1 を消したあとの2件目」が既存の site-user-2 と衝突し、
-   * 主キー違反になる。さらに、過去のrunに残る拠点IDを別の拠点が再利用してしまうと、
-   * 監査時に同じIDが指すものが時期によって変わり、記録を読み解けなくなる。
-   */
-  const existing = await db.select({ id: site.id }).from(site).where(eq(site.tenantId, tenantId));
-  const maxSequence = existing.reduce((max, r) => {
-    const matched = /^site-user-(\d+)$/.exec(r.id);
-    return matched ? Math.max(max, Number(matched[1])) : max;
-  }, 0);
-  const id = `${USER_SITE_ID_PREFIX}${maxSequence + 1}`;
+  // UUIDなら同時追加でも読取→採番の競合がなく、削除後に過去のIDを再利用することもない。
+  // 既存の site-user-<連番> は監査履歴との参照を保つため、そのまま有効とする。
+  const id = `${USER_SITE_ID_PREFIX}${crypto.randomUUID()}`;
 
   await db.insert(site).values({
     tenantId,
@@ -138,11 +130,12 @@ export async function updateSiteEntry(
   tenantId: string,
   id: string,
   row: Omit<SiteRow, "id">,
-  deepDive: UserSiteDeepDiveParams
+  deepDive: UserSiteDeepDiveParams,
+  db: DbExecutor = getDb()
 ): Promise<SiteRow> {
   assertUserSiteId(id);
 
-  const updated = await getDb()
+  const updated = await db
     .update(site)
     .set({
       name: row.name,
@@ -168,10 +161,10 @@ export async function updateSiteEntry(
  * 消えるのは「これから評価する対象」としての登録だけで、**過去のrun・台帳・監査証跡は残る**
  * (それらは追記のみのテーブルにあり、アプリ用ロールにDELETE権限がない)。
  */
-export async function removeSiteEntry(tenantId: string, id: string): Promise<void> {
+export async function removeSiteEntry(tenantId: string, id: string, db: DbExecutor = getDb()): Promise<void> {
   assertUserSiteId(id);
 
-  const deleted = await getDb()
+  const deleted = await db
     .delete(site)
     .where(and(eq(site.tenantId, tenantId), eq(site.id, id)))
     .returning({ id: site.id });

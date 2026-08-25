@@ -179,6 +179,7 @@ describe("拠点の削除", () => {
       baseDeepDive
     );
     expect(first.id).not.toBe(second.id);
+    expect(first.id).toMatch(/^site-user-[0-9a-f-]{36}$/);
 
     await removeSiteEntry(TENANT, first.id);
     const third = await addSiteEntry(

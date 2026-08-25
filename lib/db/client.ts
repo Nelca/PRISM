@@ -46,6 +46,10 @@ export function getDb() {
   return drizzle(getPool(), { schema });
 }
 
+/** Repository が通常接続と同じ形で受け取れる、Drizzle のトランザクション実行器。 */
+export type DbTransaction = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+export type DbExecutor = ReturnType<typeof getDb> | DbTransaction;
+
 /**
  * 既定テナント。認証がないハーネスのための単一値であり、本番のテナント解決ではない。
  * 未設定を暗黙の既定値で埋めない(D-15)。

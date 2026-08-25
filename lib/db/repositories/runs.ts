@@ -7,6 +7,7 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../client";
+import type { DbExecutor } from "../client";
 import { buildDecisionCountRows } from "./decision-counts";
 import {
   assumptionEntry,
@@ -28,11 +29,11 @@ export interface PersistRunInput {
   result: DemoPipelineResult;
 }
 
-export async function persistRun(input: PersistRunInput): Promise<string> {
-  const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+export async function persistRun(input: PersistRunInput, db?: DbExecutor): Promise<string> {
+  const runId = `run-${crypto.randomUUID()}`;
   const extracts = extractRunRows(input.tenantId, runId, input.result);
 
-  await getDb().transaction(async (tx) => {
+  const write = async (tx: DbExecutor) => {
     await tx.insert(pipelineRun).values({
       id: runId,
       tenantId: input.tenantId,
@@ -62,7 +63,10 @@ export async function persistRun(input: PersistRunInput): Promise<string> {
     if (countRows.length > 0) {
       await tx.insert(decisionCountEntry).values(countRows).onConflictDoNothing();
     }
-  });
+  };
+
+  if (db) await write(db);
+  else await getDb().transaction(write);
 
   return runId;
 }
