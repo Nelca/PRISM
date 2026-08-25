@@ -59,7 +59,7 @@ export const INTERNAL_REVIEW_TEMPLATE: DisclosureViewTemplate = {
         if (exchange.length === 0) {
           return null;
         }
-        const total = exchange.reduce((sum, record) => sum + (record.centralValue as unknown as number), 0);
+        const total = exchange.reduce((sum, record) => sum + (record.centralValue), 0);
         const low = exchange.reduce((sum, record) => sum + record.quantileRange.p5, 0);
         const high = exchange.reduce((sum, record) => sum + record.quantileRange.p95, 0);
 

@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Shippori_Mincho, Noto_Sans_JP, JetBrains_Mono } from "next/font/google";
 import { COMPANY_NAME } from "@/lib/demo/company";
-import { getTenantId } from "@/lib/db/client";
-import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { loadPipelineView } from "@/lib/views/pipeline";
 import { deriveOpenTasks } from "@/lib/pipeline/open-tasks";
 import { Nav } from "./components/nav";
 import "./globals.css";
@@ -51,8 +50,7 @@ export const dynamic = "force-dynamic";
  * (deriveOpenTasksが返すhrefは現状どちらも含まないが、将来の追加に備えた防御)。
  */
 async function getNeedsAttentionHrefs(): Promise<string[]> {
-  const tenantId = await getTenantId();
-  const result = await getOrCreateLatestResult(tenantId);
+  const result = await loadPipelineView();
   const hrefs = new Set(deriveOpenTasks(result).map((task) => task.href));
   hrefs.delete("/");
   hrefs.delete("/ledger");

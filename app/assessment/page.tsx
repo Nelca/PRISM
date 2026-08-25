@@ -1,5 +1,4 @@
-import { getTenantId } from "@/lib/db/client";
-import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { loadPipelineView } from "@/lib/views/pipeline";
 import { computePercentileRanks } from "@core/assessment/percentile-rank";
 import type { DepthDecision } from "@core/types/assessment";
 import { Card, GuideBox, GuideButton, ScreenLead, Tag } from "../components/ui";
@@ -63,7 +62,7 @@ function Bar({ ratio, sub }: { ratio: number; sub?: boolean }) {
 }
 
 export default async function AssessmentPage() {
-  const result = await getOrCreateLatestResult(await getTenantId());
+  const result = await loadPipelineView();
   const { priorityScores, depthDecisions, materialIssues, sites } = result.assessment;
 
   const depthById = new Map(depthDecisions.map((d) => [d.materialIssueId, d]));

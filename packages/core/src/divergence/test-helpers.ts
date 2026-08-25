@@ -104,5 +104,5 @@ export function makeValuationRecord(options: ValuationRecordFixtureOptions): Val
 }
 
 export function unwrapAmount(value: ExchangeAmount | WelfareAmount): number {
-  return value as unknown as number;
+  return value;
 }

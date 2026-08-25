@@ -104,7 +104,7 @@ export function buildRepresentativeValueSelection(
   }
 
   return {
-    selection: { ...base, recalculatedWithPriorMethod: priorRecord.centralValue as unknown as number },
+    selection: { ...base, recalculatedWithPriorMethod: priorRecord.centralValue },
     status: "recalculated",
   };
 }
@@ -133,7 +133,7 @@ export function buildRepresentativeValueEvidence(
     valueConcept: record.valueConcept,
     transferFitnessTier: record.transferFitness.tier,
     aopCode: record.aopCode,
-    centralValue: record.centralValue as unknown as number,
+    centralValue: record.centralValue,
     selectedLastYear: record.methodId === priorYearMethodId,
   }));
 }

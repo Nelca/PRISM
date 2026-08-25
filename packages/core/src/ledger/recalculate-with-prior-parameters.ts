@@ -67,6 +67,6 @@ export function recalculateWithPriorParameters(
     return { status: "identical_parameters" };
   }
 
-  const uncalibrated = (current.centralValue as unknown as number) / currentFactor;
+  const uncalibrated = (current.centralValue) / currentFactor;
   return { status: "recalculated", recalculatedValue: uncalibrated * priorFactor };
 }

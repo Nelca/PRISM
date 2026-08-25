@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { getTenantId } from "@/lib/db/client";
-import { loadInteractionState } from "@/lib/db/repositories/interactions";
-import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { deriveMoneySummary, deriveOpenTasks, joinSiteNames, sitesWithDegenerateRepresentative } from "@/lib/pipeline/open-tasks";
+import { loadInteractivePipelineView } from "@/lib/views/pipeline";
 import { CompanyFinancialsForm } from "./financials-form";
 import { buildWaterfallSteps } from "@core/financial-bridge/bridge1";
 import { Num, pickYenScale } from "../components/numeric";
@@ -24,11 +22,10 @@ export default async function FinancialBridgePage({
   searchParams: Promise<{ site?: string }>;
 }) {
   const { site: siteParam } = await searchParams;
-  const tenantId = await getTenantId();
-  const result = await getOrCreateLatestResult(tenantId);
+  const { result, interactions } = await loadInteractivePipelineView();
   const { decisions } = result;
   // 入力済みの企業財務データ(未入力ならデモの既定値で計算されている)
-  const { companyFinancials } = await loadInteractionState(tenantId);
+  const { companyFinancials } = interactions;
 
   if (decisions.length === 0) {
     return (
@@ -250,9 +247,9 @@ export default async function FinancialBridgePage({
         .filter((row) => row.siteId === openSiteId)
         .map(({ siteId, siteName, financialBridge, comparisonTargets }) => {
         const waterfallSteps = buildWaterfallSteps(financialBridge.bridge1);
-        const expectedLoss = financialBridge.natureDebt.totalDebt as unknown as number;
-        const operatingProfit = financialBridge.bridge1.reportedOperatingProfit as unknown as number;
-        const uninternalizedCost = financialBridge.internalizationStatus.uninternalizedCost as unknown as number;
+        const expectedLoss = financialBridge.natureDebt.totalDebt;
+        const operatingProfit = financialBridge.bridge1.reportedOperatingProfit;
+        const uninternalizedCost = financialBridge.internalizationStatus.uninternalizedCost;
         // 指示09:「期待損失」カード内の未内部化コストと自然債務で単位を揃える(拠点によっては
         // 一方が百万円台・もう一方が億円台になり、そのまま自動判定すると単位が割れる)。
         const lossScale = pickYenScale(uninternalizedCost, expectedLoss);
@@ -276,13 +273,13 @@ export default async function FinancialBridgePage({
                   </span>
                 }
                 foot={`利益への影響:営業利益(決算値)比 ${(
-                  (((financialBridge.bridge1.natureAdjustedOperatingProfit as unknown as number) - operatingProfit) /
+                  (((financialBridge.bridge1.natureAdjustedOperatingProfit) - operatingProfit) /
                     operatingProfit) *
                   100
                 ).toFixed(1)}%`}
               >
                 <Waterfall
-                  steps={waterfallSteps.map((s) => ({ label: financialDisplayLabel(s.label), value: s.value as unknown as number, isTotal: s.isTotal }))}
+                  steps={waterfallSteps.map((s) => ({ label: financialDisplayLabel(s.label), value: s.value, isTotal: s.isTotal }))}
                 />
                 {/* D-12:図の中の独自用語はhoverできないため、直下に用語説明を常設する。 */}
                 <p className="tooltip-note">
@@ -311,7 +308,7 @@ export default async function FinancialBridgePage({
                     <>
                       <Stat
                         label="社会的コスト"
-                        value={<Num value={financialBridge.bridge2.socialCost as unknown as number} unit="円/年" />}
+                        value={<Num value={financialBridge.bridge2.socialCost} unit="円/年" />}
                       />
                       <div style={{ marginTop: 10 }}>
                         <KV k="対応率" v={`${(financialBridge.bridge2.internalizationRate * 100).toFixed(1)}%`} />

@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { getTenantId } from "@/lib/db/client";
-import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { loadPipelineView } from "@/lib/views/pipeline";
 import {
   deriveFindings,
   deriveMoneySummary,
@@ -101,7 +100,7 @@ function SegBar({ segments }: { segments: { count: number; className: string; la
  * (c)分かったこと:実データから導出した発見(指示14)。
  */
 export default async function Home() {
-  const result = await getOrCreateLatestResult(await getTenantId());
+  const result = await loadPipelineView();
 
   const steps = deriveStepProgress(result);
   const tasks = deriveOpenTasks(result);

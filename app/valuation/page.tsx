@@ -2,10 +2,8 @@ import Link from "next/link";
 import { computeTornadoChart } from "@core/monetization/tornado";
 import type { PairwiseDecomposition } from "@core/types/divergence";
 import { decomposeQuantileRange } from "@core/divergence/quantile-decomposition";
-import type { UncertaintyFactor } from "@core/divergence/quantile-decomposition";
 import type { ValuationRecord } from "@core/types/valuation";
-import { getTenantId } from "@/lib/db/client";
-import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { loadPipelineView } from "@/lib/views/pipeline";
 import {
   decompositionForMaterialIssue,
   materialIssueIdsWithoutRepresentativeSelection,
@@ -16,80 +14,17 @@ import { Num, pickYenScale } from "../components/numeric";
 import { Card, GuideBox, GuideButton, KV, ScreenLead, Stat, Tag } from "../components/ui";
 import { tierLabel, tierTagVariant } from "../components/tag-utils";
 import { methodLabel, methodShortLabel, withMethodLabelsInText } from "../components/method-labels";
-import { decompositionFactorShortLabel, materialIssueLabel } from "../components/labels";
+import { materialIssueLabel } from "../components/labels";
 import { StepNav } from "../components/step-nav";
 import { Football } from "../components/charts/Football";
 import { Tornado } from "../components/charts/Tornado";
-import { Waterfall, type WaterfallStepInput } from "../components/charts/Waterfall";
+import { Waterfall } from "../components/charts/Waterfall";
 import { RepresentativeSelector } from "./representative-selector";
 import { DataSourceAttribution } from "../components/attribution";
 import { PipelineWarnings } from "../components/pipeline-warnings";
 import { ScalableSelector } from "../components/scalable-selector";
 import { TaskBanner } from "../components/task-banner";
-
-/** 幅を決める要因(M4 U-3)。中心値の要因とは別の集合。 */
-const UNCERTAINTY_FACTOR_LABEL: Record<UncertaintyFactor, string> = {
-  parameterUncertainty: "推計値そのもののばらつき(層i)",
-  transferError: "他地域の研究値を当てはめる誤差(層ii・確からしさ)",
-};
-
-/**
- * 中心値0の行に付ける「なぜ0か」(第4版 D-08)。
- *
- * IFVI水方法論の内訳値は、物理量に価値係数を乗じるだけの構造
- * (packages/core/src/monetization/plugins/ifvi-water-consumption.ts)なので、
- * 0円になるのは公表係数そのものが0の場合に限られる。デモの係数は
- * IFVI Water Consumption Topic Methodology, Appendix D Table D1の日本の行からの転記で、
- * 日本はVFnutrition・VFdisease・VFaccessが0(lib/demo/company.ts)。
- * それ以外の手法では係数の出典を特定できないため、断定しない文言に留める(推測で理由を作らない)。
- */
-function zeroValueNote(record: ValuationRecord): { short: string; detail: string } | null {
-  if ((record.centralValue as unknown as number) !== 0) return null;
-  if (record.methodId.startsWith("ifvi-water-consumption.")) {
-    const region = record.geographicCalibration.targetRegion;
-    const regionLabel = region === "JP" ? "日本" : region;
-    return {
-      short: `${regionLabel}の公表係数が0のため`,
-      detail: `IFVIが公表する${regionLabel}の係数(IFVI水方法論 Appendix D Table D1)が0のため、物理量に関わらず0円になります。`,
-    };
-  }
-  return {
-    short: "当該地点の係数が0のため",
-    detail: "この手法では当該地点の係数が0と評価されています。",
-  };
-}
-
-function pairwiseToWaterfallSteps(pair: PairwiseDecomposition, labelA: string, labelB: string): WaterfallStepInput[] {
-  const steps: WaterfallStepInput[] = [{ label: `${labelA} 中心値`, value: pair.valueA as unknown as number, isTotal: true }];
-  let running = pair.valueA as unknown as number;
-  for (const c of pair.contributions) {
-    const next = running * c.multiplier;
-    // 図の軸ラベルは短縮版を使う(第5版:バー幅に対して通常表記が長すぎ、隣接ラベルと詰まる)。
-    steps.push({ label: decompositionFactorShortLabel(c.factor), value: next - running, isTotal: false });
-    running = next;
-  }
-  if (pair.residual) {
-    const next = running * pair.residual.multiplier;
-    steps.push({ label: "分解不能な残差", value: next - running, isTotal: false });
-    running = next;
-  }
-  steps.push({ label: `${labelB} 中心値`, value: pair.valueB as unknown as number, isTotal: true });
-  return steps;
-}
-
-/**
- * 加法フォールバック(F-1:いずれかの中心値が0または負)のときの表示(第4版 D-07)。
- * 倍率での要因分解ができないため、両端の中心値と金額差だけを示す。
- */
-function additivePairSteps(pair: PairwiseDecomposition, labelA: string, labelB: string): WaterfallStepInput[] {
-  const valueA = pair.valueA as unknown as number;
-  const valueB = pair.valueB as unknown as number;
-  return [
-    { label: `${labelA} 中心値`, value: valueA, isTotal: true },
-    { label: "金額差", value: valueB - valueA, isTotal: false },
-    { label: `${labelB} 中心値`, value: valueB, isTotal: true },
-  ];
-}
+import { additivePairSteps, pairwiseToWaterfallSteps, UNCERTAINTY_FACTOR_LABEL, zeroValueNote } from "./view-model";
 
 /**
  * 価値の算定と代表値の選択(指示03。旧 /valuation + /decomposition)。
@@ -105,7 +40,7 @@ export default async function ValuationPage({
   searchParams: Promise<{ issue?: string; pair?: string }>;
 }) {
   const { issue: issueParam, pair: pairParam } = await searchParams;
-  const result = await getOrCreateLatestResult(await getTenantId());
+  const result = await loadPipelineView();
   const { valuationRecordsByMaterialIssue, representativeRecordByMaterialIssue, m4ChangeLogByMaterialIssue } =
     result.valuation;
   const materialIssueIds = Object.keys(valuationRecordsByMaterialIssue);
@@ -161,7 +96,7 @@ export default async function ValuationPage({
   // 行ごとに単位が割れないよう(百万円の行と億円の行が混ざらないよう)、この対象に出てくる
   // すべての金額から表全体で使うスケールを1つ決めて明示的に揃える。
   const recordScale = pickYenScale(
-    ...records.flatMap((r) => [r.centralValue as unknown as number, r.quantileRange.p5, r.quantileRange.p95])
+    ...records.flatMap((r) => [r.centralValue, r.quantileRange.p5, r.quantileRange.p95])
   );
 
   // 中心値が0円の手法(D-08:0の行も非表示にせず、理由を添えて出す)。同じ理由はまとめて1文にする。
@@ -225,7 +160,7 @@ export default async function ValuationPage({
   const zeroSideRecord = selectedPair
     ? [selectedPair.methodIdA, selectedPair.methodIdB]
         .map((methodId) => records.find((r) => r.methodId === methodId))
-        .find((record) => record !== undefined && (record.centralValue as unknown as number) === 0)
+        .find((record) => record !== undefined && (record.centralValue) === 0)
     : undefined;
 
   const currentRepresentativeId = representativeRecordByMaterialIssue[selectedIssueId];
@@ -235,7 +170,7 @@ export default async function ValuationPage({
   const selection = decomposition?.representativeValueSelection;
   const selectionStatus = result.valuation.representativeSelectionStatus[selectedIssueId];
   const selectedCentralValue = selection
-    ? (records.find((r) => r.methodId === selection.selectedMethodId)?.centralValue as unknown as number | undefined)
+    ? (records.find((r) => r.methodId === selection.selectedMethodId)?.centralValue as number | undefined)
     : undefined;
 
   // 指示09:「前年度手法との比較」カード内の3つの金額(再計算値・今年度値・差分)で単位を揃える。
@@ -251,7 +186,7 @@ export default async function ValuationPage({
   // 折りたたみに格下げした「試算の幅に影響する要因」(トルネード図)。
   const primaryRecord: ValuationRecord | undefined = records.find((r) => r.methodId === "replacement-cost") ?? records[0];
   const tornadoEntries = primaryRecord ? computeTornadoChart(primaryRecord) : [];
-  const tornadoCenter = primaryRecord ? (primaryRecord.centralValue as unknown as number) : 0;
+  const tornadoCenter = primaryRecord ? (primaryRecord.centralValue) : 0;
   const tornadoFactors = tornadoEntries.map((e, i) => ({
     name: e.label,
     low: tornadoCenter * (1 - e.sigma),
@@ -357,7 +292,7 @@ export default async function ValuationPage({
                   <Tag variant={tierTagVariant(r.transferFitness.tier)}>{tierLabel(r.transferFitness.tier)}</Tag>
                 </td>
                 <td className="num" style={{ fontWeight: 700 }}>
-                  <Num value={r.centralValue as unknown as number} unit="円" scale={recordScale} />
+                  <Num value={r.centralValue} unit="円" scale={recordScale} />
                   {/* D-08:0円の行は非表示にせず、なぜ0かの短い注記を値の隣に付ける。 */}
                   {zeroValueNote(r) && (
                     <span className="cell-note" style={{ fontWeight: 400 }} title={zeroValueNote(r)!.detail}>
@@ -530,7 +465,7 @@ export default async function ValuationPage({
             {exchangeGroup.methodIds.map((id) => {
               const r = records.find((rec) => rec.methodId === id && rec.valueConcept === "exchange");
               if (!r) return null;
-              return <KV key={id} k={methodLabel(id)} v={<Num value={r.centralValue as unknown as number} unit="円" scale={recordScale} />} />;
+              return <KV key={id} k={methodLabel(id)} v={<Num value={r.centralValue} unit="円" scale={recordScale} />} />;
             })}
             <div style={{ marginTop: 10 }}>
               <Tag variant="exchange">投資判断に反映できます</Tag>
@@ -545,7 +480,7 @@ export default async function ValuationPage({
             {welfareGroup.methodIds.map((id) => {
               const r = records.find((rec) => rec.methodId === id && rec.valueConcept === "welfare");
               if (!r) return null;
-              return <KV key={id} k={methodLabel(id)} v={<Num value={r.centralValue as unknown as number} unit="円" scale={recordScale} />} />;
+              return <KV key={id} k={methodLabel(id)} v={<Num value={r.centralValue} unit="円" scale={recordScale} />} />;
             })}
             <div style={{ marginTop: 10 }}>
               <Tag variant="welfare">開示にのみ使用します</Tag>
@@ -610,7 +545,7 @@ export default async function ValuationPage({
                     </td>
                     <td>{tierLabel(r.transferFitness.tier)}</td>
                     <td className="num">
-                      <Num value={r.centralValue as unknown as number} unit="円" scale={recordScale} />
+                      <Num value={r.centralValue} unit="円" scale={recordScale} />
                     </td>
                   </tr>
                 );

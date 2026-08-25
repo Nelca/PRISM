@@ -1,6 +1,5 @@
-import { getTenantId } from "@/lib/db/client";
-import { isUserSiteId, listSiteEntries } from "@/lib/db/repositories/sites";
-import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { isUserSiteId } from "@/lib/db/repositories/sites";
+import { loadSitesView } from "@/lib/views/pipeline";
 import { Card, GuideBox, GuideButton, ScreenLead, Tag } from "../components/ui";
 import { industrySectorLabel, siteTypeLabel } from "../components/labels";
 import { StepNav } from "../components/step-nav";
@@ -57,8 +56,7 @@ const LOCKED_REASON = {
 } as const;
 
 export default async function SitesPage() {
-  const tenantId = await getTenantId();
-  const result = await getOrCreateLatestResult(tenantId);
+  const { result, storedEntries } = await loadSitesView();
   const { sites, ingestionErrors } = result.assessment;
 
   /*
@@ -68,7 +66,6 @@ export default async function SitesPage() {
    *   - DBにあり site-user-*    → 画面から登録した拠点。編集・削除できる
    *   - DBにあるがそれ以外のID  → CSV取込。取込のやり直しが正規の修正経路
    */
-  const storedEntries = await listSiteEntries(tenantId);
   const storedById = new Map(storedEntries.map((entry) => [entry.row.id, entry]));
 
   return (

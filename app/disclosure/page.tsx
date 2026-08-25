@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { getTenantId } from "@/lib/db/client";
-import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { loadPipelineView } from "@/lib/views/pipeline";
 import { buildDisclosureView } from "@core/disclosure/build-disclosure-view";
 import { INTERNAL_REVIEW_TEMPLATE } from "@core/disclosure/templates/internal-review-template";
 import { Card, GuideBox, GuideButton, KV, ScreenLead, Tag } from "../components/ui";
@@ -29,7 +28,7 @@ export default async function DisclosurePage({
   searchParams: Promise<{ finding?: string }>;
 }) {
   const { finding: findingParam } = await searchParams;
-  const result = await getOrCreateLatestResult(await getTenantId());
+  const result = await loadPipelineView();
   const claimsById = new Map(result.disclosureClaims.map((claim) => [claim.id, claim]));
 
   /**

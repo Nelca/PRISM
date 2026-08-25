@@ -1,9 +1,5 @@
 import Link from "next/link";
-import { getTenantId } from "@/lib/db/client";
-import { listDecisionCounts } from "@/lib/db/repositories/decision-counts";
-import { listParameterVersionsWithStatus } from "@/lib/db/repositories/parameter-versions";
-import { getRunById, listRuns } from "@/lib/db/repositories/runs";
-import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { loadLedgerView } from "@/lib/views/pipeline";
 import { recalculateWithPriorParameters } from "@core/ledger/recalculate-with-prior-parameters";
 import { Mono, Num, pickYenScale } from "../components/numeric";
 import { Card, ScreenLead, Stat, Tag } from "../components/ui";
@@ -21,17 +17,12 @@ import { DataSourceAttribution } from "../components/attribution";
  */
 export default async function LedgerPage({ searchParams }: { searchParams: Promise<{ compareWith?: string }> }) {
   const { compareWith } = await searchParams;
-  const tenantId = await getTenantId();
-  const result = await getOrCreateLatestResult(tenantId);
+  const { result, parameterVersions, runs, decisionCounts, priorRun } = await loadLedgerView(compareWith);
   const { decisions } = result;
 
   // --- M8 D-3:版レジストリと、旧版パラメータでの再計算(GAP-07)---
-  const parameterVersions = await listParameterVersionsWithStatus(tenantId);
-  const runs = await listRuns(tenantId, 10);
-  const latestRunId = runs[0]?.id;
   // 比較元:URLで指定がなければ1つ前のrun。無ければ比較しない。
   const priorRunId = compareWith ?? runs[1]?.id;
-  const priorRun = priorRunId && priorRunId !== latestRunId ? await getRunById(tenantId, priorRunId) : null;
 
   const currentRecords = Object.values(result.valuation.valuationRecordsByMaterialIssue).flat();
   const priorRecords = priorRun
@@ -75,7 +66,6 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   // 判定件数(従量課金の根拠、M6 D-8・D-30)。⑤対策と判定から移設した(指示05)。
   // 意思決定の最中に課金明細が見えるのは判断を歪めうるノイズであり、日常業務の外にある
   // この記録画面に置くほうがふさわしい。
-  const decisionCounts = await listDecisionCounts(tenantId);
 
   return (
     <div className="screen">
@@ -327,7 +317,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
                 </thead>
                 <tbody>
                   {recalculations.map(({ record, outcome }) => {
-                    const current = record.centralValue as unknown as number;
+                    const current = record.centralValue;
                     // 指示09:レコードごとに算定対象(水・GHG等)が異なり金額の桁も大きく違うため、
                     // 行ではなくレコード単位(現在値・再計算値・差分の3列)で単位を揃える。
                     const rowScale = pickYenScale(

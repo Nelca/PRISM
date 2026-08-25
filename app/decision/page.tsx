@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { getTenantId } from "@/lib/db/client";
 import { listConfirmedDecisionSnapshots } from "@/lib/db/repositories/decision-counts";
 import { detectReassessmentAlerts } from "@core/decision/reassessment";
-import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { loadInteractivePipelineView } from "@/lib/views/pipeline";
 import { Num, pickYenScale } from "../components/numeric";
 import { Card, GuideBox, GuideButton, ScreenLead, Stat, Tag } from "../components/ui";
 import { bindingLabel, formatDominantAssumption, verdictLabel, verdictTagVariant } from "../components/labels";
@@ -14,7 +13,6 @@ import { CountermeasureSelector } from "./countermeasure-selector";
 import { BindingForm } from "./binding-form";
 import { DecisionParametersForm } from "./parameters-form";
 import { PipelineWarnings } from "../components/pipeline-warnings";
-import { loadInteractionState } from "@/lib/db/repositories/interactions";
 
 /**
  * ★判定の意味を一文にする(指示15 → 第4版 D-13で拡張)。
@@ -37,11 +35,10 @@ export default async function DecisionPage({
   searchParams: Promise<{ site?: string }>;
 }) {
   const { site: siteParam } = await searchParams;
-  const tenantId = await getTenantId();
-  const result = await getOrCreateLatestResult(tenantId);
+  const { tenantId, result, interactions } = await loadInteractivePipelineView();
   const { decisions } = result;
   // 入力済みの投資判断の前提(フォームの初期値に使う)
-  const { decisionParameters } = await loadInteractionState(tenantId);
+  const { decisionParameters } = interactions;
 
   /**
    * 前提が変わった判定の洗い直し(GAP-20)。
@@ -201,7 +198,7 @@ export default async function DecisionPage({
         .filter((row) => row.siteId === openSiteId)
         .map(({ siteId, siteName, decision, countermeasureCandidates, selectedCountermeasureKey, alerts }) => {
         const record = decision.decisionRecord;
-        const threshold = record.approvalThreshold === "pending" ? null : (record.approvalThreshold.value as unknown as number);
+        const threshold = record.approvalThreshold === "pending" ? null : (record.approvalThreshold.value);
         /**
          * 「投資1億円あたり」に揃える(指示09)。100_000_000円=1億円。
          *
@@ -216,7 +213,7 @@ export default async function DecisionPage({
         const invPerOku = (c: (typeof countermeasureCandidates)[number]) => {
           const invest = c.investmentCost.initial + c.investmentCost.recurring;
           if (invest === 0) return 0;
-          const npv = c.decisionRecord.natureAdjustedNpv.central as unknown as number;
+          const npv = c.decisionRecord.natureAdjustedNpv.central;
           const baseline = c.decisionRecord.baselineNpv.value;
           return ((npv - baseline) / invest) * 100_000_000;
         };
@@ -229,13 +226,13 @@ export default async function DecisionPage({
         // 指示09:⑤の対策表で列ごとに単位を揃える(初期投資額は拠点によって百万円台と
         // 億円台が混在し、そのまま自動判定すると同じ列内で単位が割れる)。
         const investInitialScale = pickYenScale(
-          ...countermeasureCandidates.map((c) => c.investmentCost.initial as unknown as number)
+          ...countermeasureCandidates.map((c) => c.investmentCost.initial)
         );
         const investRecurringScale = pickYenScale(
-          ...countermeasureCandidates.map((c) => c.investmentCost.recurring as unknown as number)
+          ...countermeasureCandidates.map((c) => c.investmentCost.recurring)
         );
         const npvScale = pickYenScale(
-          ...countermeasureCandidates.map((c) => c.decisionRecord.natureAdjustedNpv.central as unknown as number)
+          ...countermeasureCandidates.map((c) => c.decisionRecord.natureAdjustedNpv.central)
         );
 
         return (
@@ -295,7 +292,7 @@ export default async function DecisionPage({
                         <Num value={record.natureAdjustedNpv.quantileRange.p95} />
                       </>
                     }
-                    unit={`(中心 ${new Intl.NumberFormat("ja-JP").format(record.natureAdjustedNpv.central as unknown as number)})`}
+                    unit={`(中心 ${new Intl.NumberFormat("ja-JP").format(record.natureAdjustedNpv.central)})`}
                   />
                   <Stat
                     label="結果の反映先"
@@ -375,7 +372,7 @@ export default async function DecisionPage({
                             <Num value={c.avoidedPhysicalQuantity} unit="m3" />
                           </td>
                           <td className="num" style={{ fontWeight: 700 }}>
-                            <Num value={c.decisionRecord.natureAdjustedNpv.central as unknown as number} unit="円" scale={npvScale} />(
+                            <Num value={c.decisionRecord.natureAdjustedNpv.central} unit="円" scale={npvScale} />(
                             {verdictLabel(c.decisionRecord.verdict)})
                           </td>
                           <td>

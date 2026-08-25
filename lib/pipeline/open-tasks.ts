@@ -624,8 +624,8 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
     }
   }
   if (widest) {
-    const low = Math.min(widest.pair.valueA as unknown as number, widest.pair.valueB as unknown as number);
-    const high = Math.max(widest.pair.valueA as unknown as number, widest.pair.valueB as unknown as number);
+    const low = Math.min(widest.pair.valueA, widest.pair.valueB);
+    const high = Math.max(widest.pair.valueA, widest.pair.valueB);
     const conceptNote =
       widest.concept === "welfare"
         ? "これは社会全体への影響(開示にのみ使用する参考値)どうしの比較で、投資判断には使用しません。"
@@ -672,7 +672,7 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
   // 3. 減損テストの前提に抵触する拠点。
   const impairment = decisions.filter((d) => d.comparisonTargets.impairmentTestImpact.changesAssumption);
   if (impairment.length > 0) {
-    const totalDebt = impairment.reduce((sum, d) => sum + (d.financialBridge.natureDebt.totalDebt as unknown as number), 0);
+    const totalDebt = impairment.reduce((sum, d) => sum + (d.financialBridge.natureDebt.totalDebt), 0);
     findings.push({
       id: "finding-impairment",
       headline: `${joinSiteNames(impairment.map((d) => d.siteName))}の自然債務${formatCompactYen(

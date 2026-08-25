@@ -54,7 +54,7 @@ export function extractRunRows(tenantId: string, runId: string, result: DemoPipe
         physicalQuantityId: record.physicalQuantityId,
         valueConcept: record.valueConcept,
         transferFitnessTier: record.transferFitness.tier,
-        centralValue: record.centralValue as unknown as number,
+        centralValue: record.centralValue,
         recalculationHash: record.recalculationHash,
         data: record,
       }))

@@ -53,7 +53,7 @@ export function toSiteEntries(dataset: CompanyDataset): SiteEntriesFromDataset {
         approvalThresholdValue:
           config.approvalThreshold === "pending"
             ? DEFAULTS.approvalThresholdValue
-            : (config.approvalThreshold.value as unknown as number),
+            : (config.approvalThreshold.value),
         // 深掘り対象として明示された拠点は、優先度算定の結果によらず深掘りに進める
         forcePromote: true,
         ...(firstClaim ? { disclosureClaimText: firstClaim.rawText } : {}),
