@@ -23,7 +23,6 @@ import { createIdSequence } from "@core/pipeline/ids";
 import { getPluginsForCategory } from "@core/monetization/registry";
 import { createSeededRng } from "@core/monetization/rng";
 import { runFinancialBridgePipeline } from "@core/pipeline/financial-bridge-pipeline";
-import { computeRecalculationHash } from "@core/ledger/recalculation-hash";
 import { exchangeAmount } from "@core/types/common";
 import type { ExchangeAmount } from "@core/types/common";
 import type { ExchangeValuationRecord, WelfareValuationRecord } from "@core/types/valuation";
@@ -78,6 +77,7 @@ import { emptyInteractionState } from "./interaction-state";
 import type { InteractionState } from "./interaction-state";
 import { methodLabel } from "@/app/components/method-labels";
 import { buildDisclosureExclusions } from "./build-disclosure-exclusions";
+import { buildDemoRecalculationHash } from "./build-recalculation-hash";
 
 /**
  * 「保存済みの操作のうち、今回の計算にそのまま適用できなかったもの」の記録(第4版 D-01-3)。
@@ -108,7 +108,7 @@ const DECOMPOSITION_VERSIONS = {
   aopMappingVersion: "aop-mapping-v1",
   f3ThresholdVersion: "f3-v1",
   f8ThresholdVersion: "f8-v1",
-};
+} as const;
 
 /** MaterialIssue.id は "${siteId}-mi-${category}" の形式(build-material-issues.ts)。 */
 function siteIdFromMaterialIssueId(materialIssueId: string): string {
@@ -742,29 +742,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   });
 
   // --- M8:パイプライン全体のRecalculationHash ---
-  const recalculationHash = computeRecalculationHash({
-    m1_sensitivityCriteriaVersion: "tnfd-leap-l3-v1",
-    m2_priorityFormulaVersion: "priority-v1",
-    m3_methodPluginVersions: {
-      "replacement-cost": "1.0.0",
-      "lime3-water": "3.0.0",
-      // 手法(2026-03-final)は不変。係数データを仮値からIFVI Table D1(日本)実値に差し替えたため、
-      // GAP-20の再判定アラートが発火するようデータ版を明示的に区別する。
-      "ifvi-water-consumption": "2026-03-final:jp-table-d1-v1",
-      // GAP-11・D-128:気候カテゴリの拠点(site-070)を追加し、初めて実際に接続した。
-      "ghg-carbon-price-conversion": "1.0.0",
-    },
-    m3_geoCalibrationVersion: "ifvi-water-consumption-v2",
-    m3_fitnessTierThresholdVersion: "fitness-tier-v1",
-    m4_decompositionAlgorithmVersion: DECOMPOSITION_VERSIONS.algorithmVersion,
-    m4_cicesMatchLevel: DECOMPOSITION_VERSIONS.cicesMatchLevel,
-    m4_aopMappingVersion: DECOMPOSITION_VERSIONS.aopMappingVersion,
-    // v1(シナリオはラベルのみ、全シナリオ同一コスト)→v2(NGFS軌道に基づきシナリオ別の
-    // 未内部化コストを実際に算出。GAP-11・D-127・D-128)。
-    m5_carbonPriceScenarioSetVersion: "carbon-price-v2",
-    m6_bindingMechanismDefinitionVersion: "binding-mechanism-v1",
-    m7_gapDetectionRuleVersion: "gap-detection-v1",
-  });
+  const recalculationHash = buildDemoRecalculationHash(DECOMPOSITION_VERSIONS);
 
   const assumptionEntries = [
     ...assessment.assumptionEntries,
