@@ -29,7 +29,6 @@ import type { ExchangeAmount } from "@core/types/common";
 import type { ExchangeValuationRecord, WelfareValuationRecord } from "@core/types/valuation";
 import type { DisclosureClaim } from "@core/types/disclosure";
 import type { EvidenceCandidate } from "@core/disclosure/evidence-match";
-import type { ExclusionRecord } from "@core/disclosure/selective-disclosure";
 import type { IntentionalDecisionInput } from "@core/pipeline/disclosure-pipeline";
 import type { BaselineNpvInput, CarbonPriceScenario } from "@core/types/financial-bridge";
 import type { ApprovalThreshold, BindingMechanism } from "@core/types/decision";
@@ -78,6 +77,7 @@ import {
 import { emptyInteractionState } from "./interaction-state";
 import type { InteractionState } from "./interaction-state";
 import { methodLabel } from "@/app/components/method-labels";
+import { buildDisclosureExclusions } from "./build-disclosure-exclusions";
 
 /**
  * 「保存済みの操作のうち、今回の計算にそのまま適用できなかったもの」の記録(第4版 D-01-3)。
@@ -98,12 +98,6 @@ export interface PipelineWarning {
 const NOW = "2027-02-14T09:12:00Z";
 const DECISION_MAKER = "宮里(サステナビリティ推進室)";
 
-/** 評価できなかった理由の表示文言(G6の出力にそのまま載る)。 */
-const UNEVALUATED_REASON_LABEL: Record<string, string> = {
-  license_pending: "データ利用契約の確認待ち",
-  no_data_source: "判定に使えるデータ源がない",
-  site_not_located: "拠点の位置が特定できず未評価",
-};
 
 /** M6 D-6の拘束方式定義の版。DecisionRecordの再計算ハッシュに入る(GAP-06)。 */
 const DECISION_VERSIONS = { bindingMechanismDefinitionVersion: "binding-mechanism-v1" };
@@ -720,46 +714,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
    * G6(選択的開示)の情報源。build-plan §5.5が「M7のG6を可能にする唯一の情報源」と書いた
    * M1・M2の除外理由記録を、そのままM7の射影型に写す。**新しい判断を加えない。**
    */
-  const exclusions: ExclusionRecord[] = [
-    // M1:座標・住所が解決できず、評価対象にすら入らなかった拠点
-    ...assessment.materialIssues
-      .filter((issue) => issue.excluded)
-      .map((issue) => ({
-        siteId: issue.siteId,
-        category: issue.impactCategory,
-        scope: assessment.sites.find((s) => s.id === issue.siteId)?.name ?? issue.siteId,
-        kind: "not_assessed" as const,
-        reason: issue.exclusionReason ?? "理由不明",
-      })),
-    // M2:評価対象には入ったが、深掘り評価に進めなかった課題
-    ...assessment.depthDecisions
-      .filter((decision) => decision.excludedFromDeepDive)
-      .flatMap((decision) => {
-        const issue = assessment.materialIssues.find((i) => i.id === decision.materialIssueId);
-        if (!issue) return [];
-        return [
-          {
-            siteId: issue.siteId,
-            category: issue.impactCategory,
-            scope: assessment.sites.find((s) => s.id === issue.siteId)?.name ?? issue.siteId,
-            kind: "not_deep_dived" as const,
-            reason: decision.exclusionReason ?? "優先度が深掘りの閾値に達しなかったため",
-          },
-        ];
-      }),
-    // M1/M8:ライセンス保留・データ源不在で評価できなかった基準
-    ...assessment.materialIssues
-      .filter((issue) => !issue.excluded && issue.unevaluatedCriteria.length > 0)
-      .map((issue) => ({
-        siteId: issue.siteId,
-        category: issue.impactCategory,
-        scope: assessment.sites.find((s) => s.id === issue.siteId)?.name ?? issue.siteId,
-        kind: "criteria_unevaluated" as const,
-        reason: `${issue.unevaluatedCriteria.length}件の基準を評価できていません(${[
-          ...new Set(issue.unevaluatedCriteria.map((c) => UNEVALUATED_REASON_LABEL[c.reason])),
-        ].join("・")})`,
-      })),
-  ];
+  const exclusions = buildDisclosureExclusions(assessment);
 
   const discoveryDisclosure = runDisclosurePipeline({
     claims,
