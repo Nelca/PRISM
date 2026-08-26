@@ -15,22 +15,15 @@
 
 import { runValuationPipeline } from "@core/pipeline/valuation-pipeline";
 import { RepresentativeValueSelectionError } from "@core/divergence/representative-value";
-import { runDecisionPipeline } from "@core/pipeline/decision-pipeline";
-import { NoContributingRecordError } from "@core/decision/dominant-assumption";
 import { runDisclosurePipeline } from "@core/pipeline/disclosure-pipeline";
 import { createIdSequence } from "@core/pipeline/ids";
 import { getPluginsForCategory } from "@core/monetization/registry";
 import { createSeededRng } from "@core/monetization/rng";
-import { runFinancialBridgePipeline } from "@core/pipeline/financial-bridge-pipeline";
-import { exchangeAmount } from "@core/types/common";
-import type { ExchangeAmount } from "@core/types/common";
 import type { ExchangeValuationRecord, WelfareValuationRecord } from "@core/types/valuation";
 import type { DisclosureClaim } from "@core/types/disclosure";
 import type { EvidenceCandidate } from "@core/disclosure/evidence-match";
 import type { IntentionalDecisionInput } from "@core/pipeline/disclosure-pipeline";
-import type { CarbonPriceScenario } from "@core/types/financial-bridge";
 import type { BindingMechanism } from "@core/types/decision";
-import { convertNgfsPriceToJpy, lookupNgfsCarbonPrice } from "@core/financial-bridge/carbon-price-trajectory";
 import {
   buildClimateCountermeasureCandidates,
   buildCountermeasureCandidates,
@@ -67,6 +60,10 @@ import { buildDisclosureExclusions } from "./build-disclosure-exclusions";
 import { buildDemoRecalculationHash } from "./build-recalculation-hash";
 import { runDemoAssessment } from "./run-demo-assessment";
 import { buildDecisionInputs } from "./build-decision-inputs";
+import { buildCountermeasurePreviews } from "./build-countermeasure-previews";
+import { selectCountermeasure } from "./select-countermeasure";
+import { buildSiteDecision } from "./build-site-decision";
+import { buildFinancialBridge } from "./build-financial-bridge";
 
 /**
  * 「保存済みの操作のうち、今回の計算にそのまま適用できなかったもの」の記録(第4版 D-01-3)。
@@ -378,64 +375,13 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       companyFinancials: interactions.companyFinancials,
     });
 
-    /**
-     * GAP-11(D-127・D-128):気候カテゴリの拠点(site-070)だけ、NGFSのシナリオ別炭素価格軌道を
-     * 使って実際にシナリオごとに異なる未内部化コストを計算する。水カテゴリの拠点は
-     * 従来どおり(全シナリオ共通の`uninternalizedCost`)のまま変更しない。
-     *
-     * 対象年は2030年(period=5・NOW=2027年のため、軌道データの5年刻みのうち直近の年)。
-     * `gx_ets_official`シナリオは指定せず、`representative`(GX-ETS価格ベース)の
-     * 基準コストにフォールバックさせる(4シナリオ分のみ上書きする設計、nature-debt.ts参照)。
-     */
-    const uninternalizedCostByScenario: Partial<Record<CarbonPriceScenario, ExchangeAmount>> | undefined =
-      isClimateShowcaseSite
-        ? (() => {
-            const physicalQuantityTco2 = CLIMATE_DEEP_DIVE_INPUT.physicalQuantity;
-            const year = 2030;
-            const costFor = (scenario: "net_zero_2050" | "current_policies", model: "gcam" | "remind") =>
-              exchangeAmount(
-                physicalQuantityTco2 * convertNgfsPriceToJpy(lookupNgfsCarbonPrice(scenario, model, "japan", year)) -
-                  (companyFinancials.currentlyInternalizedCost as number)
-              );
-            return {
-              ngfs_net_zero_2050_gcam: costFor("net_zero_2050", "gcam"),
-              ngfs_net_zero_2050_remind: costFor("net_zero_2050", "remind"),
-              ngfs_current_policies_gcam: costFor("current_policies", "gcam"),
-              ngfs_current_policies_remind: costFor("current_policies", "remind"),
-            };
-          })()
-        : undefined;
-
-    const financialBridgeResult = runFinancialBridgePipeline({
-      exchangeRecord: representative,
+    const { financialBridge, comparisonTargets } = buildFinancialBridge({
+      representative,
       ...(lime3 ? { welfareRecord: lime3 } : {}),
-      // 以前は通常NPVを報告営業利益として渡していた(別概念の値の代入)。企業提供の
-      // 報告営業利益を使う。実データの入口はT-15(財務パラメータ入力UI)で作る。
-      reportedOperatingProfit: companyFinancials.reportedOperatingProfit,
-      currentlyInternalizedCost: companyFinancials.currentlyInternalizedCost,
-      existingImpairmentThreshold: companyFinancials.existingImpairmentThreshold,
-      financials: companyFinancials.creditMetrics,
-      // 5シナリオ均等割り(M5 D-4.3の中立的な初期値。PRISMは特定シナリオを推奨しない)。
-      // NGFS 2シナリオはGCAM/REMIND-MAgPIEの2モデルに分けている(D-127)。
-      internalizationProbabilities: [
-        { scenario: "ngfs_net_zero_2050_gcam", probability: 1 / 5, period: 5 },
-        { scenario: "ngfs_net_zero_2050_remind", probability: 1 / 5, period: 5 },
-        { scenario: "ngfs_current_policies_gcam", probability: 1 / 5, period: 5 },
-        { scenario: "ngfs_current_policies_remind", probability: 1 / 5, period: 5 },
-        { scenario: "gx_ets_official", probability: 1 / 5, period: 5 },
-      ],
-      discountRate: baselineNpv.discountRate,
-      socialCostInternalizationRate: 0.15,
-      ...(uninternalizedCostByScenario ? { uninternalizedCostByScenario } : {}),
+      baselineNpv,
+      companyFinancials,
+      isClimateShowcaseSite,
     });
-
-    const financialBridge = {
-      bridge1: financialBridgeResult.bridge1,
-      bridge2: financialBridgeResult.bridge2,
-      internalizationStatus: financialBridgeResult.internalizationStatus,
-      natureDebt: financialBridgeResult.natureDebt,
-    };
-    const comparisonTargets = financialBridgeResult.comparisonTargets;
 
     // --- M6:対策案4種を並行して計算し、比較テーブル/散布図に使う ---
     const candidates: CountermeasureCandidate[] = isFlagshipSite
@@ -456,66 +402,27 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     const bindingState = interactions.bindingMechanismState.get(siteId);
     const bindingMechanism: BindingMechanism = bindingState?.mechanism ?? { kind: "weak_reference" };
     const bindingHistory = bindingState?.history ?? [];
-    const latestBindingChange = bindingHistory[bindingHistory.length - 1];
-
-    /**
-     * 第5版レビュー(2026-08-17):「対策を実施せず監視を継続」案は回避コストが0円のため
-     * `avoidedNatureCost: []`で構成される(コスト0=対策なしを正しく表す設計)。
-     * この案のNPVレンジは通常NPVちょうどに退化し(p5=p50=p95)、承認閾値がその値と
-     * 一致する入力だと★判定が「またぐ」になる。`identifyDominantAssumption`
-     * (M6 D-3、packages/core・変更不可)は「参照できるValuationRecordが1つもない」を
-     * エラーとして扱うため、この組み合わせで`runDecisionPipeline`が例外を投げる。
-     *
-     * 以前はこの例外が保存前の検証(D-01-2)を通らないケースでは捕捉されるが、
-     * **保存済みのrunを読み直すだけの経路(`executeAndPersistRun`)では捕捉されず、
-     * ページ全体がクラッシュしていた。**候補1件の計算失敗で画面全体を落とさず、
-     * その候補だけを比較対象から外し、理由を警告として残す(黙って消さない、第4版D-01-3と同じ規律)。
-     */
-    const countermeasureCandidates = candidates.flatMap((candidate) => {
-      try {
-        const previewDecision = runDecisionPipeline({
-          id: `dr-${siteId}-${candidate.key}-preview`,
-          decisionTarget: "investment_approval",
-          decisionMaker: DECISION_MAKER,
-          decisionDate: "2027-02-14",
-          approvalThreshold,
-          relatedValuationRecords: [representative],
-          baselineNpv,
-          countermeasures: [candidate.countermeasure],
-          valuationRecordsById,
-          bindingMechanism,
-          versions: DECISION_VERSIONS,
-          idSequence,
-          now: NOW,
-        });
-        return [
-          {
-            key: candidate.key,
-            label: candidate.label,
-            investmentCost: candidate.countermeasure.investmentCost,
-            avoidedPhysicalQuantity: candidate.avoidedPhysicalQuantity,
-            decisionRecord: previewDecision.decisionRecord,
-          },
-        ];
-      } catch (cause) {
-        /**
-         * ここで捕捉してよいのは`NoContributingRecordError`(M6 D-3)だけに限る。
-         * 承認閾値がちょうど通常NPVと一致し、かつ回避コスト0円の対策(「対策を実施せず
-         * 監視を継続」)が選ばれたときにだけ起こる、構造的に無害な退化ケース。
-         * それ以外の例外(例:評価期間を超えるavoidedNatureCost)は**利用者の入力自体が
-         * 不正である**ことを示す正当なエラーのため、ここで握りつぶさず再送出し、
-         * 呼び出し元(`tryRunAndPersist`の事前検証)で正しく「保存しない」判断をさせる。
-         */
-        if (!(cause instanceof NoContributingRecordError)) throw cause;
-        console.error(`[run-demo-pipeline] 対策案「${candidate.label}」(${siteId})の計算に失敗しました:`, cause);
-        warnings.push({
-          id: `countermeasure-preview-failed-${siteId}-${candidate.key}`,
-          screen: "/decision",
-          message: `${site.name}の対策案「${candidate.label}」は、承認基準がちょうど通常NPVと一致する等の理由で計算できなかったため、比較対象から除いています。`,
-        });
-        return [];
-      }
+    const commonDecisionOptions = {
+      decisionTarget: "investment_approval" as const,
+      decisionMaker: DECISION_MAKER,
+      decisionDate: "2027-02-14",
+      approvalThreshold,
+      relatedValuationRecords: [representative],
+      baselineNpv,
+      valuationRecordsById,
+      bindingMechanism,
+      versions: DECISION_VERSIONS,
+      idSequence,
+      now: NOW,
+    };
+    const previewResult = buildCountermeasurePreviews({
+      siteId,
+      siteName: site.name,
+      candidates,
+      commonOptions: commonDecisionOptions,
     });
+    const countermeasureCandidates = previewResult.previews;
+    warnings.push(...previewResult.warnings);
     if (countermeasureCandidates.length === 0) {
       warnings.push({
         id: `countermeasure-all-failed-${siteId}`,
@@ -525,69 +432,32 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       return [];
     }
 
-    const requestedKey = interactions.selectedCountermeasureKey.get(siteId);
-    const selectedKey = countermeasureCandidates.some((c) => c.key === requestedKey)
-      ? requestedKey!
-      : countermeasureCandidates[0].key;
-    if (requestedKey && requestedKey !== selectedKey) {
-      warnings.push({
-        id: `countermeasure-selection-unavailable-${siteId}`,
-        screen: "/decision",
-        message: `${site.name}で選択されていた対策案は今回計算できなかったため、既定の対策案で計算しています。`,
-      });
-    }
+    const selection = selectCountermeasure({
+      siteId,
+      siteName: site.name,
+      previews: countermeasureCandidates,
+      requestedKey: interactions.selectedCountermeasureKey.get(siteId),
+    });
+    const selectedKey = selection.selectedKey;
+    if (selection.warning) warnings.push(selection.warning);
     const selectedCandidateSource = candidates.find((c) => c.key === selectedKey)!;
-
-    let decision;
-    try {
-      decision = runDecisionPipeline({
-        id: isFlagshipSite ? "dr-site042-2027" : `dr-${siteId}-2027`,
-        decisionTarget: "investment_approval",
-        decisionMaker: DECISION_MAKER,
-        decisionDate: "2027-02-14",
-        approvalThreshold,
-        relatedValuationRecords: [representative],
-        baselineNpv,
-        countermeasures: [selectedCandidateSource.countermeasure],
-        valuationRecordsById,
-        bindingMechanism,
-        versions: DECISION_VERSIONS,
-        ...(latestBindingChange
-          ? {
-              bindingMechanismChange: {
-                previousMechanism: latestBindingChange.previousMechanism,
-                reason: latestBindingChange.reason,
-                changedAt: latestBindingChange.changedAt,
-              },
-            }
-          : {}),
-        idSequence,
-        now: NOW,
-      });
-    } catch (cause) {
-      // 上と同じ理由で、捕捉範囲を`NoContributingRecordError`だけに限る。
-      if (!(cause instanceof NoContributingRecordError)) throw cause;
-      console.error(`[run-demo-pipeline] ${siteId}の判定計算に失敗しました:`, cause);
-      warnings.push({
-        id: `decision-failed-${siteId}`,
-        screen: "/decision",
-        message: `${site.name}の判定を計算できなかったため、対策と判定・財務への影響を表示できませんでした。投資の承認ラインまたは選択中の対策案をご確認ください。`,
-      });
-      return [];
-    }
-    // 直近の変更のみpipelineの標準経路でAssumptionEntryを生成する。それより前の変更は
-    // このデモが毎回ゼロから再計算する構成上、当時のAssumptionEntryを再現できないため、
-    // bindingMechanismHistory配列にのみ反映する(表示上の履歴としては完全な形にする)。
-    const decisionRecord = {
-      ...decision.decisionRecord,
-      bindingMechanismHistory: bindingHistory,
-    };
+    const siteDecision = buildSiteDecision({
+      siteId,
+      siteName: site.name,
+      isFlagshipSite,
+      selectedCandidate: selectedCandidateSource,
+      commonOptions: commonDecisionOptions,
+      bindingHistory,
+    });
+    if (siteDecision.warning) warnings.push(siteDecision.warning);
+    if (!siteDecision.decision) return [];
+    const decision = siteDecision.decision;
 
     return [
       {
         siteId,
         siteName: site.name,
-        decision: { decisionRecord, assumptionEntries: decision.assumptionEntries },
+        decision,
         financialBridge,
         comparisonTargets,
         countermeasureCandidates,

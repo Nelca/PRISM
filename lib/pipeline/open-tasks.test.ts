@@ -3,11 +3,11 @@ import { runDemoPipeline, DEFAULT_RNG_SEED } from "@/lib/demo/run-demo-pipeline"
 import { emptyInteractionState } from "@/lib/demo/interaction-state";
 import type { InteractionState } from "@/lib/demo/interaction-state";
 import { formatCompactYenRange } from "@/app/components/numeric";
+import { deriveOpenTasks } from "./open-actions";
+import { deriveFindings } from "./pipeline-findings";
 import {
   decompositionForMaterialIssue,
-  deriveFindings,
   deriveMoneySummary,
-  deriveOpenTasks,
   deriveStepProgress,
   hasRepresentativeSelection,
   materialIssueIdsWithoutRepresentativeSelection,
