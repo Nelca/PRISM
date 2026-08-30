@@ -15,13 +15,39 @@ import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { getLatestRun, persistRun } from "@/lib/db/repositories/runs";
 import { observedVersionsFromHashInputs, recordObservedVersions } from "@/lib/db/repositories/parameter-versions";
 import type { DbExecutor } from "@/lib/db/client";
+import { listActiveInputBatches, listActivePhysicalInputRecords } from "@/lib/db/repositories/physical-inputs";
+import type { AppendCalculationLineItemInput } from "@/lib/db/repositories/physical-inputs";
+import { DEMO_CATEGORY_EXPANSION_BATCHES, DEMO_CATEGORY_EXPANSION_RECORDS } from "@/lib/demo/category-expansion-data";
+import { buildCategoryExpansionRuntime } from "./category-expansion-runtime";
 
 /** 入力を読み直してパイプラインを実行し、新しいrunとして永続化する。 */
-export async function executeAndPersistRun(tenantId: string): Promise<DemoPipelineResult> {
-  const [userSites, interactions] = await Promise.all([listSiteEntries(tenantId), loadInteractionState(tenantId)]);
-
-  const result = runDemoPipeline({ userSites, interactions, rngSeed: DEFAULT_RNG_SEED });
-  return persistComputedRun(tenantId, result);
+export async function executeAndPersistRun(tenantId: string, db?: DbExecutor): Promise<DemoPipelineResult> {
+  // DbTransactionは単一clientなので、pg@9でも安全なよう同一tx内のqueryを並列実行しない。
+  const userSites = await listSiteEntries(tenantId, db);
+  const interactions = await loadInteractionState(tenantId, db);
+  const physicalInputRecords = await listActivePhysicalInputRecords(tenantId, undefined, db);
+  const activeBatches = await listActiveInputBatches(tenantId, db);
+  // 未登録環境でも追加3カテゴリの画面・算定を確認できるよう、入力バッチが一件も
+  // 有効化されていない場合だけ架空サンプルを使う。顧客入力が一件でもあれば混在させない。
+  const usesDemoCategoryInputs = activeBatches.length === 0;
+  const expansion = await buildCategoryExpansionRuntime(
+    usesDemoCategoryInputs ? DEMO_CATEGORY_EXPANSION_RECORDS : physicalInputRecords,
+    usesDemoCategoryInputs ? DEMO_CATEGORY_EXPANSION_BATCHES : activeBatches
+  );
+  const result = runDemoPipeline({
+    userSites,
+    interactions,
+    rngSeed: DEFAULT_RNG_SEED,
+    physicalInputs: expansion.physicalInputs,
+    activeMaterialIssueTargets: expansion.activeMaterialIssueTargets,
+    deepDiveConfigsByMaterialIssue: expansion.deepDiveConfigsByMaterialIssue,
+    coverageByMaterialIssue: expansion.coverageByMaterialIssue,
+    methodAvailabilityByMaterialIssue: expansion.methodAvailabilityByMaterialIssue,
+    inputBatchHashes: expansion.inputBatchHashes,
+  });
+  // デモレコードはDBのphysical_input_recordに存在しないため、外部キーを持つ算定行は
+  // 保存しない。run内の入力ハッシュ・カバレッジ・仮定台帳には出所を残す。
+  return persistComputedRun(tenantId, result, db, usesDemoCategoryInputs ? [] : expansion.calculationLineItems);
 }
 
 /**
@@ -35,9 +61,10 @@ export async function executeAndPersistRun(tenantId: string): Promise<DemoPipeli
 export async function persistComputedRun(
   tenantId: string,
   result: DemoPipelineResult,
-  db?: DbExecutor
+  db?: DbExecutor,
+  calculationLineItems?: AppendCalculationLineItemInput[]
 ): Promise<DemoPipelineResult> {
-  await persistRun({ tenantId, rngSeed: DEFAULT_RNG_SEED, result }, db);
+  await persistRun({ tenantId, rngSeed: DEFAULT_RNG_SEED, result, calculationLineItems }, db);
 
   // 実際に使われた版を台帳に取り込む(M8「後から手で入力する設計にしない」)。
   // 変更理由は付けない(自動検出では分からないため。画面が未記録として人間に促す)。
@@ -74,7 +101,7 @@ export const getOrCreateLatestResult = cache(async function getOrCreateLatestRes
   tenantId: string
 ): Promise<DemoPipelineResult> {
   const latest = await getLatestRun(tenantId);
-  if (latest && latest.resultSchemaVersion === RESULT_SCHEMA_VERSION) {
+  if (latest && latest.resultSchemaVersion === RESULT_SCHEMA_VERSION && !requiresLicenseRefresh(latest.result)) {
     // 保存済みrunを返す場合も、そのrunが使った版が台帳にあることを保証する。
     // 版管理を後から導入したため、既存runの分が台帳に載っていないことがある。
     // 追記は冪等(同じsetId・versionは無視される)なので、読み出しのたびに呼んでよい。
@@ -87,3 +114,19 @@ export const getOrCreateLatestResult = cache(async function getOrCreateLatestRes
   }
   return executeAndPersistRun(tenantId);
 });
+
+/** 保存済みrunの計算後にライセンス期限を迎えた場合、期限前の金額を配信し続けない。 */
+export function requiresLicenseRefresh(result: DemoPipelineResult, now = new Date()): boolean {
+  const expiresAtEndOfDay = (date: string): number =>
+    /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? new Date(`${date}T23:59:59.999+09:00`).getTime()
+      : new Date(date).getTime();
+  return Object.values(result.valuation.methodAvailabilityByMaterialIssue).some((methods) =>
+    methods.some(
+      (method) =>
+        method.status === "available" &&
+        method.licenseExpiresAt !== undefined &&
+        (!Number.isFinite(expiresAtEndOfDay(method.licenseExpiresAt)) || expiresAtEndOfDay(method.licenseExpiresAt) < now.getTime())
+    )
+  );
+}

@@ -4,7 +4,7 @@ import { detectReassessmentAlerts } from "@core/decision/reassessment";
 import { loadInteractivePipelineView } from "@/lib/views/pipeline";
 import { Num, pickYenScale } from "../components/numeric";
 import { Card, GuideBox, GuideButton, ScreenLead, Stat, Tag } from "../components/ui";
-import { bindingLabel, formatDominantAssumption, verdictLabel, verdictTagVariant } from "../components/labels";
+import { bindingLabel, categoryLabel, formatDominantAssumption, materialIssueLabel, verdictLabel, verdictTagVariant } from "../components/labels";
 import { methodLabel } from "../components/method-labels";
 import { StepNav } from "../components/step-nav";
 import { TaskBanner } from "../components/task-banner";
@@ -37,6 +37,11 @@ export default async function DecisionPage({
   const { site: siteParam } = await searchParams;
   const { tenantId, result, interactions } = await loadInteractivePipelineView();
   const { decisions } = result;
+  const siteNameById = new Map(result.assessment.sites.map((site) => [site.id, site.name]));
+  const welfareOnlyIssues = result.assessment.materialIssues.filter((issue) => {
+    const records = result.valuation.valuationRecordsByMaterialIssue[issue.id] ?? [];
+    return records.length > 0 && records.every((record) => record.valueConcept === "welfare");
+  });
   // 入力済みの投資判断の前提(フォームの初期値に使う)
   const { decisionParameters } = interactions;
 
@@ -80,6 +85,13 @@ export default async function DecisionPage({
             評価対象の絞り込みへ →
           </Link>
         </Card>
+        {welfareOnlyIssues.length > 0 && (
+          <Card title="社会的厚生価値の参考結果" headExtra={<Tag variant="welfare">NPV・ROI対象外</Tag>}>
+            <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+              追加カテゴリのLIME3結果は社会的な厚生価値です。企業の交換価値が登録されるまで、投資判定には使用しません。
+            </p>
+          </Card>
+        )}
       </div>
     );
   }
@@ -141,6 +153,28 @@ export default async function DecisionPage({
 
       {/* D-11-1:残タスクの頭出し(最下部までスクロールしなくても見える)。 */}
       <TaskBanner current="/decision" result={result} />
+
+      {welfareOnlyIssues.length > 0 && (
+        <Card
+          title="社会的厚生価値は投資判定に加算しません"
+          subtitle="追加カテゴリのLIME3結果"
+          headExtra={<Tag variant="welfare">NPV・ROI対象外</Tag>}
+        >
+          <p style={{ marginTop: 0, color: "var(--ink-soft)" }}>
+            次の評価結果は社会全体への影響を示す参考値です。企業の交換価値が入力されるまで、対策ROI、自然調整後NPV、承認ライン判定には使用しません。
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {welfareOnlyIssues.map((issue) => (
+              <li key={issue.id}>
+                <Link href={`/valuation?issue=${encodeURIComponent(issue.id)}`}>
+                  {materialIssueLabel(siteNameById.get(issue.siteId), issue.impactCategory, issue.id)}
+                </Link>
+                <span className="cell-note">{categoryLabel(issue.impactCategory)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* D-11-3:サマリーが先、詳細は要求時。1拠点1行で判定・対策・反映先・残タスクを見渡す。 */}
       <Card

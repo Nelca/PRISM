@@ -78,11 +78,13 @@ export function bindingLabel(kind: string): string {
   return BINDING_LABEL.get(kind as BindingKind) ?? kind;
 }
 
-/** 評価カテゴリ。M3は現状 water と climate を実装している(pollutionは型のみ)。 */
+/** 評価カテゴリ。M3は気候・水に加え、LIME3単独で汚染・廃棄物・土地利用を扱う。 */
 export const CATEGORY_LABEL: Record<ImpactCategory, string> = {
   water: "取水量・水ストレス",
   climate: "GHG排出量",
   pollution: "汚染物質の排出",
+  waste: "廃棄物・資源循環",
+  land_use: "土地利用・土地改変",
 };
 
 export function categoryLabel(category: string): string {

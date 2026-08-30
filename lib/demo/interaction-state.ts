@@ -40,6 +40,8 @@ export type InteractionKind =
   | "company_financials"
   /** 決定単位の入力(M6 D-4・D-10)。経営企画・経理が入力する。 */
   | "decision_parameters"
+  /** 物理入力カテゴリごとの有効バッチ切替。現在値は入力リポジトリ側で射影する。 */
+  | "input_batch_activation"
   /**
    * 登録済み拠点の編集・削除(指示B-03)。subjectIdは拠点ID。
    *

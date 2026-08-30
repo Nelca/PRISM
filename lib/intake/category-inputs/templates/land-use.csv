@@ -1,0 +1,3 @@
+site_id,activity_kind,project_id,quantity,unit,land_class,land_class_before,land_class_after,source_record_id,geometry_geojson
+site-042,conversion,project-demo-001,500,m2,,forest,building,land-demo-001,"{""type"":""Polygon"",""coordinates"":[[[136.89,35.09],[136.91,35.09],[136.91,35.11],[136.89,35.09]]]}"
+site-042,occupation,project-demo-001,500,m2year,building,,,land-demo-002,

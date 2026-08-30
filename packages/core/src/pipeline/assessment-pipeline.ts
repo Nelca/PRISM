@@ -51,7 +51,7 @@ export interface AssessmentPipelineOptions {
    */
   resolveCriterion?: (iface: NatureInterface) => CriterionKey | null;
   /** M2 D-1のスクリーニング評価結果(M3スクリーニング深度)を注入する。 */
-  screeningValuationForMaterialIssue: (materialIssue: MaterialIssue) => ExchangeValuationRecord;
+  screeningValuationForMaterialIssue: (materialIssue: MaterialIssue) => ExchangeValuationRecord | null;
   promotionOptions?: ComputeDepthDecisionsOptions;
   idSequence: () => string;
   now: string;
@@ -99,15 +99,47 @@ export function runAssessmentPipeline(options: AssessmentPipelineOptions): Asses
   }
 
   const evaluableIssues = materialIssues.filter((issue) => !issue.excluded);
-  const priorityInputs: PriorityScoreInput[] = evaluableIssues.map((issue) => ({
-    materialIssueId: issue.id,
-    sensitivityScore: issue.sensitivityScore,
-    screeningValuationRecord: options.screeningValuationForMaterialIssue(issue),
-    impactCategory: issue.impactCategory,
-  }));
+  const priorityInputs: PriorityScoreInput[] = evaluableIssues.flatMap((issue) => {
+    const record = options.screeningValuationForMaterialIssue(issue);
+    return record
+      ? [
+          {
+            materialIssueId: issue.id,
+            sensitivityScore: issue.sensitivityScore,
+            screeningValuationRecord: record,
+            impactCategory: issue.impactCategory,
+          },
+        ]
+      : [];
+  });
 
   const priorityScores = computePriorityScores(priorityInputs);
   const rawDepthDecisions = computeDepthDecisions(priorityScores, options.promotionOptions);
+  const scoredIssueIds = new Set(priorityScores.map((score) => score.materialIssueId));
+  const manualOverrides = options.promotionOptions?.manualOverrides ?? new Set<string>();
+  for (const issue of evaluableIssues) {
+    if (scoredIssueIds.has(issue.id)) continue;
+    const promotedManually = manualOverrides.has(issue.id);
+    rawDepthDecisions.push(
+      promotedManually
+        ? {
+            materialIssueId: issue.id,
+            depth: "deep_dive",
+            promotedManually: true,
+            excludedFromDeepDive: false,
+            assumptionEntryIds: [],
+          }
+        : {
+            materialIssueId: issue.id,
+            depth: "screening",
+            promotedManually: false,
+            excludedFromDeepDive: true,
+            exclusionReason:
+              "企業財務に接続できる交換価値の入力がないため自動優先度を算定していません。必要な場合は手動で詳細評価へ進めてください。",
+            assumptionEntryIds: [],
+          }
+    );
+  }
 
   const depthDecisions = rawDepthDecisions.map((decision) => {
     const payload = deriveM2DepthDecisionPayload(decision);

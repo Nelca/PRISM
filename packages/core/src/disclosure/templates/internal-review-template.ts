@@ -20,6 +20,8 @@ const CATEGORY_LABEL: Record<ImpactCategory, string> = {
   climate: "気候変動",
   water: "水資源",
   pollution: "汚染",
+  waste: "廃棄物・資源循環",
+  land_use: "土地利用・土地改変",
 };
 
 const BINDING_LABEL: Record<BindingMechanism["kind"], string> = {

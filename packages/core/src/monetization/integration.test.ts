@@ -98,6 +98,7 @@ describe("M3統合テスト:水カテゴリで3手法・合計6本のValuationRe
     });
 
     for (const record of groups.flatMap((g) => g.records)) {
+      if (!record.quantileRange) throw new Error("既存水手法には不確実性レンジが必要です");
       expect(record.quantileRange.p5).toBeLessThanOrEqual(record.quantileRange.p50);
       expect(record.quantileRange.p50).toBeLessThanOrEqual(record.quantileRange.p95);
       expect(record.transferFitness.tier).toMatch(/^(A|B|C|not_applicable)$/);

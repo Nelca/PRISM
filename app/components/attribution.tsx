@@ -16,6 +16,8 @@ export const DATA_SOURCE_ATTRIBUTION: Record<string, string> = {
     "ENCORE Partners (Global Canopy, UNEP FI, and UNEP-WCMC) (2026). ENCORE: Exploring Natural Capital Opportunities, Risks and Exposure. [On-line], May/2026, Cambridge, UK: the ENCORE Partners. Available at: https://encorenature.org.",
   "World Bank":
     "Data source: World Bank, World Development Indicators. License: CC BY-4.0 (https://creativecommons.org/licenses/by/4.0/). Indicators used: PA.NUS.PPP, NY.GNP.PCAP.PP.CD, NY.GDP.DEFL.ZS.",
+  "AIST-IDEA LIME3 Ver.4.0":
+    "出典: 産業技術総合研究所 IDEAラボ AIST-IDEA Ver.4.0標準版 / LIME3。社内ライセンスに基づき算定し、原係数は再配布していません。",
 };
 
 /** `dataSource`名の配列から、帰属表示が必要なものだけを1行にまとめて表示する。 */

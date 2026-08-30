@@ -14,6 +14,8 @@ export const DISCLOSURE_REQUIREMENT_TABLE: Record<ImpactCategory, number> = {
   climate: 3, // 高:SSBJが既に義務化
   water: 2, // 中:自然関連、2029〜2031年見込み
   pollution: 2, // 中:自然関連、2029〜2031年見込み
+  waste: 2, // 中:ESRS E5/TNFD汚染ドライバー
+  land_use: 2, // 中:TNFD中核指標/ESRS E4
 };
 
 export function getDisclosureRequirement(category: ImpactCategory): number {

@@ -7,6 +7,8 @@ import { DataSourceAttribution } from "../components/attribution";
 import { RegisterTabs } from "./register-tabs";
 import { EditSiteButton } from "./add-site-form";
 import { RemoveSiteButton } from "./remove-site-button";
+import { PrtrImportForm } from "./prtr-import-form";
+import { CategoryInputImportForms } from "./category-input-import-forms";
 import { TaskBanner } from "../components/task-banner";
 
 /**
@@ -80,7 +82,7 @@ export default async function SitesPage() {
         <GuideBox>
           この画面では、評価の対象になる拠点を登録します。<b>1.</b> 右の表で3つのCSV/JSONの記入例をダウンロードし、
           担当部門に記入を依頼します → <b>2.</b> 「登録する」でCSV3ファイルをまとめて取り込むか、1件ずつ追加します →{" "}
-          <b>3.</b> 「拠点一覧」で座標解決の状態を確認します → <b>4.</b> 揃ったら「評価対象の絞り込み」へ進みます。
+          <b>3.</b> 汚染物質を評価する場合は「PRTR排出量を取り込む」で対象施設と拠点を対応付けます → <b>4.</b> 「拠点一覧」で座標解決の状態を確認します → <b>5.</b> 揃ったら「評価対象の絞り込み」へ進みます。
           登録すると住所は座標に解決され、周辺の自然環境との関係が分析されて
           <b title="TNFDの5基準(水ストレス・生物多様性の重要性など)のうち該当した数。数が多いほど自然への依存・影響が強く、評価の優先度が上がります">自然との関わり(0〜5)</b>
           が算出されます。座標も住所もない行は評価に進めないため、黙って消さず理由付きで下段に残します。
@@ -140,6 +142,22 @@ export default async function SitesPage() {
           </table>
         </Card>
       </div>
+
+      <Card
+        title="PRTR排出量を取り込む"
+        subtitle="既存の拠点CSV取込とは別の、汚染物質算定専用の入力経路です"
+        foot="対象施設はfacility-crosswalk.csvで明示的にPRISM拠点へ対応付けます。下水道・事業所外への移動量は保存しますが、環境への直接排出としては算定しません。"
+      >
+        <PrtrImportForm />
+      </Card>
+
+      <Card
+        title="廃棄物・土地利用を取り込む"
+        subtitle="廃棄物は汚染と別カテゴリ、土地利用はLIME3単独の内部パイロットとして算定します"
+        foot="廃棄物のPRTR移動量リンクは、現在有効な移動量だけを参照でき、同じ移動量を複数行へ割り当てられません。内部処理費用は社会的な厚生価値へ加算しません。土地利用は顧客提供の転換前後・面積を一次入力とし、公開メッシュで自動上書きしません。"
+      >
+        <CategoryInputImportForms />
+      </Card>
 
       <Card
         title="拠点一覧"

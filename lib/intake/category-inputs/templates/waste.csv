@@ -1,0 +1,2 @@
+site_id,reporting_period,waste_type_code,hazardous,treatment_route,treatment_location,weight_basis,quantity_kg,source_record_id,linked_prtr_transfer_input_id,internal_treatment_cost
+site-042,2023,industrial_unspecified,false,landfill,offsite,wet,1000,waste-demo-001,DEMO-FAC-001:1:offsite_waste,25000

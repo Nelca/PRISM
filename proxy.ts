@@ -81,11 +81,11 @@ export function proxy(request: NextRequest) {
 
   const host = request.headers.get("host") ?? "";
   const subdomain = extractSubdomain(host);
-  if (!subdomain) {
-    return NextResponse.next();
-  }
+  // x-tenant-idは外部入力として信用しない。必ずHostから再生成し、ルートドメインでは削除する。
+  // Server Actionは直接POSTできるため、これを残すと任意ヘッダーで別テナントを書き換えられる。
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-tenant-id", subdomain);
+  if (subdomain) requestHeaders.set("x-tenant-id", subdomain);
+  else requestHeaders.delete("x-tenant-id");
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
 

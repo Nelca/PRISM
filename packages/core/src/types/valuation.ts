@@ -10,6 +10,7 @@ import type {
   ExchangeAmount,
   ImpactCategory,
   LicenseMode,
+  ParameterUncertainty,
   QuantileRange,
   SpecifiedLevel,
   ValueConcept,
@@ -17,8 +18,7 @@ import type {
 } from "./common";
 import type { AssessmentDepth } from "./assessment";
 
-export interface PhysicalQuantityInput {
-  category: ImpactCategory;
+interface PhysicalQuantityInputBase {
   physicalQuantity: number;
   unit: string;
   siteId: string;
@@ -26,6 +26,116 @@ export interface PhysicalQuantityInput {
   sourceRegion: string;
   /** 評価対象地域(通常は日本)。 */
   targetRegion: string;
+}
+
+export interface ClimateQuantityInput extends PhysicalQuantityInputBase {
+  category: "climate";
+}
+
+export interface WaterQuantityInput extends PhysicalQuantityInputBase {
+  category: "water";
+}
+
+export type PollutionReleaseMedium =
+  | "air"
+  | "public_water"
+  | "soil"
+  | "onsite_landfill"
+  | "sewer"
+  | "offsite_waste";
+
+export interface PollutionReleaseInput extends PhysicalQuantityInputBase {
+  category: "pollution";
+  unit: "kg";
+  reportingYear: number;
+  prtrListVersion: string;
+  facilityId: string;
+  prtrSubstanceCode: string;
+  casRns: string[];
+  /** CASの由来。公式物質マスタ未接続時にレビュー済み対応表から補完した事実も隠さない。 */
+  casSource?: "prtr_substance_master" | "reviewed_mapping";
+  releaseMedium: PollutionReleaseMedium;
+  sourceKind: "public_prtr" | "customer_prtr" | "demo_sample";
+  sourceRecordId: string;
+  sourceRecordHash: string;
+}
+
+export interface WasteQuantityInput extends PhysicalQuantityInputBase {
+  category: "waste";
+  unit: "kg";
+  reportingPeriod: string;
+  wasteTypeCode: string;
+  hazardous: boolean;
+  treatmentRoute: string;
+  treatmentLocation: "onsite" | "offsite";
+  weightBasis: "wet" | "dry" | "unknown";
+  sourceRecordId: string;
+  sourceRecordHash: string;
+  linkedPrtrTransferInputId?: string;
+  internalTreatmentCost?: number;
+}
+
+export interface LandConversionInput extends PhysicalQuantityInputBase {
+  category: "land_use";
+  activityKind: "conversion";
+  unit: "m2";
+  projectId: string;
+  landClassBefore: string;
+  landClassAfter: string;
+  sourceRecordId: string;
+  sourceRecordHash: string;
+}
+
+export interface LandOccupationInput extends PhysicalQuantityInputBase {
+  category: "land_use";
+  activityKind: "occupation";
+  unit: "m2year";
+  projectId: string;
+  landClass: string;
+  sourceRecordId: string;
+  sourceRecordHash: string;
+}
+
+export type PhysicalQuantityInput =
+  | ClimateQuantityInput
+  | WaterQuantityInput
+  | PollutionReleaseInput
+  | WasteQuantityInput
+  | LandConversionInput
+  | LandOccupationInput;
+
+export interface ValueFactorRecord {
+  factorId: string;
+  methodId: string;
+  methodVersion: string;
+  sourceFlowId: string;
+  sourceFlowName: string;
+  medium?: Exclude<PollutionReleaseMedium, "sewer" | "offsite_waste">;
+  valuePerUnit: number;
+  denominatorUnit: "kg" | "m2" | "m2year";
+  currency: "JPY" | "USD" | "EUR";
+  priceYear: number | null;
+  geographicPerspective: string;
+  sourceRegion: string;
+  sourceHash: string;
+  licenseMode: LicenseMode;
+  licenseValidUntil?: string;
+}
+
+export interface FactorResolution {
+  factor: ValueFactorRecord;
+  mappingId: string;
+  mappingVersion: string;
+  mappingHash: string;
+}
+
+/** 通貨換算は、便益の地域移転(PPP・所得弾力性等)と分離して記録する。 */
+export interface CurrencyConversionRecord {
+  fromCurrency: "USD" | "EUR" | "JPY";
+  toCurrency: "JPY";
+  rate: number;
+  rateDate: string;
+  source: string;
 }
 
 export interface MethodConfig {
@@ -44,6 +154,9 @@ export interface MethodConfig {
    * 将来のデータ接続実装で行う。MVPでは呼び出し側が既知の値を直接渡す。
    */
   externalValueFactors?: Record<string, number>;
+  /** 追加カテゴリで使う、レビュー済み対応表から解決済みの構造化係数。 */
+  factorResolution?: FactorResolution;
+  currencyConversion?: CurrencyConversionRecord;
   /**
    * IFVIのVFes深掘り評価(D-6)で使う5次元適合度スコア。ESVD個別レコード照合の実装は
    * MVPスコープ外のため、外部(将来的なESVD検索機能)から渡される値として受け取る。
@@ -112,7 +225,7 @@ export interface MethodOutput {
   /** 較正前(source region)の値。 */
   centralValue: number;
   /** 層i:パラメータ不確実性。 */
-  parameterUncertainty: Distribution;
+  parameterUncertainty: ParameterUncertainty;
   /** 層ii:移転誤差。 */
   transferFitness: TransferFitness;
   discountRate: number | null;
@@ -206,8 +319,6 @@ interface ValuationRecordCommon {
   /** 損害の測定単位(該当する場合)。 */
   metric?: "DALY" | "PDF" | "MSA" | null;
   cicesRef?: CicesReference;
-  /** 層i×層iiを合成した最終分位点(P5/P50/P95)。 */
-  quantileRange: QuantileRange;
   /**
    * 層i(パラメータ不確実性)の分布パラメータ(2026-08-02追記、M6実装時に発見)。
    * M6 D-3が前提とする「M3のトルネード図」はM3実装時には作られておらず、複合後の
@@ -215,7 +326,6 @@ interface ValuationRecordCommon {
    * MethodOutputが既に持つ値をそのまま引き継ぐことで、M6がtransferFitness(層ii)と
    * 同じ尺度(対数正規sigma)で比較できるようにする。
    */
-  parameterUncertainty: Distribution;
   transferFitness: TransferFitness;
   discountRate: number | null;
   discountRateStatus: DiscountRateStatus;
@@ -228,6 +338,21 @@ interface ValuationRecordCommon {
   };
   assumptionEntryIds: string[];
   recalculationHash: string;
+  /** 実際に計算へ入った入力と係数を、再現可能な形で保持する。 */
+  inputSnapshot?: PhysicalQuantityInput;
+  factorSnapshot?: ValueFactorRecord;
+  mappingSnapshot?: Pick<FactorResolution, "mappingId" | "mappingVersion" | "mappingHash">;
+  currencyConversion?: CurrencyConversionRecord;
+}
+
+interface ModeledUncertaintyFields {
+  parameterUncertainty: Distribution;
+  quantileRange: QuantileRange;
+}
+
+interface UnavailableUncertaintyFields {
+  parameterUncertainty: Extract<ParameterUncertainty, { kind: "not_available" }>;
+  quantileRange: null;
 }
 
 /**
@@ -237,8 +362,9 @@ interface ValuationRecordCommon {
  * `Extract<ValuationRecord, { valueConcept: "exchange" }>` という形で実際に強制できる。
  */
 export type ValuationRecord =
-  | (ValuationRecordCommon & { valueConcept: "exchange"; centralValue: ExchangeAmount })
-  | (ValuationRecordCommon & { valueConcept: "welfare"; centralValue: WelfareAmount });
+  | (ValuationRecordCommon & ModeledUncertaintyFields & { valueConcept: "exchange"; centralValue: ExchangeAmount })
+  | (ValuationRecordCommon & ModeledUncertaintyFields & { valueConcept: "welfare"; centralValue: WelfareAmount })
+  | (ValuationRecordCommon & UnavailableUncertaintyFields & { valueConcept: "welfare"; centralValue: WelfareAmount });
 
 export type ExchangeValuationRecord = Extract<ValuationRecord, { valueConcept: "exchange" }>;
 export type WelfareValuationRecord = Extract<ValuationRecord, { valueConcept: "welfare" }>;

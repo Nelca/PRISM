@@ -29,6 +29,9 @@ export interface TornadoChartEntry {
 }
 
 function layerISigma(record: ValuationRecord): number {
+  if (record.parameterUncertainty.kind === "not_available") {
+    throw new Error(`ValuationRecord ${record.id} は不確実性分布が未取得のためトルネード図を作成できません。`);
+  }
   return record.parameterUncertainty.sigma;
 }
 

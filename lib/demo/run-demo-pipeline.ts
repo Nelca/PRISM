@@ -13,13 +13,14 @@
  * 任意の入力で呼べる。
  */
 
-import { runValuationPipeline } from "@core/pipeline/valuation-pipeline";
+import { quantitiesInDeepDiveConfig, runValuationPipeline } from "@core/pipeline/valuation-pipeline";
+import type { DeepDiveQuantityConfig } from "@core/pipeline/valuation-pipeline";
 import { RepresentativeValueSelectionError } from "@core/divergence/representative-value";
 import { runDisclosurePipeline } from "@core/pipeline/disclosure-pipeline";
 import { createIdSequence } from "@core/pipeline/ids";
 import { getPluginsForCategory } from "@core/monetization/registry";
 import { createSeededRng } from "@core/monetization/rng";
-import type { ExchangeValuationRecord, WelfareValuationRecord } from "@core/types/valuation";
+import type { ExchangeValuationRecord, PhysicalQuantityInput, WelfareValuationRecord } from "@core/types/valuation";
 import type { DisclosureClaim } from "@core/types/disclosure";
 import type { EvidenceCandidate } from "@core/disclosure/evidence-match";
 import type { IntentionalDecisionInput } from "@core/pipeline/disclosure-pipeline";
@@ -112,6 +113,72 @@ export interface RunPipelineInput {
    * packages/core が rng を引数で受け取れるようになったため廃止した。
    */
   rngSeed: number;
+  /** PRTR・廃棄物・土地利用の有効な正規化入力。M1の課題生成にも使う。 */
+  physicalInputs?: PhysicalQuantityInput[];
+  /** レビュー済み対応表と係数まで解決できた入力だけをM3へ渡す。 */
+  deepDiveConfigsByMaterialIssue?: Record<string, DeepDiveQuantityConfig[]>;
+  coverageByMaterialIssue?: Record<string, InputCoverageSummary>;
+  methodAvailabilityByMaterialIssue?: Record<string, MethodAvailability[]>;
+  inputBatchHashes?: string[];
+  activeMaterialIssueTargets?: { siteId: string; category: PhysicalQuantityInput["category"] }[];
+}
+
+export interface InputCoverageSummary {
+  sourceKind: string;
+  reportingPeriod: string;
+  /** m2とm2year等を決して合算しない、単位ごとの量カバレッジ。 */
+  quantities: Array<{
+    unit: string;
+    total: number;
+    calculated: number;
+    unmapped: number;
+    transferOnly: number;
+    blocked: number;
+    rowCounts: { total: number; calculated: number; unmapped: number; transferOnly: number; blocked: number };
+  }>;
+  rowCounts: { total: number; calculated: number; unmapped: number; transferOnly: number; blocked: number };
+  mappingVersion?: string;
+  coefficientVersion?: string;
+}
+
+export interface MethodAvailability {
+  methodId: string;
+  licenseMode: string;
+  status: "available" | "pending_review" | "expired" | "unavailable";
+  reason?: string;
+  licenseExpiresAt?: string;
+}
+
+function validateCoverageSummary(materialIssueId: string, coverage: InputCoverageSummary): void {
+  const rowSum =
+    coverage.rowCounts.calculated +
+    coverage.rowCounts.unmapped +
+    coverage.rowCounts.transferOnly +
+    coverage.rowCounts.blocked;
+  const units = new Set<string>();
+  const rowsByUnit = { total: 0, calculated: 0, unmapped: 0, transferOnly: 0, blocked: 0 };
+  for (const quantity of coverage.quantities) {
+    if (!quantity.unit || units.has(quantity.unit)) throw new Error(`${materialIssueId} のカバレッジ単位が空または重複しています。`);
+    units.add(quantity.unit);
+    const sum = quantity.calculated + quantity.unmapped + quantity.transferOnly + quantity.blocked;
+    if ([quantity.total, quantity.calculated, quantity.unmapped, quantity.transferOnly, quantity.blocked].some((v) => v < 0)) {
+      throw new Error(`${materialIssueId} のカバレッジ量に負値があります。`);
+    }
+    if (Math.abs(quantity.total - sum) > 1e-9) throw new Error(`${materialIssueId} のカバレッジ内訳が総量と一致しません。`);
+    const quantityRowSum = quantity.rowCounts.calculated + quantity.rowCounts.unmapped + quantity.rowCounts.transferOnly + quantity.rowCounts.blocked;
+    if (Object.values(quantity.rowCounts).some((value) => !Number.isInteger(value) || value < 0)) {
+      throw new Error(`${materialIssueId} の単位別行数に負値または整数でない値があります。`);
+    }
+    if (quantity.rowCounts.total !== quantityRowSum) throw new Error(`${materialIssueId} の単位別行数内訳が総数と一致しません。`);
+    for (const key of Object.keys(rowsByUnit) as Array<keyof typeof rowsByUnit>) rowsByUnit[key] += quantity.rowCounts[key];
+  }
+  if (
+    Object.values(coverage.rowCounts).some((value) => !Number.isInteger(value) || value < 0) ||
+    coverage.rowCounts.total !== rowSum ||
+    (Object.keys(rowsByUnit) as Array<keyof typeof rowsByUnit>).some((key) => rowsByUnit[key] !== coverage.rowCounts[key])
+  ) {
+    throw new Error(`${materialIssueId} のカバレッジ内訳が総量と一致しません。`);
+  }
 }
 
 /**
@@ -133,6 +200,9 @@ function hasUsableUncertaintyRange(record: ExchangeValuationRecord): boolean {
 }
 
 export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInput()) {
+  for (const [materialIssueId, coverage] of Object.entries(input.coverageByMaterialIssue ?? {})) {
+    validateCoverageSummary(materialIssueId, coverage);
+  }
   const warnings: PipelineWarning[] = [];
   const idSequence = createIdSequence("ae");
   const rng = createSeededRng(input.rngSeed);
@@ -148,7 +218,14 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
    * 外れてしまうことが分かった(D-128で発見)。**flagshipのデモ拠点(site-042)は
    * 常に深掘りを見せる前提のため、site-070と同様に明示的な手動昇格に切り替える。**
    */
-  const assessment = runDemoAssessment(userSiteEntries, interactions, idSequence, NOW);
+  const assessment = runDemoAssessment(
+    userSiteEntries,
+    interactions,
+    idSequence,
+    NOW,
+    input.physicalInputs ?? [],
+    input.activeMaterialIssueTargets ?? []
+  );
 
   const promoted = assessment.depthDecisions.filter((d) => d.depth === "deep_dive");
 
@@ -169,6 +246,14 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     materialIssueIds: promoted.map((d) => d.materialIssueId),
     deepDiveConfigForMaterialIssue: (materialIssueId: string) => {
       const siteId = siteIdFromMaterialIssueId(materialIssueId);
+      const additionalConfigs = input.deepDiveConfigsByMaterialIssue?.[materialIssueId];
+      if (additionalConfigs) {
+        return { quantities: additionalConfigs };
+      }
+      const issue = assessment.materialIssues.find((entry) => entry.id === materialIssueId);
+      if (issue && !["climate", "water"].includes(issue.impactCategory)) {
+        return { quantities: [] };
+      }
       if (siteId === "site-042") {
         return {
           physicalQuantityId: DEEP_DIVE_PHYSICAL_QUANTITY_ID,
@@ -246,16 +331,42 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   }
 
   const allValuationRecords = Object.values(valuation.valuationRecordsByMaterialIssue).flat();
+  const impactCategoryByRecordId = new Map<string, PhysicalQuantityInput["category"]>();
+  for (const [materialIssueId, records] of Object.entries(valuation.valuationRecordsByMaterialIssue)) {
+    const issueCategory = assessment.materialIssues.find((issue) => issue.id === materialIssueId)?.impactCategory;
+    for (const record of records) {
+      const category = record.inputSnapshot?.category ?? issueCategory;
+      if (category) impactCategoryByRecordId.set(record.id, category);
+    }
+  }
 
   /**
    * 算定に使った物理量の実数(第4版 D-05)。ValuationRecordは物理量のIDしか持たないため、
    * ③の画面が「取水量 45,000 m3/年」のような実数を表示できるよう、深掘り設定から引き写す。
    */
   const physicalQuantityByMaterialIssue = Object.fromEntries(
-    Object.keys(valuation.valuationRecordsByMaterialIssue).map((materialIssueId) => {
-      const { input } = valuationOptions.deepDiveConfigForMaterialIssue(materialIssueId);
-      return [materialIssueId, { category: input.category, quantity: input.physicalQuantity, unit: input.unit }];
+    Object.keys(valuation.valuationRecordsByMaterialIssue).flatMap((materialIssueId) => {
+      const [quantityConfig] = quantitiesInDeepDiveConfig(valuationOptions.deepDiveConfigForMaterialIssue(materialIssueId));
+      if (!quantityConfig) return [];
+      const { input: physicalInput } = quantityConfig;
+      return [
+        [
+          materialIssueId,
+          { category: physicalInput.category, quantity: physicalInput.physicalQuantity, unit: physicalInput.unit },
+        ],
+      ];
     })
+  );
+  const physicalQuantitiesByMaterialIssue = Object.fromEntries(
+    Object.keys(valuation.valuationRecordsByMaterialIssue).map((materialIssueId) => [
+      materialIssueId,
+      quantitiesInDeepDiveConfig(valuationOptions.deepDiveConfigForMaterialIssue(materialIssueId)).map((entry) => ({
+        physicalQuantityId: entry.physicalQuantityId,
+        category: entry.input.category,
+        quantity: entry.input.physicalQuantity,
+        unit: entry.input.unit,
+      })),
+    ])
   );
 
   // --- M4:代表値選択(未選択時はreplacement-costをデフォルト代表値とする) ---
@@ -298,9 +409,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
    * デフォルトの手法(`methodId === "replacement-cost"`)も、水以外のカテゴリには存在しない
    * ため`valueConcept === "exchange"`の先頭レコードに一般化した。
    */
-  function representativeRecordForSite(siteId: string): ExchangeValuationRecord | undefined {
-    const materialIssueId = promoted.find((d) => siteIdFromMaterialIssueId(d.materialIssueId) === siteId)?.materialIssueId;
-    if (!materialIssueId) return undefined;
+  function representativeRecordForMaterialIssue(materialIssueId: string): ExchangeValuationRecord | undefined {
     const records = valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [];
     const id = representativeRecordByMaterialIssue[materialIssueId];
     const overridden = records.find((r) => r.id === id && r.valueConcept === "exchange");
@@ -308,12 +417,11 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     return (overridden ?? fallback) as ExchangeValuationRecord | undefined;
   }
 
-  // --- M5:財務接続、M6:対策案比較と意思決定(深掘りに進んだ拠点1件ごと) ---
-  const promotedSiteIds = [...new Set(promoted.map((d) => siteIdFromMaterialIssueId(d.materialIssueId)))];
-
-  const decisions = promotedSiteIds.flatMap((siteId) => {
-    const siteRecords = allValuationRecords.filter((r) => r.siteId === siteId);
-    const representative = representativeRecordForSite(siteId);
+  // --- M5:財務接続、M6:対策案比較と意思決定(深掘りに進んだMaterialIssueごと) ---
+  const decisions = promoted.flatMap(({ materialIssueId }) => {
+    const siteId = siteIdFromMaterialIssueId(materialIssueId);
+    const siteRecords = valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [];
+    const representative = representativeRecordForMaterialIssue(materialIssueId);
     if (!representative) return [];
 
     const site = assessment.sites.find((s) => s.id === siteId);
@@ -456,6 +564,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     return [
       {
         siteId,
+        materialIssueId,
         siteName: site.name,
         decision,
         financialBridge,
@@ -469,7 +578,10 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   // --- M7:開示検証(site-042固定claim + 深掘りに進んだ他拠点の自動生成claim) ---
   // site-070(気候カテゴリ実証用、D-128)は除外する。buildUserDisclosureClaimは水消費削減の
   // コミットメントを模した文言を生成するため、気候カテゴリの拠点には意味を持たない。
-  const decisionsForAutoClaims = decisions.filter((d) => d.siteId !== "site-042" && d.siteId !== CLIMATE_SITE_ID);
+  const decisionsForAutoClaims = decisions.filter((d) => {
+    const category = assessment.materialIssues.find((issue) => issue.id === d.materialIssueId)?.impactCategory;
+    return d.siteId !== "site-042" && d.siteId !== CLIMATE_SITE_ID && category === "water";
+  });
   const userClaims: DisclosureClaim[] = decisionsForAutoClaims.map((d) => {
     const site = assessment.sites.find((s) => s.id === d.siteId)!;
     const params = deepDiveParamsBySiteId.get(d.siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
@@ -495,7 +607,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       .filter((r) => r.siteId === siteId)
       .map((r) => ({
         recordId: r.id,
-        category: "water",
+        category: impactCategoryByRecordId.get(r.id) ?? null,
         period: claim.extractedMetadata.periodMentioned ?? { startYear: 2027, endYear: 2030 },
         scope: claim.extractedMetadata.scopeMentioned ?? "",
         transferFitnessTier: r.transferFitness.tier,
@@ -537,7 +649,19 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   });
 
   // --- M8:パイプライン全体のRecalculationHash ---
-  const recalculationHash = buildDemoRecalculationHash(DECOMPOSITION_VERSIONS);
+  const additionalConfigs = Object.values(input.deepDiveConfigsByMaterialIssue ?? {}).flat();
+  const recalculationHash = buildDemoRecalculationHash(DECOMPOSITION_VERSIONS, {
+    activeInputBatchHashes: input.inputBatchHashes ?? [],
+    inputMappingHashes: additionalConfigs.flatMap((entry) =>
+      entry.config.factorResolution ? [entry.config.factorResolution.mappingHash] : []
+    ),
+    valueFactorSourceHashes: additionalConfigs.flatMap((entry) =>
+      entry.config.factorResolution ? [entry.config.factorResolution.factor.sourceHash] : []
+    ),
+    methodPluginVersions: Object.fromEntries(
+      additionalConfigs.flatMap((entry) => entry.plugins.map((plugin) => [plugin.methodId, plugin.version]))
+    ),
+  });
 
   const assumptionEntries = [
     ...assessment.assumptionEntries,
@@ -554,6 +678,9 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       representativeRecordByMaterialIssue,
       m4ChangeLogByMaterialIssue,
       physicalQuantityByMaterialIssue,
+      physicalQuantitiesByMaterialIssue,
+      coverageByMaterialIssue: input.coverageByMaterialIssue ?? {},
+      methodAvailabilityByMaterialIssue: input.methodAvailabilityByMaterialIssue ?? {},
     },
     decisions,
     disclosure,
@@ -572,7 +699,13 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
  * GATE検証テストのように「追加拠点も操作もない状態」を対象とする呼び出し元のために残す。
  */
 function defaultRunPipelineInput(): RunPipelineInput {
-  return { userSites: [], interactions: emptyInteractionState(), rngSeed: DEFAULT_RNG_SEED };
+  return {
+    userSites: [],
+    interactions: emptyInteractionState(),
+    rngSeed: DEFAULT_RNG_SEED,
+    physicalInputs: [],
+    deepDiveConfigsByMaterialIssue: {},
+  };
 }
 
 /** 既定のシード。runごとに変える必要はない(同じ入力からは同じ結果が出ることを優先する)。 */
@@ -588,8 +721,8 @@ export const DEFAULT_RNG_SEED = 42;
  * **結果オブジェクトの形を変えたら必ず上げること。**値の計算方法だけを変えた場合は
  * 上げなくても壊れないが、過去のrunと比較したいなら上げる方が安全。
  */
-// 7: 減損判定を自然債務の絶対額比較に修正・比率差分の単位をptから倍に変更(2026-08-23、
-//    comparison-targets.ts)。形は同じだが保存済みrunの判定・文言を新計算で作り直すために上げる。
-export const RESULT_SCHEMA_VERSION = 7;
+// 9: 入力未登録時のPRTR・廃棄物・土地利用デモ算定を追加。保存済みrunも追加カテゴリを
+//    表示するため、新しい入力フォールバックで再計算する。
+export const RESULT_SCHEMA_VERSION = 9;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

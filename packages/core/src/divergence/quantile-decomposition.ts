@@ -53,6 +53,9 @@ export interface QuantileRangeDecomposition {
 
 /** そのレコードの σ_i(層i:パラメータ不確実性)。 */
 function parameterSigma(record: ValuationRecord): number {
+  if (record.parameterUncertainty.kind === "not_available") {
+    throw new Error(`ValuationRecord ${record.id} は不確実性分布が未取得です。`);
+  }
   return record.parameterUncertainty.sigma;
 }
 
@@ -78,6 +81,17 @@ function totalSigma(sigmaI: number, sigmaII: number): number {
  * 分解しない。**幅ゼロを微小値で置き換えない**(F-1・F-3と同じ、推定で埋めない規律)。
  */
 export function decomposeQuantileRange(a: ValuationRecord, b: ValuationRecord): QuantileRangeDecomposition {
+  if (a.parameterUncertainty.kind === "not_available" || b.parameterUncertainty.kind === "not_available") {
+    return {
+      methodIdA: a.methodId,
+      methodIdB: b.methodId,
+      widthRatio: null,
+      mode: "not_decomposed",
+      contributions: [],
+      notDecomposedReason:
+        "いずれかの手法で不確実性分布が未取得のため、根拠のないレンジを補わず幅の分解を行いません。",
+    };
+  }
   const sigmaIA = parameterSigma(a);
   const sigmaIIA = transferSigma(a);
   const sigmaIB = parameterSigma(b);

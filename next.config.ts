@@ -3,8 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      // PDF本体10MBにmultipartの境界・ヘッダー分の余裕を加える。
-      bodySizeLimit: "10.1mb",
+      // PRTR 4ファイルの合計上限45MBにmultipartの境界・ヘッダー分の余裕を加える。
+      // 各Server Actionでも用途別の個別上限（PDF 10MB、カテゴリCSV 20MB）を検証する。
+      bodySizeLimit: "50.1mb",
     },
   },
   /**

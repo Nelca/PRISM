@@ -14,7 +14,7 @@ import { Num, pickYenScale } from "../components/numeric";
 import { Card, GuideBox, GuideButton, KV, ScreenLead, Stat, Tag } from "../components/ui";
 import { tierLabel, tierTagVariant } from "../components/tag-utils";
 import { methodLabel, methodShortLabel, withMethodLabelsInText } from "../components/method-labels";
-import { materialIssueLabel } from "../components/labels";
+import { categoryLabel, materialIssueLabel } from "../components/labels";
 import { StepNav } from "../components/step-nav";
 import { Football } from "../components/charts/Football";
 import { Tornado } from "../components/charts/Tornado";
@@ -25,6 +25,15 @@ import { PipelineWarnings } from "../components/pipeline-warnings";
 import { ScalableSelector } from "../components/scalable-selector";
 import { TaskBanner } from "../components/task-banner";
 import { additivePairSteps, pairwiseToWaterfallSteps, UNCERTAINTY_FACTOR_LABEL, zeroValueNote } from "./view-model";
+import {
+  availabilityLabel,
+  coverageRows,
+  coverageStatusLabel,
+  inputDetail,
+  inputSourceLabel,
+  isLime3SingleMethodPilot,
+  physicalQuantityLabel,
+} from "./category-expansion";
 
 /**
  * 価値の算定と代表値の選択(指示03。旧 /valuation + /decomposition)。
@@ -91,12 +100,19 @@ export default async function ValuationPage({
   const physicalQuantityId = records[0]?.physicalQuantityId;
   // 算定に使った物理量の実数(D-05。IDだけでなく「45,000 m3/年」の形で出す)。
   const physicalQuantity = result.valuation.physicalQuantityByMaterialIssue[selectedIssueId];
+  const physicalQuantities = result.valuation.physicalQuantitiesByMaterialIssue[selectedIssueId] ?? [];
+  const coverage = result.valuation.coverageByMaterialIssue[selectedIssueId];
+  const methodAvailability = result.valuation.methodAvailabilityByMaterialIssue[selectedIssueId] ?? [];
+  const isLime3Pilot = isLime3SingleMethodPilot(records);
+  const exchangeRecords = records.filter((record) => record.valueConcept === "exchange");
 
   // 指示09:③のこの画面では同じ対象の中心値・幅・代表値選択の各表に同じ金額群が繰り返し出る。
   // 行ごとに単位が割れないよう(百万円の行と億円の行が混ざらないよう)、この対象に出てくる
   // すべての金額から表全体で使うスケールを1つ決めて明示的に揃える。
   const recordScale = pickYenScale(
-    ...records.flatMap((r) => [r.centralValue, r.quantileRange.p5, r.quantileRange.p95])
+    ...records.flatMap((r) =>
+      r.quantileRange ? [r.centralValue, r.quantileRange.p5, r.quantileRange.p95] : [r.centralValue]
+    )
   );
 
   // 中心値が0円の手法(D-08:0の行も非表示にせず、理由を添えて出す)。同じ理由はまとめて1文にする。
@@ -107,7 +123,7 @@ export default async function ValuationPage({
     zeroNoteGroups.set(note.detail, [...(zeroNoteGroups.get(note.detail) ?? []), methodLabel(record.methodId)]);
   }
 
-  const footballMethods = records.map((r) => ({
+  const footballMethods = records.filter((r) => r.quantileRange !== null).map((r) => ({
     name: methodLabel(r.methodId),
     tier: r.transferFitness.tier,
     concept: r.valueConcept,
@@ -185,7 +201,10 @@ export default async function ValuationPage({
 
   // 折りたたみに格下げした「試算の幅に影響する要因」(トルネード図)。
   const primaryRecord: ValuationRecord | undefined = records.find((r) => r.methodId === "replacement-cost") ?? records[0];
-  const tornadoEntries = primaryRecord ? computeTornadoChart(primaryRecord) : [];
+  const tornadoEntries =
+    primaryRecord && primaryRecord.parameterUncertainty.kind !== "not_available"
+      ? computeTornadoChart(primaryRecord)
+      : [];
   const tornadoCenter = primaryRecord ? (primaryRecord.centralValue) : 0;
   const tornadoFactors = tornadoEntries.map((e, i) => ({
     name: e.label,
@@ -244,7 +263,7 @@ export default async function ValuationPage({
         <div className="grid-3">
           <Stat label={<span title="TNFDの5基準のうち該当した数。数が多いほど自然への依存・影響が強い">自然との関わり</span>} value={issue ? `${issue.sensitivityScore}/5` : "—"} />
           <Stat
-            label={physicalQuantity?.category === "climate" ? "GHG排出量(年間)" : "取水量(年間)"}
+            label={physicalQuantity ? physicalQuantityLabel(physicalQuantity.category) : "物理量"}
             value={
               physicalQuantity ? (
                 <span style={{ fontFamily: "var(--font-body)", fontSize: 15 }}>
@@ -261,6 +280,75 @@ export default async function ValuationPage({
         {physicalQuantityId && <span className="id-note">算定に使った物理量:{physicalQuantityId}</span>}
       </Card>
 
+      {isLime3Pilot && (
+        <div className="pipeline-warning" role="status">
+          <div className="pipeline-warning__title">LIME3単独パイロット</div>
+          <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--ink)" }}>
+            {categoryLabel(issue?.impactCategory ?? physicalQuantity?.category ?? "pollution")}は現在LIME3だけで算定しています。手法間比較と代表値選択は行わず、社会的な厚生価値として参照します。
+          </p>
+        </div>
+      )}
+
+      {(coverage || methodAvailability.length > 0 || physicalQuantities.length > 1) && (
+        <Card
+          title="入力・算定カバレッジ"
+          subtitle="入力量を欠落させず、算定できない理由も記録します"
+          padBody={false}
+          foot="移動量は環境への放出量として算定しません。PRTR等の入力・LIME3算定だけでTNFD等の完全準拠を示すものではありません。"
+        >
+          {coverage && (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>状態</th>
+                  <th>量（単位別）</th>
+                  <th>行数</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coverageRows(coverage).map(([status, quantity, unit, rowCount]) => (
+                  <tr key={`${status}-${unit}`}>
+                    <td>
+                      <Tag variant={status === "calculated" ? "ok" : status === "transferOnly" ? "neutral" : "warn"}>
+                        {coverageStatusLabel(status)}
+                      </Tag>
+                    </td>
+                    <td className="num"><Num value={quantity} /> {unit}</td>
+                    <td className="num">{rowCount}件</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {coverage && (coverage.mappingVersion || coverage.coefficientVersion) && (
+            <div style={{ padding: "12px 18px 0" }}>
+              <KV k="入力元" v={inputSourceLabel(coverage.sourceKind)} />
+              <KV k="対象期間" v={coverage.reportingPeriod} />
+              {coverage.mappingVersion && <KV k="対応表の版" v={coverage.mappingVersion} />}
+              {coverage.coefficientVersion && <KV k="係数セットの版" v={coverage.coefficientVersion} />}
+            </div>
+          )}
+          {methodAvailability.length > 0 && (
+            <div style={{ padding: coverage ? "12px 18px" : "0 18px 12px" }}>
+              <div className="section-label">手法・ライセンスの状態</div>
+              {methodAvailability.map((availability) => (
+                <KV
+                  key={availability.methodId}
+                  k={methodLabel(availability.methodId)}
+                  v={
+                    <>
+                      <Tag variant={availability.status === "available" ? "ok" : "warn"}>{availabilityLabel(availability)}</Tag>
+                      {availability.reason && <span className="cell-note">{availability.reason}</span>}
+                      {availability.licenseExpiresAt && <span className="cell-note">有効期限 {availability.licenseExpiresAt}</span>}
+                    </>
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       <Card
         title="適用している算定方法"
         subtitle={`${records.length}件を並行して適用中`}
@@ -275,6 +363,7 @@ export default async function ValuationPage({
               <th title="算定の確からしさ。A=現地評価に近い/B=補正付きで実務利用可/C=桁の把握のみ/直接算定=他地域の研究値を借りていないため等級の対象外">確からしさ</th>
               <th>中心値</th>
               <th>幅(P5〜P95)</th>
+              <th>係数・対応表</th>
             </tr>
           </thead>
           <tbody>
@@ -301,14 +390,53 @@ export default async function ValuationPage({
                   )}
                 </td>
                 <td className="num">
-                  <Num value={r.quantileRange.p5} unit="円" scale={recordScale} /> 〜{" "}
-                  <Num value={r.quantileRange.p95} unit="円" scale={recordScale} />
+                  {r.quantileRange ? (
+                    <>
+                      <Num value={r.quantileRange.p5} unit="円" scale={recordScale} /> 〜{" "}
+                      <Num value={r.quantileRange.p95} unit="円" scale={recordScale} />
+                    </>
+                  ) : (
+                    "不確実性情報未取得"
+                  )}
+                </td>
+                <td style={{ fontSize: 11.5 }}>
+                  {r.factorSnapshot ? (
+                    <>
+                      <b>{r.factorSnapshot.factorId}</b>
+                      <span className="id-note">{r.factorSnapshot.methodVersion} ・ {r.factorSnapshot.sourceHash.slice(0, 12)}</span>
+                      <span className="id-note">利用条件 {r.factorSnapshot.licenseMode}{r.factorSnapshot.licenseValidUntil ? ` ・ 有効期限 ${r.factorSnapshot.licenseValidUntil}` : ""}</span>
+                      {r.mappingSnapshot && <span className="id-note">対応表 {r.mappingSnapshot.mappingVersion}</span>}
+                      {r.currencyConversion && (
+                        <span className="id-note">
+                          {r.currencyConversion.fromCurrency}→{r.currencyConversion.toCurrency} {r.currencyConversion.rate} ({r.currencyConversion.rateDate}・{r.currencyConversion.source})
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    "既存手法の係数"
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </Card>
+
+      {records.some((record) => inputDetail(record.inputSnapshot)) && (
+        <Card title="入力行別の算定明細" subtitle="算定対象となった正規化入力（廃棄物の内部処理費用は社会的費用へ加算しません）">
+          {records.map((record) => {
+            const detail = inputDetail(record.inputSnapshot);
+            if (!detail) return null;
+            return (
+              <KV
+                key={record.id}
+                k={methodLabel(record.methodId)}
+                v={`${detail} ・ ${new Intl.NumberFormat("ja-JP").format(record.inputSnapshot!.physicalQuantity)} ${record.inputSnapshot!.unit}`}
+              />
+            );
+          })}
+        </Card>
+      )}
 
       {/* (2) 試算の幅(フットボールチャートは画面に1回だけ) */}
       <Card
@@ -317,6 +445,11 @@ export default async function ValuationPage({
         foot="単位:円/年 ・ 紫は社会全体への影響(投資判断には使用しません)"
       >
         <Football methods={footballMethods} />
+        {footballMethods.length === 0 && (
+          <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+            出典に不確実性分布がないため、根拠のないP5〜P95を作らず中心値だけを表示しています。
+          </p>
+        )}
         {/* D-08:0円の手法がある場合、なぜ0かをチャートの直下でも説明する。 */}
         {zeroRecords.length > 0 && (
           <p className="tooltip-note">
@@ -491,7 +624,7 @@ export default async function ValuationPage({
       </div>
 
       {/* (5) 代表値の選択 = この画面の出口(必須アクション) */}
-      <Card
+      {exchangeRecords.length > 0 ? <Card
         id="representative-selection"
         title="投資判断に使う代表値の選択"
         subtitle="この画面ですべきこと。推奨値は表示しません"
@@ -507,8 +640,7 @@ export default async function ValuationPage({
             </tr>
           </thead>
           <tbody>
-            {records
-              .filter((r) => r.valueConcept === "exchange")
+            {exchangeRecords
               .map((r) => {
                 const selected = r.id === currentRepresentativeId;
                 return (
@@ -566,7 +698,18 @@ export default async function ValuationPage({
             <p style={{ color: "var(--ink-faint)", fontSize: 12 }}>代表値の変更履歴はまだありません。</p>
           )}
         </div>
-      </Card>
+      </Card> : (
+        <Card
+          id="representative-selection"
+          title="企業財務への接続"
+          subtitle="このカテゴリは厚生価値の参照値です"
+          headExtra={<Tag variant="welfare">NPV・ROIには算入しません</Tag>}
+        >
+          <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+            現在の{categoryLabel(issue?.impactCategory ?? physicalQuantity?.category ?? "pollution")}の結果は社会的な厚生価値です。企業が保有する回避費用などの交換価値入力が登録されるまで、財務への影響・対策ROI・投資判定には加算しません。
+          </p>
+        </Card>
+      )}
 
       {/*
         C-05:この画面の出口(代表値の選択)の直下で、他の課題がまだ未選択であることを知らせる。
@@ -644,10 +787,16 @@ export default async function ValuationPage({
           <small>{primaryRecord ? methodLabel(primaryRecord.methodId) : ""}</small>
         </summary>
         <div className="foldout__body">
-          <Tornado center={tornadoCenter} factors={tornadoFactors} />
-          <p className="tooltip-note">
-            パラメータ不確実性(層i)と確からしさ由来の移転誤差(層ii)のsigmaを中心値からの近似的な振れ幅として表示しています。
-          </p>
+          {tornadoFactors.length > 0 ? (
+            <>
+              <Tornado center={tornadoCenter} factors={tornadoFactors} />
+              <p className="tooltip-note">
+                パラメータ不確実性(層i)と確からしさ由来の移転誤差(層ii)のsigmaを中心値からの近似的な振れ幅として表示しています。
+              </p>
+            </>
+          ) : (
+            <p style={{ color: "var(--ink-soft)" }}>出典に不確実性分布がないため、要因別の幅は表示しません。</p>
+          )}
         </div>
       </details>
 
@@ -665,7 +814,7 @@ export default async function ValuationPage({
         </div>
       </details>
 
-      <DataSourceAttribution sources={["World Bank"]} />
+      <DataSourceAttribution sources={isLime3Pilot ? ["AIST-IDEA LIME3 Ver.4.0", "World Bank"] : ["World Bank"]} />
       <StepNav current="/valuation" result={result} />
     </div>
   );

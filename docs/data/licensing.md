@@ -1,7 +1,7 @@
 # ライセンス条件
 
 **目的:** build-plan §3.4が定めるフェーズ0のライセンス確認作業の成果物。外部データ・係数の商用利用条件を、確認日・確認先・原文該当箇所とともに記録する。
-**最終更新:** 2026-08-15
+**最終更新:** 2026-08-28(IFVI追加カテゴリ、CE Delft/ESVD並行照会方針を追記)
 **確認済み:** WDPA、ENCORE、IFVI(方法論PDF自体のContent Terms。Global Value Factor Database側の利用規約は別途未確認)、World Bank(World Development Indicators)、WRI Aqueduct 4.0、LIME3(AIST-IDEA、既存社内ライセンス)
 **未確認:** ESVD日本カバレッジ・再配布条件の詳細確認(`method-recalculability.md`・`aop-mapping-v1.md`で言及済み、本ファイルへの正式な転記は未)、CE Delft
 
@@ -92,6 +92,8 @@
 **保証・責任の否認:** Available Contentは"AS IS"提供。IFVI/VBAは正確性・信頼性等について一切の保証をしない(§5-6)。
 
 **未確認:** Global Value Factor Database(フォーム登録が別途必要)にも同じContent Termsが適用されるかは、ダウンロードフォーム到達後に規約表示を確認する必要がある。IFVI本体の一般利用規約(https://ifvi.org/terms-of-use/)は未読(本規約に定めのない事項に適用されるため)。
+
+**追加カテゴリへの含意(2026-08-28):** 提供済みPDFはWater Consumption Topic Methodologyだけであり、Air Pollution、Water Pollution、Waste、Land Use and Conversionは別のInterim Methodology、モデル/技術マニュアル、Global Value Factor Databaseを取得する必要がある。公式取得ページは https://ifvi.org/methodology/environmental-topic-methodology/interim-methodologies/download-the-interim-methodologies/ 。原本は利用者登録・第三者アクセス制限を踏まえて一般リポジトリへコミットしない。4テーマ横断のSaaS利用、内部保管、派生結果表示の条件を`contact@ifvi.org`へ、方法論上の質問を`research@ifvi.org`へ並行照会する。詳細は`docs/data/category-expansion-acquisition.md`。
 
 **現状の運用判断(2026-08-10):** 事業判断として、「本プロダクトは現時点で個人利用のみであり、§1.3(a)の商用・営利目的での提供に該当しない」と確認済みのため、日本の水消費VF4本(`docs/data/acquisition-runbook.md` §3.4)をコード(`lib/demo/company.ts`・`lib/demo/user-site-defaults.ts`)に反映した。**この判断は現在の利用状況に基づくものであり、恒久的な許諾ではない。** 顧客への商用提供・SaaS化・有償契約を開始する前には、必ずこのセクションを再確認し、IFVIへの個別照会(§1.2の非営利アドバイザリー例外に当たるか)または有償ライセンスの締結を先に完了させること。
 
@@ -186,3 +188,5 @@ CC BY 4.0の一般要件に従い、以下の書式で表示する:
 | 3 | ESVD:商用利用は「ストラテジックパートナー」化が必要と判明。日本カバレッジは**確認完了**(67件、2026-08-14、`docs/data/acquisition-runbook.md` §3.5a)。商用契約自体は未着手 | 中 | 人間による送信・交渉待ち |
 | 4 | CE Delft・IFVI:IFVIは方法論PDF自体のContent Termsで商用利用(製品への組込・販売促進)が明確に禁止と確認済み(2026-08-10)。非営利アドバイザリー例外に当たるかの個別照会が必要。CE Delftは条件不透明、書面確認が必要。メール下書き準備済み | 中 | 人間による送信・交渉待ち |
 | ~~5~~ | ~~LIME3:商用利用条件の確認~~ | — | **解消(2026-08-15。アスエネ社が既存の標準版ライセンスを保有していることが判明。`docs/data/lime3-coefficients-notes.md`)** |
+
+**2026-08-28の実行順:** IFVI、CE Delft、ESVDの3件は優先度を同列として並行送信する。回答待ちの間も、既存LIME3を使うPRTR汚染・廃棄物・土地利用の内部実装は進める。書面回答前に外部3ソースの係数を顧客向け結果へ有効化しない。

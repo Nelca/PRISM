@@ -32,6 +32,24 @@ export type AssumptionEntryPayload =
   | { module: "M3"; kind: "reconciliation_check"; aggregationFunctionVersion: string; goldenTestPassed: boolean }
   | { module: "M3"; kind: "fitness_tier_assignment"; tier: "A" | "B" | "C" | "not_applicable"; compositeScore: number | null }
   | {
+      module: "M3";
+      kind: "input_mapping";
+      physicalQuantityId: string;
+      sourceRecordHash: string | null;
+      mappingId: string;
+      mappingVersion: string;
+      mappingHash: string;
+      factorId: string;
+      factorSourceHash: string;
+      currencyConversion: {
+        fromCurrency: string;
+        toCurrency: "JPY";
+        rate: number;
+        rateDate: string;
+        source: string;
+      } | null;
+    }
+  | {
       module: "M4";
       kind: "decomposition";
       algorithmVersion: string;
@@ -70,6 +88,10 @@ export interface RecalculationHashInputs {
   m5_carbonPriceScenarioSetVersion: string;
   m6_bindingMechanismDefinitionVersion: string;
   m7_gapDetectionRuleVersion: string;
+  /** 追加カテゴリで実際に有効化された入力・対応表・係数。未使用時は空配列。 */
+  activeInputBatchHashes?: string[];
+  inputMappingHashes?: string[];
+  valueFactorSourceHashes?: string[];
 }
 
 export interface RecalculationHash {

@@ -3,12 +3,13 @@ import { loadPipelineView } from "@/lib/views/pipeline";
 import { buildDisclosureView } from "@core/disclosure/build-disclosure-view";
 import { INTERNAL_REVIEW_TEMPLATE } from "@core/disclosure/templates/internal-review-template";
 import { Card, GuideBox, GuideButton, KV, ScreenLead, Tag } from "../components/ui";
-import { formatDepthReason, gapTypeLabel } from "../components/labels";
+import { categoryLabel, formatDepthReason, gapTypeLabel, materialIssueLabel } from "../components/labels";
 import { Num } from "../components/numeric";
 import { StepNav } from "../components/step-nav";
 import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
 import { PdfIntakeForm } from "./pdf-intake-form";
 import { TaskBanner } from "../components/task-banner";
+import { inputSourceLabel } from "../valuation/category-expansion";
 
 const EXCLUSION_KIND_LABEL: Record<string, string> = {
   not_assessed: "評価対象に入っていない",
@@ -30,6 +31,13 @@ export default async function DisclosurePage({
   const { finding: findingParam } = await searchParams;
   const result = await loadPipelineView();
   const claimsById = new Map(result.disclosureClaims.map((claim) => [claim.id, claim]));
+  const issueById = new Map(result.assessment.materialIssues.map((issue) => [issue.id, issue]));
+  const siteNameById = new Map(result.assessment.sites.map((site) => [site.id, site.name]));
+  const coverageSummaries = Object.entries(result.valuation.coverageByMaterialIssue).map(([materialIssueId, coverage]) => ({
+    materialIssueId,
+    coverage,
+    issue: issueById.get(materialIssueId),
+  }));
 
   /**
    * 第6版 D-22:対応状況の判定はホームの進捗(`countProgress`)と同じソースから導く。
@@ -75,6 +83,49 @@ export default async function DisclosurePage({
 
       {/* D-11-1:残タスクの頭出しバナー(全6画面共通。残タスクがある時だけ出る)。 */}
       <TaskBanner current="/disclosure" result={result} />
+
+      {coverageSummaries.length > 0 && (
+        <Card
+          title="追加カテゴリの算定範囲と除外"
+          subtitle="開示の根拠にできる範囲を明示します"
+          padBody={false}
+          foot="PRTRデータの取込・LIME3算定は、TNFD、ESRS、SSBJ、ISSB等への完全準拠を単独で示すものではありません。"
+        >
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>評価対象</th>
+                <th>入力元・期間</th>
+                <th>算定済み</th>
+                <th>除外・未算定</th>
+              </tr>
+            </thead>
+            <tbody>
+              {coverageSummaries.map(({ materialIssueId, coverage, issue }) => {
+                const calculated = coverage.quantities
+                  .filter((quantity) => quantity.rowCounts.calculated > 0)
+                  .map((quantity) => `${new Intl.NumberFormat("ja-JP").format(quantity.calculated)} ${quantity.unit}（${quantity.rowCounts.calculated}行）`);
+                const exclusions = coverage.quantities.flatMap((quantity) => [
+                  quantity.rowCounts.unmapped > 0 ? `係数未対応 ${quantity.unmapped} ${quantity.unit}（${quantity.rowCounts.unmapped}行）` : null,
+                  quantity.rowCounts.transferOnly > 0 ? `移動量 ${quantity.transferOnly} ${quantity.unit}（${quantity.rowCounts.transferOnly}行）` : null,
+                  quantity.rowCounts.blocked > 0 ? `算定停止 ${quantity.blocked} ${quantity.unit}（${quantity.rowCounts.blocked}行、未報告量を含む）` : null,
+                ]).filter((entry): entry is string => entry !== null);
+                return (
+                  <tr key={materialIssueId}>
+                    <td>
+                      <b>{issue ? materialIssueLabel(siteNameById.get(issue.siteId), issue.impactCategory, issue.id) : materialIssueId}</b>
+                      {issue && <span className="id-note">{categoryLabel(issue.impactCategory)}</span>}
+                    </td>
+                    <td>{inputSourceLabel(coverage.sourceKind)} ・ {coverage.reportingPeriod}</td>
+                    <td className="num">{calculated.length > 0 ? calculated.join("、") : "0"}</td>
+                    <td>{exclusions.length > 0 ? exclusions.join("、") : "なし"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
 
       <Card
         title="PDFから主張を抽出する"

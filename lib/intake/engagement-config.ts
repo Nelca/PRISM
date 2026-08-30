@@ -43,7 +43,8 @@ export interface EngagementDisclosureClaimConfig {
 export interface EngagementConfig {
   physicalQuantityId: string;
   deepDive: {
-    category: ImpactCategory;
+    /** 既存の汎用エンゲージメント設定。追加カテゴリは専用の構造化取込経路を使う。 */
+    category: Extract<ImpactCategory, "climate" | "water">;
     physicalQuantity: number;
     unit: string;
     siteId: string;
@@ -80,7 +81,7 @@ export interface EngagementConfig {
   disclosureClaims: EngagementDisclosureClaimConfig[];
 }
 
-const VALID_CATEGORIES: ImpactCategory[] = ["climate", "water", "pollution"];
+const VALID_CATEGORIES: EngagementConfig["deepDive"]["category"][] = ["climate", "water"];
 const VALID_DEPTHS: AssessmentDepth[] = ["screening", "deep_dive"];
 const VALID_BINDING_KINDS = ["weak_reference", "npv_formula_replacement", "budget_allocation", "procurement_contract_clause"];
 const VALID_CLAIM_TYPES: ClaimType[] = ["state", "quantitative", "trend", "comparative", "net_amount", "future_commitment"];
@@ -113,7 +114,7 @@ export function parseEngagementConfig(jsonText: string): EngagementConfigParseRe
   if (!deepDive) {
     errors.push("deepDiveが必須です。");
   } else if (!VALID_CATEGORIES.includes(deepDive.category)) {
-    errors.push(`deepDive.categoryが不正です("${deepDive.category}")。climate/water/pollutionのいずれかです。`);
+    errors.push(`deepDive.categoryが不正です("${deepDive.category}")。climate/waterのいずれかです。追加カテゴリは専用取込を使います。`);
   }
 
   const methodConfig = obj.methodConfig as EngagementConfig["methodConfig"] | undefined;

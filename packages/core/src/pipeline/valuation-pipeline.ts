@@ -16,6 +16,7 @@ import {
   buildAssumptionEntry,
   deriveM3CoefficientCalibrationPayload,
   deriveM3FitnessTierPayload,
+  deriveM3InputMappingPayload,
   deriveM3ReconciliationCheckPayload,
   deriveM4DecompositionPayload,
   deriveM4RepresentativeValueSelectionPayload,
@@ -32,7 +33,7 @@ import type { DivergenceDecomposition } from "../types/divergence";
 import type { AssumptionEntry } from "../types/ledger";
 import type { ValueConcept } from "../types/common";
 
-export interface DeepDiveConfig {
+export interface DeepDiveQuantityConfig {
   physicalQuantityId: string;
   input: PhysicalQuantityInput;
   config: MethodConfig;
@@ -45,6 +46,20 @@ export interface DeepDiveConfig {
   reconciliationFunctionVersion: string;
   /** 適合度ティア閾値の版(M3 D-5)。ValuationRecordの再計算ハッシュに入る。 */
   fitnessTierThresholdVersion: string;
+}
+
+/**
+ * 既存の1物理量設定と、PRTR等の複数物理量設定を同じ入口で扱う。
+ * 新規呼び出しは`quantities`を使い、既存水・GHGは単数形をそのまま利用できる。
+ */
+export type DeepDiveConfig =
+  | DeepDiveQuantityConfig
+  | {
+      quantities: DeepDiveQuantityConfig[];
+    };
+
+export function quantitiesInDeepDiveConfig(config: DeepDiveConfig): DeepDiveQuantityConfig[] {
+  return "quantities" in config ? config.quantities : [config];
 }
 
 /** 利用者が選んだ代表値(M4 §7.4)。システムは推奨しないため、選択は必ず外から渡される。 */
@@ -95,109 +110,141 @@ export function runValuationPipeline(options: ValuationPipelineOptions): Valuati
   const representativeSelectionStatus: Record<string, RepresentativeValueSelectionResult> = {};
 
   for (const materialIssueId of options.materialIssueIds) {
-    const deepDiveConfig = options.deepDiveConfigForMaterialIssue(materialIssueId);
+    const quantityConfigs = quantitiesInDeepDiveConfig(options.deepDiveConfigForMaterialIssue(materialIssueId));
+    const materialIssueRecords: ValuationRecord[] = [];
 
-    const groups = buildValuationRecords({
-      physicalQuantityId: deepDiveConfig.physicalQuantityId,
-      input: deepDiveConfig.input,
-      config: deepDiveConfig.config,
-      calibration: deepDiveConfig.calibration,
-      plugins: deepDiveConfig.plugins,
-      officialAggregates: deepDiveConfig.officialAggregates,
-      rng: options.rng,
-      versions: {
-        calibrationSetVersion: deepDiveConfig.calibrationSetVersion,
-        fitnessTierThresholdVersion: deepDiveConfig.fitnessTierThresholdVersion,
-        // AoP正規化対応表はM3(aopCodeの付与)とM4(グループ化)が共有する1つの表なので、
-        // 分解側の版をそのまま使う。2つに分かれると対応表の版が食い違いうる。
-        aopMappingVersion: options.decompositionVersions.aopMappingVersion,
-      },
-    });
+    for (const deepDiveConfig of quantityConfigs) {
+      const groups = buildValuationRecords({
+        physicalQuantityId: deepDiveConfig.physicalQuantityId,
+        input: deepDiveConfig.input,
+        config: deepDiveConfig.config,
+        calibration: deepDiveConfig.calibration,
+        plugins: deepDiveConfig.plugins,
+        officialAggregates: deepDiveConfig.officialAggregates,
+        rng: options.rng,
+        versions: {
+          calibrationSetVersion: deepDiveConfig.calibrationSetVersion,
+          fitnessTierThresholdVersion: deepDiveConfig.fitnessTierThresholdVersion,
+          aopMappingVersion: options.decompositionVersions.aopMappingVersion,
+        },
+      });
+      const quantityRecords: ValuationRecord[] = [];
 
-    const records: ValuationRecord[] = [];
-
-    for (const group of groups) {
-      const reconciliationPayload = deriveM3ReconciliationCheckPayload(group, deepDiveConfig.reconciliationFunctionVersion);
-      const reconciliationEntryId = reconciliationPayload
-        ? (() => {
-            const entry = buildAssumptionEntry(options.idSequence(), options.now, "M3", group.methodId, reconciliationPayload);
-            assumptionEntries.push(entry);
-            return entry.id;
-          })()
-        : null;
-
-      for (const record of group.records) {
-        const calibrationPayload = deriveM3CoefficientCalibrationPayload(
-          record.geographicCalibration,
-          deepDiveConfig.calibrationSetVersion
+      for (const group of groups) {
+        const reconciliationPayload = deriveM3ReconciliationCheckPayload(
+          group,
+          deepDiveConfig.reconciliationFunctionVersion
         );
-        const calibrationEntry = buildAssumptionEntry(options.idSequence(), options.now, "M3", record.id, calibrationPayload);
-        assumptionEntries.push(calibrationEntry);
-
-        const compositeScore = record.transferFitness.dimensions
-          ? computeFitnessTier(record.transferFitness.dimensions).compositeScore
+        const reconciliationEntryId = reconciliationPayload
+          ? (() => {
+              const entry = buildAssumptionEntry(
+                options.idSequence(),
+                options.now,
+                "M3",
+                group.methodId,
+                reconciliationPayload
+              );
+              assumptionEntries.push(entry);
+              return entry.id;
+            })()
           : null;
-        const fitnessPayload = deriveM3FitnessTierPayload(record.transferFitness.tier, compositeScore);
-        const fitnessEntry = buildAssumptionEntry(options.idSequence(), options.now, "M3", record.id, fitnessPayload);
-        assumptionEntries.push(fitnessEntry);
 
-        const entryIds = [calibrationEntry.id, fitnessEntry.id];
-        if (reconciliationEntryId) {
-          entryIds.push(reconciliationEntryId);
+        for (const record of group.records) {
+          const calibrationEntry = buildAssumptionEntry(
+            options.idSequence(),
+            options.now,
+            "M3",
+            record.id,
+            deriveM3CoefficientCalibrationPayload(record.geographicCalibration, deepDiveConfig.calibrationSetVersion)
+          );
+          assumptionEntries.push(calibrationEntry);
+
+          const compositeScore = record.transferFitness.dimensions
+            ? computeFitnessTier(record.transferFitness.dimensions).compositeScore
+            : null;
+          const fitnessEntry = buildAssumptionEntry(
+            options.idSequence(),
+            options.now,
+            "M3",
+            record.id,
+            deriveM3FitnessTierPayload(record.transferFitness.tier, compositeScore)
+          );
+          assumptionEntries.push(fitnessEntry);
+
+          const entryIds = [calibrationEntry.id, fitnessEntry.id];
+          if (reconciliationEntryId) entryIds.push(reconciliationEntryId);
+          const mappingPayload = deriveM3InputMappingPayload(record);
+          if (mappingPayload) {
+            const mappingEntry = buildAssumptionEntry(options.idSequence(), options.now, "M3", record.id, mappingPayload);
+            assumptionEntries.push(mappingEntry);
+            entryIds.push(mappingEntry.id);
+          }
+          quantityRecords.push({ ...record, assumptionEntryIds: entryIds });
         }
-        records.push({ ...record, assumptionEntryIds: entryIds });
       }
-    }
+      materialIssueRecords.push(...quantityRecords);
 
-    valuationRecordsByMaterialIssue[materialIssueId] = records;
-
-    const decomposition = buildDivergenceDecomposition({
-      id: `dd-${materialIssueId}`,
-      targetPhysicalQuantityId: deepDiveConfig.physicalQuantityId,
-      siteId: deepDiveConfig.input.siteId,
-      records,
-      versions: options.decompositionVersions,
-    });
-
-    for (const group of decomposition.groups) {
-      for (const pairwise of group.pairwiseDecompositions) {
-        const payload = deriveM4DecompositionPayload(pairwise, options.decompositionVersions);
-        const entry = buildAssumptionEntry(options.idSequence(), options.now, "M4", decomposition.id, payload);
-        assumptionEntries.push(entry);
+      // 単一手法のLIME3パイロットではM4を起動しない。複数手法でも物理量を跨いで比較しない。
+      const isSingleMethodExpansionPilot =
+        groups.length === 1 && ["lime3-pollution", "lime3-waste", "lime3-land-use"].includes(groups[0].methodId);
+      if (isSingleMethodExpansionPilot || quantityRecords.length < 2) continue;
+      const decomposition = buildDivergenceDecomposition({
+        id:
+          quantityConfigs.length === 1
+            ? `dd-${materialIssueId}`
+            : `dd-${materialIssueId}-${deepDiveConfig.physicalQuantityId}`,
+        targetPhysicalQuantityId: deepDiveConfig.physicalQuantityId,
+        siteId: deepDiveConfig.input.siteId,
+        records: quantityRecords,
+        versions: options.decompositionVersions,
+      });
+      for (const group of decomposition.groups) {
+        for (const pairwise of group.pairwiseDecompositions) {
+          const entry = buildAssumptionEntry(
+            options.idSequence(),
+            options.now,
+            "M4",
+            decomposition.id,
+            deriveM4DecompositionPayload(pairwise, options.decompositionVersions)
+          );
+          assumptionEntries.push(entry);
+        }
       }
-    }
 
-    // --- M4 §7.4:代表値の選択と、手法変更時の前年度手法での再計算値の並記 ---
-    const selectionInput = options.representativeSelectionForMaterialIssue?.(materialIssueId);
-    let decompositionWithSelection = decomposition;
-
-    if (selectionInput) {
-      const group = decomposition.groups.find((g) => g.valueConcept === selectionInput.groupValueConcept);
-      const groupRecords = records.filter((record) => record.valueConcept === selectionInput.groupValueConcept);
-
-      if (group && groupRecords.length > 0) {
-        const result = buildRepresentativeValueSelection({
-          groupValueConcept: selectionInput.groupValueConcept,
-          records: groupRecords,
-          selectedMethodId: selectionInput.selectedMethodId,
-          reason: selectionInput.reason,
-          priorYearMethodId: selectionInput.priorYearMethodId,
-        });
-
-        const payload = deriveM4RepresentativeValueSelectionPayload(result.selection);
-        const entry = buildAssumptionEntry(options.idSequence(), options.now, "M4", decomposition.id, payload);
-        assumptionEntries.push(entry);
-
-        decompositionWithSelection = {
-          ...decomposition,
-          representativeValueSelection: result.selection,
-          assumptionEntryIds: [...decomposition.assumptionEntryIds, entry.id],
-        };
-        representativeSelectionStatus[materialIssueId] = result;
+      let decompositionWithSelection = decomposition;
+      // 現行の代表値操作はMaterialIssue単位。複数物理量で曖昧になるため適用しない。
+      const selectionInput =
+        quantityConfigs.length === 1 ? options.representativeSelectionForMaterialIssue?.(materialIssueId) : undefined;
+      if (selectionInput) {
+        const group = decomposition.groups.find((entry) => entry.valueConcept === selectionInput.groupValueConcept);
+        const groupRecords = quantityRecords.filter((record) => record.valueConcept === selectionInput.groupValueConcept);
+        if (group && groupRecords.length > 0) {
+          const result = buildRepresentativeValueSelection({
+            groupValueConcept: selectionInput.groupValueConcept,
+            records: groupRecords,
+            selectedMethodId: selectionInput.selectedMethodId,
+            reason: selectionInput.reason,
+            priorYearMethodId: selectionInput.priorYearMethodId,
+          });
+          const entry = buildAssumptionEntry(
+            options.idSequence(),
+            options.now,
+            "M4",
+            decomposition.id,
+            deriveM4RepresentativeValueSelectionPayload(result.selection)
+          );
+          assumptionEntries.push(entry);
+          decompositionWithSelection = {
+            ...decomposition,
+            representativeValueSelection: result.selection,
+            assumptionEntryIds: [...decomposition.assumptionEntryIds, entry.id],
+          };
+          representativeSelectionStatus[materialIssueId] = result;
+        }
       }
+      divergenceDecompositions.push(decompositionWithSelection);
     }
-
-    divergenceDecompositions.push(decompositionWithSelection);
+    valuationRecordsByMaterialIssue[materialIssueId] = materialIssueRecords;
   }
 
   return {

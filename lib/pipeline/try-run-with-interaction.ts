@@ -26,6 +26,9 @@ import { persistComputedRun } from "./execute-run";
 import { getDb } from "@/lib/db/client";
 import type { DbTransaction } from "@/lib/db/client";
 import { sql } from "drizzle-orm";
+import { SITE_ROWS } from "@/lib/demo/company";
+import { listActiveInputBatches, listActivePhysicalInputRecords } from "@/lib/db/repositories/physical-inputs";
+import { buildCategoryExpansionRuntime, type CategoryExpansionRuntime } from "./category-expansion-runtime";
 
 export interface TryRunInput {
   /** 追記しようとしている操作イベント。検証に通るまでDBには書かない。 */
@@ -62,6 +65,27 @@ function logFailure(label: string, cause: unknown): void {
   console.error(`[try-run-with-interaction] ${label} の事前検証でパイプラインが失敗しました:`, cause);
 }
 
+function runWithExpansion(
+  userSites: UserSiteEntry[],
+  interactions: ReturnType<typeof projectInteractionState>,
+  expansion: CategoryExpansionRuntime
+) {
+  const validSiteIds = new Set([...SITE_ROWS.map((site) => site.id), ...userSites.map((entry) => entry.row.id)]);
+  const orphan = expansion.activeMaterialIssueTargets.find((target) => !validSiteIds.has(target.siteId));
+  if (orphan) throw new Error(`有効な物理入力が存在しない拠点を参照しています: ${orphan.siteId}`);
+  return runDemoPipeline({
+    userSites,
+    interactions,
+    rngSeed: DEFAULT_RNG_SEED,
+    physicalInputs: expansion.physicalInputs,
+    activeMaterialIssueTargets: expansion.activeMaterialIssueTargets,
+    deepDiveConfigsByMaterialIssue: expansion.deepDiveConfigsByMaterialIssue,
+    coverageByMaterialIssue: expansion.coverageByMaterialIssue,
+    methodAvailabilityByMaterialIssue: expansion.methodAvailabilityByMaterialIssue,
+    inputBatchHashes: expansion.inputBatchHashes,
+  });
+}
+
 /**
  * 変更後の状態でパイプラインを試し、成功したときだけ永続化する。
  *
@@ -73,10 +97,12 @@ export async function tryRunAndPersist(tenantId: string, input: TryRunInput): Pr
       // 同じテナントの「読取→計算→追記」を直列化し、古い状態から作ったrunの後勝ちを防ぐ。
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}))`);
 
-      const [currentSites, currentEvents] = await Promise.all([
-        listSiteEntries(tenantId, tx),
-        listInteractionEvents(tenantId, tx),
-      ]);
+      // 1トランザクション=1 client。同一clientへのquery並列実行はpg@9で非対応になる。
+      const currentSites = await listSiteEntries(tenantId, tx);
+      const currentEvents = await listInteractionEvents(tenantId, tx);
+      const physicalInputRecords = await listActivePhysicalInputRecords(tenantId, undefined, tx);
+      const activeBatches = await listActiveInputBatches(tenantId, tx);
+      const expansion = await buildCategoryExpansionRuntime(physicalInputRecords, activeBatches);
       const now = new Date().toISOString();
       const pendingEvents: InteractionEvent[] = (input.events ?? []).map((event, index) => ({
         id: `pending-${index}`,
@@ -90,17 +116,17 @@ export async function tryRunAndPersist(tenantId: string, input: TryRunInput): Pr
       const candidateSites = input.userSites ? input.userSites(currentSites) : currentSites;
 
       // 書込前に検証する。例外ならトランザクションはロールバックされる。
-      let result = runDemoPipeline({ userSites: candidateSites, interactions, rngSeed: DEFAULT_RNG_SEED });
+      let result = runWithExpansion(candidateSites, interactions, expansion);
       if (input.commit) {
         await input.commit(tx);
         // UUIDなどDBへ実際に保存された識別子を結果へ反映する。
         const committedSites = await listSiteEntries(tenantId, tx);
-        result = runDemoPipeline({ userSites: committedSites, interactions, rngSeed: DEFAULT_RNG_SEED });
+        result = runWithExpansion(committedSites, interactions, expansion);
       }
       for (const [index, event] of (input.events ?? []).entries()) {
         await appendInteractionEvent(tenantId, { ...event, createdAt: new Date(Date.now() + index) }, tx);
       }
-      await persistComputedRun(tenantId, result, tx);
+      await persistComputedRun(tenantId, result, tx, expansion.calculationLineItems);
     });
   } catch (cause) {
     logFailure(input.label, cause);

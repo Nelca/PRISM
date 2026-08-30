@@ -3,7 +3,7 @@ import { loadLedgerView } from "@/lib/views/pipeline";
 import { recalculateWithPriorParameters } from "@core/ledger/recalculate-with-prior-parameters";
 import { Mono, Num, pickYenScale } from "../components/numeric";
 import { Card, ScreenLead, Stat, Tag } from "../components/ui";
-import { verdictLabel } from "../components/labels";
+import { categoryLabel, verdictLabel } from "../components/labels";
 import { methodLabel, withMethodLabelsInText } from "../components/method-labels";
 import { DataSourceAttribution } from "../components/attribution";
 
@@ -62,6 +62,20 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       hash: entry.decision.decisionRecord.recalculationHash,
     })),
   ];
+  const inputTraceRows = currentRecords.flatMap((record) => {
+    const input = record.inputSnapshot;
+    if (!input || (!record.factorSnapshot && !record.mappingSnapshot)) return [];
+    const inputHash = "sourceRecordHash" in input ? input.sourceRecordHash : undefined;
+    return [{
+      id: record.id,
+      category: input.category,
+      physicalQuantityId: record.physicalQuantityId,
+      inputHash,
+      factor: record.factorSnapshot,
+      mapping: record.mappingSnapshot,
+      currencyConversion: record.currencyConversion,
+    }];
+  });
 
   // 判定件数(従量課金の根拠、M6 D-8・D-30)。⑤対策と判定から移設した(指示05)。
   // 意思決定の最中に課金明細が見えるのは判断を歪めうるノイズであり、日常業務の外にある
@@ -160,6 +174,46 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
           </table>
         </Card>
       </div>
+
+      <Card
+        title="追加カテゴリの入力・係数の追跡"
+        subtitle="算定行ごとに入力、対応表、係数を照合できます"
+        padBody={false}
+        foot="顧客の元ファイル本文は保存・表示しません。正規化入力と出典ハッシュだけを記録します。"
+      >
+        {inputTraceRows.length === 0 ? (
+          <p style={{ padding: "12px 18px", color: "var(--ink-faint)" }}>追加カテゴリの算定行はまだありません。</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>カテゴリ・物理量</th>
+                <th>入力ハッシュ</th>
+                <th>対応表</th>
+                <th>係数</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inputTraceRows.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <b>{categoryLabel(row.category)}</b>
+                    <span className="id-note">{row.physicalQuantityId}</span>
+                  </td>
+                  <td className="num" style={{ fontSize: 11 }}><Mono>{row.inputHash ?? "—"}</Mono></td>
+                  <td style={{ fontSize: 11.5 }}>
+                    {row.mapping ? <><b>{row.mapping.mappingVersion}</b><span className="id-note"><Mono>{row.mapping.mappingHash}</Mono></span></> : "—"}
+                  </td>
+                  <td style={{ fontSize: 11.5 }}>
+                    {row.factor ? <><b>{row.factor.factorId}</b><span className="id-note"><Mono>{row.factor.sourceHash}</Mono></span></> : "—"}
+                    {row.currencyConversion && <span className="id-note">{row.currencyConversion.fromCurrency}→JPY {row.currencyConversion.rate} ({row.currencyConversion.source})</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
 
       {/*
         M6 D-8 / D-30:従量課金は「判定超過」1本のみで、結論の向きを問わず一律。

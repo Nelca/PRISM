@@ -43,6 +43,83 @@ export const site = pgTable(
   (t) => [primaryKey({ columns: [t.tenantId, t.id] })]
 );
 
+// --- 入力:カテゴリ別の物理量(追記のみ) ---
+
+/**
+ * PRTR・廃棄物・土地利用など、再計算可能な物理量入力の取込単位。
+ * 原本そのものは保持せず、`source_manifest` にファイル名・SHA-256・行数・文字コードを残す。
+ */
+export const inputBatch = pgTable(
+  "input_batch",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    category: text("category").notNull(),
+    sourceKind: text("source_kind").notNull(),
+    schemaVersion: text("schema_version").notNull(),
+    dataVersion: text("data_version").notNull(),
+    reportingYear: integer("reporting_year"),
+    sourceManifest: jsonb("source_manifest").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("input_batch_tenant_category").on(t.tenantId, t.category, t.createdAt)]
+);
+
+/**
+ * 入力をカテゴリ共通の量・単位と、カテゴリ固有のJSONへ正規化した追記専用レコード。
+ * `physical_quantity` がnullの行は未測定/空欄を意味し、0とは区別して監査用に保持する。
+ */
+export const physicalInputRecord = pgTable(
+  "physical_input_record",
+  {
+    batchId: text("batch_id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    id: text("id").notNull(),
+    siteId: text("site_id").notNull(),
+    category: text("category").notNull(),
+    physicalQuantity: doublePrecision("physical_quantity"),
+    unit: text("unit").notNull(),
+    calculationEligibility: text("calculation_eligibility").notNull(),
+    sourceRecordHash: text("source_record_hash").notNull(),
+    sourceLineNumber: integer("source_line_number").notNull(),
+    data: jsonb("data").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.batchId, t.id] }),
+    index("physical_input_record_batch").on(t.tenantId, t.batchId),
+    index("physical_input_record_site_category").on(t.tenantId, t.siteId, t.category),
+  ]
+);
+
+/**
+ * 算定runごとの入力行の処理結果。算定済みだけでなく、未対応・移動量・ライセンス停止も残す。
+ */
+export const calculationLineItem = pgTable(
+  "calculation_line_item",
+  {
+    runId: text("run_id").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    id: text("id").notNull(),
+    inputRecordId: text("input_record_id").notNull(),
+    materialIssueId: text("material_issue_id"),
+    methodId: text("method_id").notNull(),
+    status: text("status").notNull(),
+    factorId: text("factor_id"),
+    mappingId: text("mapping_id"),
+    valuationRecordId: text("valuation_record_id"),
+    amount: doublePrecision("amount"),
+    reason: text("reason"),
+    data: jsonb("data").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.runId, t.id] }),
+    index("calculation_line_item_input").on(t.tenantId, t.inputRecordId),
+    index("calculation_line_item_issue").on(t.tenantId, t.materialIssueId),
+  ]
+);
+
 // --- 入力:ユーザー操作(追記のみ) ---
 
 /**
@@ -248,6 +325,9 @@ export const versionedParameterSet = pgTable(
  * 手書きマイグレーションがこの一覧を参照する。`site` は取込のやり直しがあるため対象外。
  */
 export const APPEND_ONLY_TABLES = [
+  "input_batch",
+  "physical_input_record",
+  "calculation_line_item",
   "interaction_event",
   "pipeline_run",
   "material_issue",

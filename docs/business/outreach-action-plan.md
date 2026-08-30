@@ -1,7 +1,7 @@
 # フェーズ0残タスクの実行計画:LOI獲得・主要係数ライセンス確認
 
 **目的:** ADR-0002(`docs/decisions/0002-phase0-continuation-gate.md`)が「未達」とした条件3(LOI 3件以上)・条件4(主要係数の商用利用の目処)について、AIが調査・下書き作成まで行い、**人間にしかできない作業(実際の連絡・契約締結)のみを残す。**
-**最終更新:** 2026-08-02
+**最終更新:** 2026-08-28(IFVI/CE Delft/ESVDを算定対象拡大向けに更新。いずれも未送信)
 
 ---
 
@@ -54,21 +54,22 @@ We would welcome a call to discuss further. Thank you for your time.
 
 **調査結果:**
 - サイト全体の一般ライセンスはCC BY-NC 4.0だが、**商用利用は別条件で「ストラテジックパートナー」になる必要がある**と明記
-- 日本国内の研究地点カバレッジ数は公開情報からは確認できず、データベースの検索インターフェースへの直接アクセスが必要(このセッションではアクセスできなかった)
+- 日本関連レコードは67件まで確認済み。ただし海洋/陸域、サービス種類、評価年代が混在するため、土地案件への実用カバレッジは別途再集計が必要
 - 連絡先:esvd@fsd.nl
 
 **送信可能な問い合わせメール下書き:**
 
 ```
 To: esvd@fsd.nl
-Subject: Commercial partnership inquiry + Japan coverage question (ESVD)
+Subject: Commercial partnership inquiry - land use and ecosystem-service valuation in Japan
 
 Dear ESVD / FSD team,
 
-We are developing PRISM, a SaaS product for Japanese companies to
-quantify nature-related financial risk (water, land use, biodiversity)
-using benefit-transfer methodology. We would like to use ESVD as one of
-several monetization methods, applied to individual company sites in Japan.
+We are developing PRISM, a paid SaaS product for Japanese companies to
+quantify nature-related financial impacts. We are preparing a land-use and
+land-conversion module that applies benefit transfer to individual company
+sites and development projects in Japan. We would like to use ESVD as one
+of multiple valuation methods, alongside LIME3 and IFVI where licensed.
 
 We understand from your terms of use that commercial use requires becoming
 a strategic partner. We would appreciate information on:
@@ -76,10 +77,15 @@ a strategic partner. We would appreciate information on:
 1. What "strategic partner" status entails commercially (fee structure,
    scope of use permitted, whether individual-record benefit transfer for
    a paid product's outputs is included).
-2. How many ESVD study records are based on sites in Japan or the
-   broader East Asia region, to help us assess data coverage for our use case.
-3. Whether programmatic/bulk access to individual records is available,
-   or only manual database search.
+2. Whether we may store selected records in an access-controlled internal
+   database and show only derived client results, not the source records.
+3. Whether programmatic/bulk access or an API is available, and how updates
+   and versioning are communicated.
+4. Coverage in Japan/East Asia by terrestrial ecosystem type, ecosystem
+   service, valuation method, and study year. We have identified 67 records
+   associated with Japan, but need to assess their fitness for land projects.
+5. Whether any public-reporting requirement applies to confidential client
+   work performed under a commercial partnership.
 
 We would welcome the opportunity to discuss further. Thank you.
 ```
@@ -98,23 +104,26 @@ We would welcome the opportunity to discuss further. Thank you.
 
 ```
 To: ce@ce.nl
-Subject: Licensing inquiry - Environmental Prices Handbook coefficients in a commercial product
+Subject: Licensing inquiry - Environmental Prices Handbook 2024 v1.1 coefficients in commercial SaaS
 
 Dear CE Delft team,
 
-We are developing PRISM, a SaaS product for Japanese companies to
-quantify nature-related financial risk. We would like to use coefficients
-from your Environmental Prices Handbook (e.g., shadow prices for pollutants)
-as one of several monetization methods embedded in our paid product's output.
+We are developing PRISM, a paid SaaS product for Japanese companies to
+quantify nature-related financial impacts. Our first pollution module will
+use facility-level releases of hazardous chemicals reported under Japan's
+PRTR scheme. We are evaluating the Environmental Prices Handbook 2024 EU27
+version 1.1 as a second valuation method alongside Japan-calibrated LIME3.
 
 Could you confirm in writing:
 
-1. Whether commercial embedding of specific Environmental Prices
-   coefficients into a paid SaaS product's client-facing output is
-   permitted, and under what terms (attribution only, licensing fee,
-   or a formal agreement).
-2. If a formal license is required, the process and cost for a
-   Japan-based early-stage startup.
+1. Whether we may extract specific Annex coefficients into an internal
+   database and use them in calculations within a paid SaaS product.
+2. Whether we may show derived client results and audit metadata without
+   displaying or redistributing the coefficient tables themselves.
+3. Terms for mapping the coefficients to Japanese PRTR substances and
+   applying documented geographic adjustments to EU27-average values.
+4. Required attribution, version/erratum handling, fees, and contract process
+   for a Japan-based early-stage company in a pilot phase.
 
 We would welcome a written response or a call to discuss. Thank you.
 ```
@@ -126,37 +135,46 @@ We would welcome a written response or a call to discuss. Thank you.
 ### 1.4 IFVI(Global Value Factor Database)
 
 **調査結果:**
-- **唯一、条項が明確。商用利用には事前の書面同意と有償ライセンスが必須**であることが利用規約に明記されている("You must not access or use for any commercial purposes... without IFVI's prior written consent"、"licensing charges apply"という第三者コメントも確認)
+- 提供済みWater Consumption PDFのContent Termsでは個人・非商用利用が基本で、製品販売・公開報告・商取引での利用および第三者アクセスが制限される。PRISMの商用SaaS利用可否・料金は書面確認が必要
+- Air Pollution、Water Pollution、Waste、Land Use and ConversionはWater Consumption PDFとは別資料・別モデルで、Global Value Factor Databaseも別途取得が必要
 - 連絡先:contact@ifvi.org
 
 **送信可能な問い合わせメール下書き:**
 
 ```
 To: contact@ifvi.org
-Subject: Commercial licensing inquiry - Global Value Factor Database (Water Consumption methodology)
+Subject: Commercial licensing inquiry - Global Value Factor Database and interim environmental methodologies
 
 Dear IFVI team,
 
-We are developing PRISM, a SaaS product for Japanese companies to quantify
-nature-related financial risk in alignment with TNFD/SSBJ disclosure
-requirements. We would like to embed value factors from your Water
-Consumption Topic Methodology (VFnutrition, VFdisease, VFes, VFaccess)
-into our paid product's client-facing output.
+We are developing PRISM, a paid SaaS product for Japanese companies to quantify
+nature-related financial impacts in alignment with TNFD and related reporting.
+We currently evaluate Water Consumption and are expanding to pollution,
+waste, and land use. We would like to evaluate and, if licensed, use the
+Global Value Factor Database and the following interim methodologies and
+models: Air Pollution, Water Pollution, Waste, and Land Use and Conversion.
 
-Per your Terms of Use, we understand this requires your prior written
-consent and a commercial license. Could you share:
+We already have the final Water Consumption Topic Methodology PDF, but
+understand that it does not contain the methods or value factors for these
+additional topics. Per the Content Terms, we also understand that product
+embedding and commercial use require written confirmation. Could you share:
 
-1. The licensing process and typical terms for a startup SaaS product
-   at pilot stage (3-5 design-partner customers in year one).
-2. Fee structure for embedding methodology-derived value factors
-   (not raw IFVI content) into client-facing outputs.
-3. Whether a pilot/evaluation license is available before a full
-   commercial agreement.
+1. The licensing process and typical terms for a startup SaaS product at
+   pilot stage (3-5 design-partner customers in year one).
+2. Whether a single license can cover the Global Value Factor Database and
+   all four interim topics listed above.
+3. Whether we may store selected value factors in an access-controlled
+   internal database and show only derived results, methodology/version,
+   and audit metadata to clients without redistributing raw IFVI content.
+4. Whether a pilot/evaluation license is available, and the boundary between
+   internal evaluation, advisory use, and commercial SaaS use.
+5. Registration, user-access, attribution, versioning, and update conditions.
 
+For methodology questions, we can also coordinate with research@ifvi.org.
 We would welcome a call to discuss. Thank you.
 ```
 
-**人間による対応が必要:** メール送信、ライセンス交渉・費用確定。**この4件の中で最も条件が明確なため、優先的に連絡することを推奨。**
+**人間による対応が必要:** メール送信、ライセンス交渉・費用確定。送信後は、回答原文・日付・担当者・許諾範囲を`docs/data/licensing.md`へ転記し、口頭回答だけでプラグインを有効化しない。
 
 ---
 
@@ -164,10 +182,10 @@ We would welcome a call to discuss. Thank you.
 
 | ソース | 状況 | 優先度 | 次の人間アクション |
 |---|---|---|---|
-| IFVI | 条件明確(有償ライセンス必須) | 高(条件が明確、話が早い) | メール送信→ライセンス交渉 |
+| IFVI | 商用SaaS利用は書面確認が必要。追加4テーマは別途取得 | 高(4テーマ横断で照会) | メール送信→許諾範囲・料金交渉 |
 | WDPA(IBAT) | 料金体系公開済み、交渉余地あり | 高(コスト高、早期の条件交渉が必要) | メール送信→料金交渉 |
-| ESVD | 個別交渉必須、条件不明 | 中 | メール送信→パートナー条件確認 |
-| CE Delft | 条件不透明、書面確認が必須 | 中 | メール送信→書面確認取得 |
+| ESVD | strategic partner契約が必要。日本67件確認済み | 高(土地の第2手法候補) | メール送信→パートナー条件確認 |
+| CE Delft | 条件不透明。PRTRに近い500超物質を収録 | 高(汚染の第2手法候補) | メール送信→書面確認取得 |
 
 ---
 

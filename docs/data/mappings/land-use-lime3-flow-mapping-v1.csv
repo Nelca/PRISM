@@ -1,0 +1,5 @@
+mapping_id,mapping_version,match_status,activity_kind,land_class,land_class_before,land_class_after,source_flow_id,rationale,reviewed_by,reviewed_at
+lime3-land-use:occupation:building,1.0.0,exact,occupation,building,,,008105,顧客区分buildingをLIME3建物用地の土地占有へ対応,PRISM methodology review,2026-08-28
+lime3-land-use:occupation:orchard,1.0.0,exact,occupation,orchard,,,008103,顧客区分orchardをLIME3果樹園の土地占有へ対応,PRISM methodology review,2026-08-28
+lime3-land-use:conversion:forest:building,1.0.0,exact,conversion,,forest,building,008273,森林から建物用地への転換を同名LIME3土地改変フローへ対応,PRISM methodology review,2026-08-28
+lime3-land-use:conversion:forest:paddy,1.0.0,exact,conversion,,forest,paddy,008272,森林から田への転換を同名LIME3土地改変フローへ対応,PRISM methodology review,2026-08-28

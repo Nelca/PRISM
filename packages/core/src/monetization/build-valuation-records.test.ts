@@ -41,6 +41,7 @@ describe("buildValuationRecordsForPlugin", () => {
 
     expect(group.records).toHaveLength(1);
     const [record] = group.records;
+    if (!record.quantileRange) throw new Error("replacement-costには不確実性レンジが必要です");
     expect(record.methodId).toBe("replacement-cost"); // 単一内訳なので手法IDそのまま
     expect(record.valueConcept).toBe("exchange");
     expect(record.centralValue).toBe(500); // physicalQuantity=1 × 単価500、較正は恒等

@@ -10,7 +10,7 @@
 
 import type { AssumptionEntry, AssumptionEntryPayload, AssumptionSourceModule } from "../types/ledger";
 import type { DepthDecision } from "../types/assessment";
-import type { GeographicCalibrationRecord, TransferFitness } from "../types/valuation";
+import type { GeographicCalibrationRecord, TransferFitness, ValuationRecord } from "../types/valuation";
 import type { ValuationRecordGroup } from "../monetization/build-valuation-records";
 import type { PairwiseDecomposition, RepresentativeValueSelection } from "../types/divergence";
 import type { BindingMechanismChangeEntry } from "../types/decision";
@@ -104,6 +104,27 @@ export function deriveM3FitnessTierPayload(
   compositeScore: number | null
 ): Extract<AssumptionEntryPayload, { module: "M3"; kind: "fitness_tier_assignment" }> {
   return { module: "M3", kind: "fitness_tier_assignment", tier, compositeScore };
+}
+
+/** 入力行→レビュー済み対応表→係数の解決を、M8へ機械的に転記する。 */
+export function deriveM3InputMappingPayload(
+  record: ValuationRecord
+): Extract<AssumptionEntryPayload, { module: "M3"; kind: "input_mapping" }> | null {
+  if (!record.mappingSnapshot || !record.factorSnapshot) return null;
+  const sourceRecordHash =
+    record.inputSnapshot && "sourceRecordHash" in record.inputSnapshot ? record.inputSnapshot.sourceRecordHash : null;
+  return {
+    module: "M3",
+    kind: "input_mapping",
+    physicalQuantityId: record.physicalQuantityId,
+    sourceRecordHash,
+    mappingId: record.mappingSnapshot.mappingId,
+    mappingVersion: record.mappingSnapshot.mappingVersion,
+    mappingHash: record.mappingSnapshot.mappingHash,
+    factorId: record.factorSnapshot.factorId,
+    factorSourceHash: record.factorSnapshot.sourceHash,
+    currencyConversion: record.currencyConversion ?? null,
+  };
 }
 
 // --- M4 ---

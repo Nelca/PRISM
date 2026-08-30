@@ -30,8 +30,8 @@ export function sumWelfareAmounts(amounts: WelfareAmount[]): WelfareAmount {
 
 export type ValueConcept = "exchange" | "welfare";
 
-/** 構想書7.1のカテゴリ。MVPは気候・水・汚染の3つ(M2要件定義書§0)。 */
-export type ImpactCategory = "climate" | "water" | "pollution";
+/** PRISMが算定・開示の単位として扱う環境影響カテゴリ。 */
+export type ImpactCategory = "climate" | "water" | "pollution" | "waste" | "land_use";
 
 /**
  * 正規化AoPコード(M4要件定義書§6.2)。
@@ -61,6 +61,11 @@ export interface Distribution {
   mu: number;
   sigma: number;
 }
+
+/** 出典に分布情報がない場合を、sigma=0と偽装せず明示する。 */
+export type ParameterUncertainty =
+  | Distribution
+  | { kind: "not_available"; reason: string };
 
 /** 割引率の扱い(M4要件定義書F-5、M3各手法で使用)。 */
 export type DiscountRateStatus = "explicit" | "documented_zero" | "no_time_dimension";

@@ -11,6 +11,7 @@
 
 import { getDefaultTenantId } from "@/lib/db/client";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
+import { buildPublicPipelineResult } from "@/lib/pipeline/public-result";
 
 export async function GET(request: Request) {
   const expected = process.env.PRISM_API_KEY;
@@ -27,5 +28,5 @@ export async function GET(request: Request) {
   }
 
   const result = await getOrCreateLatestResult(getDefaultTenantId());
-  return Response.json(result);
+  return Response.json(buildPublicPipelineResult(result));
 }

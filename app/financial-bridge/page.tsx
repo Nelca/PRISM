@@ -5,7 +5,7 @@ import { CompanyFinancialsForm } from "./financials-form";
 import { buildWaterfallSteps } from "@core/financial-bridge/bridge1";
 import { Num, pickYenScale } from "../components/numeric";
 import { Card, GuideBox, GuideButton, KV, ScreenLead, Stat, Tag, Term } from "../components/ui";
-import { financialDisplayLabel, financialTermNote } from "../components/labels";
+import { categoryLabel, financialDisplayLabel, financialTermNote, materialIssueLabel } from "../components/labels";
 import { StepNav } from "../components/step-nav";
 import { TaskBanner } from "../components/task-banner";
 import { Waterfall } from "../components/charts/Waterfall";
@@ -24,6 +24,11 @@ export default async function FinancialBridgePage({
   const { site: siteParam } = await searchParams;
   const { result, interactions } = await loadInteractivePipelineView();
   const { decisions } = result;
+  const siteNameById = new Map(result.assessment.sites.map((site) => [site.id, site.name]));
+  const welfareOnlyIssues = result.assessment.materialIssues.filter((issue) => {
+    const records = result.valuation.valuationRecordsByMaterialIssue[issue.id] ?? [];
+    return records.length > 0 && records.every((record) => record.valueConcept === "welfare");
+  });
   // 入力済みの企業財務データ(未入力ならデモの既定値で計算されている)
   const { companyFinancials } = interactions;
 
@@ -46,6 +51,13 @@ export default async function FinancialBridgePage({
             評価対象の絞り込みへ →
           </Link>
         </Card>
+        {welfareOnlyIssues.length > 0 && (
+          <Card title="社会的厚生価値の参考結果" headExtra={<Tag variant="welfare">NPV・ROI対象外</Tag>}>
+            <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+              追加カテゴリのLIME3結果は社会的な厚生価値です。企業の交換価値が登録されるまで、企業財務への影響は試算しません。
+            </p>
+          </Card>
+        )}
       </div>
     );
   }
@@ -116,6 +128,28 @@ export default async function FinancialBridgePage({
 
       {/* D-11-1:残タスクの頭出し(最下部までスクロールしなくても見える)。 */}
       <TaskBanner current="/financial-bridge" result={result} />
+
+      {welfareOnlyIssues.length > 0 && (
+        <Card
+          title="企業財務へ接続していない評価結果"
+          subtitle="社会的な厚生価値は企業NPV・ROIには加算しません"
+          headExtra={<Tag variant="welfare">参考値</Tag>}
+        >
+          <p style={{ marginTop: 0, color: "var(--ink-soft)" }}>
+            次の追加カテゴリはLIME3による厚生価値のみです。顧客が保有する回避費用など、企業の交換価値入力が登録されるまで、利益・自然債務・減損リスクには反映しません。
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {welfareOnlyIssues.map((issue) => (
+              <li key={issue.id}>
+                <Link href={`/valuation?issue=${encodeURIComponent(issue.id)}`}>
+                  {materialIssueLabel(siteNameById.get(issue.siteId), issue.impactCategory, issue.id)}
+                </Link>
+                <span className="cell-note">{categoryLabel(issue.impactCategory)}の社会的影響</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/*
         D-10:companyFinancialsはテナント単位の値なのに、入力ボタンが各拠点のカード内にあり、

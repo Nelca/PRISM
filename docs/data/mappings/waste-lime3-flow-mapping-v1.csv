@@ -1,0 +1,3 @@
+mapping_id,mapping_version,match_status,waste_type_code,treatment_route,treatment_location,source_flow_id,rationale,reviewed_by,reviewed_at
+lime3-waste:industrial_unspecified:landfill:offsite,1.0.0,exact,industrial_unspecified,landfill,offsite,006153,LIME3産廃・特定せずの埋立物フローへ同粒度で対応,PRISM methodology review,2026-08-28
+lime3-waste:municipal_unspecified:landfill:offsite,1.0.0,exact,municipal_unspecified,landfill,offsite,006150,LIME3一廃・特定せずの埋立物フローへ同粒度で対応,PRISM methodology review,2026-08-28

@@ -8,6 +8,9 @@
 export const METHOD_LABEL: Record<string, string> = {
   "replacement-cost": "代替費用法(浄水コスト)",
   "lime3-water": "LIME3(水消費統合指標)",
+  "lime3-pollution": "LIME3(汚染統合指標)",
+  "lime3-waste": "LIME3(廃棄物統合指標)",
+  "lime3-land-use": "LIME3(土地利用統合指標)",
   "ifvi-water-consumption": "IFVI 水ストレス係数",
   "ghg-carbon-price-conversion.ghg-social-cost": "炭素の社会的費用(IFVI GHG方法論)",
   "ghg-carbon-price-conversion.ghg-gx-ets-price": "GX-ETS調整基準取引価格",
@@ -69,6 +72,9 @@ export function methodLabel(methodId: string | undefined | null): string {
 const METHOD_SHORT_LABEL: Record<string, string> = {
   "replacement-cost": "代替費用法",
   "lime3-water": "LIME3",
+  "lime3-pollution": "LIME3汚染",
+  "lime3-waste": "LIME3廃棄物",
+  "lime3-land-use": "LIME3土地",
   "ifvi-water-consumption": "IFVI",
   "ghg-carbon-price-conversion.ghg-social-cost": "炭素の社会的費用",
   "ghg-carbon-price-conversion.ghg-gx-ets-price": "GX-ETS価格",

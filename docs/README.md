@@ -49,9 +49,11 @@ docs/
     0001-mvp-pilot-category-scope.md            MVP実データ検証の対象カテゴリ
     0002-phase0-continuation-gate.md            フェーズ0末の継続判定(条件2〜4は未完了)
     0003-data-model-review-gate.md               データモデルレビュー(条件付き通過、6件修正済み)
+    0004-category-expansion-scope.md             PRTR汚染・廃棄物・土地利用への拡大順序とカテゴリ境界
 
   roadmap/
     build-plan.md                  フェーズ0からMVP完成までの作業指示
+    category-expansion-directive.md PRTR汚染→廃棄物→土地利用のPlanモード実装指示書
 
   data/                          外部データの調査結果(フェーズ0の成果物)
     aop-mapping-v1.md                初版済 — AoP正規化対応表(IFVI/LIME3確認済、CE Delft未着手)
@@ -62,6 +64,7 @@ docs/
     calibration-parameters-v1.md     初版済 — 地理較正パラメータの実値と出典(World Bank PPP/所得/デフレータ、η、相対価格上昇率)
     carbon-price-scenarios.md        初版済 — NGFS(未取得)・GX-ETS(二次資料一致)の確認状況
     acquisition-runbook.md           初版済 — コード実装以外に必要なものの一覧と取得手順書
+    category-expansion-acquisition.md PRTR・LIME3・IFVI・CE Delft・ESVD・顧客データの追加取得手順
 
   business/                      事業側の資料
     board-proposal.md                経営会議提案資料
@@ -120,5 +123,7 @@ docs/
 - **ローカルデモ手順書(`demo-guide.md`)を作成。** セットアップ・自動テスト・UI各画面の見どころ・出力APIの確認方法・ダミーデータの注意事項をまとめた。デザインパートナー候補への説明・社内共有に使う想定
 - **実データ受け入れテンプレートを実装。** `lib/intake/`(引用符対応の最小限CSVパーサ・拠点一覧CSVテンプレート・NatureInterface調査結果CSVテンプレート・エンゲージメント設定JSONテンプレート・統合ローダー)。実データが「①顧客提供・②PRISM運用チーム調査・③顧客財務部門」という由来の異なる3種のデータの合流であることを整理し、ファイルを分けた(design-rationale-log D-105)。M1実装時に「スコープ外」としていたCSV文字列パースを、実データ投入という別の関心事のために`lib/intake/`限定で追加した(D-106)。`lib/intake/templates/`の記入例が実際にM1〜M7を通しで実行できることをテストで検証済み。`docs/data-intake-guide.md`に非エンジニア向けの記入ガイドを作成した。テスト31件追加(リポジトリ全体で289件)すべて通過、`tsc --noEmit`・ESLintも通過
 - 次は実データでの[GATE]検証・パイロット(build-plan §7、デザインパートナーとの調整が必要)。並行して現在の実装(ダミーデータ上で動く一連の機能)をブラッシュアップしていくフェーズ
+- **算定対象拡大の方針をADR-0004で確定。** PRTR対象有害化学物質を汚染MVPの最初の入力とし、廃棄物を同リリース後半へ追加、LIME3単独の土地利用パイロットを並行開始する。実装順・完了条件・人間GATEは`roadmap/category-expansion-directive.md`、外部データ取得は`data/category-expansion-acquisition.md`に整理済み
 
 次にやることは `roadmap/build-plan.md` §12 のチェックリストを参照。
+算定対象拡大を進める場合は、先に `roadmap/category-expansion-directive.md` を参照。

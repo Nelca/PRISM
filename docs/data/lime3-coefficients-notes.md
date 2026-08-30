@@ -1,7 +1,7 @@
 # LIME3(AIST-IDEA)係数の取り込み
 
 **目的:** A-5(LIME3係数)の取得。`packages/core/src/monetization/plugins/lime3-water.ts` が要求する `MethodConfig.externalValueFactors["lime3-water"]` に実データを供給する。
-**最終更新:** 2026-08-15
+**最終更新:** 2026-08-28(汚染・廃棄物・土地利用への拡大監査を追記)
 
 ---
 
@@ -68,3 +68,41 @@
 - `lib/demo/company.ts`:`DEEP_DIVE_CONFIG.externalValueFactors["lime3-water"]`
 - `lib/demo/user-site-defaults.ts`:`buildUserDeepDiveConfig()`内の同キー
 - 両方とも旧仮値 `28_500`(単位・出典不明のプレースホルダ)から `0.0135886259`(US$/m³、上記§3.2)に差し替え
+
+---
+
+## 5. 汚染・廃棄物・土地利用への拡大監査(2026-08-28)
+
+### 5.1 元Excelとの全件照合
+
+提供済みExcelの`LCIA係数_LIME3`シート、行6〜985・列A〜Xと、抽出CSVの980データ行・24列を文字列表現で全件比較した。**差分は0行**であり、抽出CSVを追加カテゴリの係数ローダーの入力に使用できることを確認した。
+
+- 元Excel SHA-256: `fb5273861253be1f0d732d81c128a3a5817affcdd1f9a32323931bf81d3eaf53`
+- 抽出CSV SHA-256: `63e1744476fc33fb741e176bcea94f0e9dbd5c757a48e9aa620f70d22a959844`
+
+### 5.2 代表的な候補フロー
+
+| 対象 | 基本フロー例 | 単位 | 備考 |
+|---|---|---|---|
+| 大気汚染 | NOx、PM2.5、SO2/SOx、VOC | kg | 都市/非都市、煙突/地表等を区別する行がある。PRTR汚染MVPでは媒体・物質が一致する行だけを使う |
+| NH3 | NH3、大気、不特定 | kg | 該当行の係数が空欄。0として使わない |
+| 廃棄物 | 埋立物、一廃/産廃 | kg | 廃棄物種類と処理経路が一致する場合のみ |
+| 土地占有 | 果樹園、建物用地、田、畑地等 | m²year | 森林、鉱物採掘用地、最終処分場用地等は空欄行がある |
+| 土地改変 | 森林→建物用地、森林→幹線交通用地等 | m² | 転換前後クラスが一致する場合のみ |
+
+### 5.3 利用列の暫定判断
+
+汚染・廃棄物・土地利用は日本の事業所・開発案件における活動なので、内部パイロットでは**「利子率2%、生産国、日本 / 統合化 / US$」**を採用する。水は生産国列が空欄だったため、既存判断どおり消費国・日本を維持する。
+
+この列選択は係数レコードとAssumptionEntryに残す。LIME3の公式手引きで別の視点が指定された場合は、係数版を切り替えて再計算する。
+
+### 5.4 追加カテゴリで実装済みの接続
+
+- `lib/data/lime3/`: 980行の厳格ローダーと、汚染・廃棄物・土地利用のレビュー済み対応表resolver
+- `packages/core/src/monetization/plugins/lime3-{pollution,waste,land-use}.ts`: 単位・媒体・処理経路・土地活動種別を検証する第1手法
+- `lib/pipeline/category-expansion-runtime.ts`: USD→JPY換算を地理較正と分離し、対応表・係数・入力・ライセンス状態を算定runへ接続
+- 統合化係数は`welfare`かつ`aopCode: unmapped`とし、内訳を復元できない間は企業NPV/ROIや単一AoPへ割り当てない
+
+対応表v1の範囲は意図的に狭い。年度別PRTR物質マスタの追加取得と人手レビューにより対象物質・媒体を増やすが、未レビュー行は引き続き`unmapped`とする。
+
+詳細は`docs/data/category-expansion-acquisition.md`と`docs/roadmap/category-expansion-directive.md`を参照。

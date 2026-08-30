@@ -1,0 +1,2 @@
+mapping_id,mapping_version,match_status,reporting_year,prtr_list_version,prtr_substance_code,cas_rn,release_medium,source_flow_id,rationale,reviewed_by,reviewed_at
+lime3-pollution:2023:2023:009:air,1.0.0,exact,2023,2023,009,107-13-1,air,002P22009,PRTR対象物質名・CAS・大気媒体とLIME3基本フローが一致,PRISM methodology review,2026-08-28

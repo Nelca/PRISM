@@ -95,6 +95,14 @@ export function makeValuationRecord(options: ValuationRecordFixtureOptions): Val
     recalculability: { endpointBreakdownPublished: false, damageTimeProfilePublished: false },
     assumptionEntryIds: [] as string[],
     recalculationHash: "placeholder:test",
+    inputSnapshot: {
+      category: "water" as const,
+      physicalQuantity: 1,
+      unit: "m3",
+      siteId: "site-042",
+      sourceRegion: "JP",
+      targetRegion: "JP",
+    },
   };
 
   if (valueConcept === "exchange") {

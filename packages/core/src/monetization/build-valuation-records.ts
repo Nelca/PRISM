@@ -37,6 +37,12 @@ export class ReconciliationError extends Error {
   }
 }
 
+export class LicenseGateError extends Error {
+  constructor(public readonly methodId: string, public readonly reason: "pending_review" | "expired") {
+    super(`[${methodId}] ライセンス状態が${reason}のため算定を実行できません。`);
+  }
+}
+
 /**
  * このValuationRecordの計算に実際に入ったパラメータ版(GAP-06)。
  * `recalculationHash`の入力になるため **Optionalにしない**(build-plan §4.2:
@@ -95,16 +101,36 @@ function buildValuationRecordFromOutput(
   methodId: string,
   methodVersion: string,
   physicalQuantityId: string,
+  input: PhysicalQuantityInput,
+  factorResolution: MethodConfig["factorResolution"],
+  currencyConversion: MethodConfig["currencyConversion"],
   siteId: string,
   calibration: GeographicCalibrationRecord,
   versions: ValuationRecordVersions,
   rng?: () => number
 ): ValuationRecord {
   // 較正が不要な値(すでに現地通貨で表現された値)はスキップする(D-127・D-128)。
+  const factorCurrency = factorResolution?.factor.currency ?? "JPY";
+  let currencyAdjustedValue = output.centralValue;
+  if (factorCurrency !== "JPY") {
+    if (
+      !currencyConversion ||
+      currencyConversion.fromCurrency !== factorCurrency ||
+      currencyConversion.toCurrency !== "JPY" ||
+      !Number.isFinite(currencyConversion.rate) ||
+      currencyConversion.rate <= 0
+    ) {
+      throw new Error(`[${methodId}] ${factorCurrency}建て係数には明示的なJPY通貨換算が必要です。`);
+    }
+    currencyAdjustedValue *= currencyConversion.rate;
+  }
   const centralValue = output.skipGeographicCalibration
-    ? output.centralValue
-    : applyGeographicCalibration(output.centralValue, calibration);
-  const quantileRange = combineUncertainty(centralValue, output.parameterUncertainty, output.transferFitness, { rng });
+    ? currencyAdjustedValue
+    : applyGeographicCalibration(currencyAdjustedValue, calibration);
+  const quantileRange =
+    output.parameterUncertainty.kind === "not_available"
+      ? null
+      : combineUncertainty(centralValue, output.parameterUncertainty, output.transferFitness, { rng });
 
   const common = {
     id: `${methodId}-${physicalQuantityId}`,
@@ -117,13 +143,21 @@ function buildValuationRecordFromOutput(
     aopMappingConfidence: output.aopMappingConfidence,
     metric: output.metric,
     cicesRef: output.cicesRef,
-    quantileRange,
-    parameterUncertainty: output.parameterUncertainty,
     transferFitness: output.transferFitness,
     discountRate: output.discountRate,
     discountRateStatus: output.discountRateStatus,
     geographicCalibration: calibration,
     scopeExclusions: output.scopeExclusions,
+    inputSnapshot: input,
+    factorSnapshot: factorResolution?.factor,
+    mappingSnapshot: factorResolution
+      ? {
+          mappingId: factorResolution.mappingId,
+          mappingVersion: factorResolution.mappingVersion,
+          mappingHash: factorResolution.mappingHash,
+        }
+      : undefined,
+    currencyConversion: factorCurrency === "JPY" ? undefined : currencyConversion,
     recalculability: deriveRecalculability(output),
     assumptionEntryIds: [] as string[], // パイプライン層(valuation-pipeline.ts)が実配線する
     /**
@@ -136,14 +170,41 @@ function buildValuationRecordFromOutput(
       methodVersion,
       physicalQuantityId,
       siteId,
+      input,
+      factorResolution,
+      currencyConversion,
       calibration,
       versions,
     }),
   };
 
-  return output.valueConcept === "exchange"
-    ? { ...common, valueConcept: "exchange", centralValue: exchangeAmount(centralValue) }
-    : { ...common, valueConcept: "welfare", centralValue: welfareAmount(centralValue) };
+  if (output.valueConcept === "exchange") {
+    if (output.parameterUncertainty.kind === "not_available" || quantileRange === null) {
+      throw new Error(`[${methodId}] 企業財務へ接続する交換価値には不確実性分布が必要です。`);
+    }
+    return {
+      ...common,
+      parameterUncertainty: output.parameterUncertainty,
+      quantileRange,
+      valueConcept: "exchange",
+      centralValue: exchangeAmount(centralValue),
+    };
+  }
+  return output.parameterUncertainty.kind === "not_available"
+    ? {
+        ...common,
+        parameterUncertainty: output.parameterUncertainty,
+        quantileRange: null,
+        valueConcept: "welfare",
+        centralValue: welfareAmount(centralValue),
+      }
+    : {
+        ...common,
+        parameterUncertainty: output.parameterUncertainty,
+        quantileRange: quantileRange!,
+        valueConcept: "welfare",
+        centralValue: welfareAmount(centralValue),
+      };
 }
 
 export function buildValuationRecordsForPlugin(
@@ -151,6 +212,24 @@ export function buildValuationRecordsForPlugin(
   options: Omit<BuildValuationRecordsOptions, "plugins">
 ): ValuationRecordGroup {
   const { input, config, physicalQuantityId, calibration: calibrationParams, officialAggregates, versions, rng } = options;
+
+  if (!plugin.supportedCategories.includes(input.category)) {
+    throw new Error(`[${plugin.methodId}] category=${input.category} はサポート対象外です。`);
+  }
+  if (plugin.licenseMode === "pending_review" || config.factorResolution?.factor.licenseMode === "pending_review") {
+    throw new LicenseGateError(plugin.methodId, "pending_review");
+  }
+  const validUntil = config.factorResolution?.factor.licenseValidUntil;
+  // YYYY-MM-DDはUTCの当日0時に解釈されるため、そのままだと有効期限日の開始時点で失効する。
+  // LIME3契約は日本の暦日終端まで有効として実行時ゲートする。
+  const validUntilEnd = validUntil && /^\d{4}-\d{2}-\d{2}$/.test(validUntil)
+    ? new Date(`${validUntil}T23:59:59.999+09:00`).getTime()
+    : validUntil
+      ? new Date(validUntil).getTime()
+      : undefined;
+  if (validUntilEnd !== undefined && (!Number.isFinite(validUntilEnd) || validUntilEnd < Date.now())) {
+    throw new LicenseGateError(plugin.methodId, "expired");
+  }
 
   const outputs = plugin.evaluate(input, config);
 
@@ -182,6 +261,9 @@ export function buildValuationRecordsForPlugin(
       methodId,
       plugin.version,
       physicalQuantityId,
+      input,
+      config.factorResolution,
+      config.currencyConversion,
       input.siteId,
       calibration,
       versions,
