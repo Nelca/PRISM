@@ -41,17 +41,40 @@ describe("追加カテゴリのM1〜M8接続", () => {
       coverageByMaterialIssue: expansion.coverageByMaterialIssue,
       methodAvailabilityByMaterialIssue: expansion.methodAvailabilityByMaterialIssue,
       inputBatchHashes: expansion.inputBatchHashes,
+      financialEffectSourceHashes: expansion.financialEffectSourceHashes,
     });
 
-    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-pollution"]).toHaveLength(1);
-    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-waste"]).toHaveLength(1);
-    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-land_use"]).toHaveLength(2);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-pollution"]).toHaveLength(2);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-waste"]).toHaveLength(2);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-land_use"]).toHaveLength(4);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-070-mi-pollution"]).toHaveLength(1);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-070-mi-waste"]).toHaveLength(1);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-070-mi-land_use"]).toHaveLength(2);
     expect(expansion.coverageByMaterialIssue["site-042-mi-pollution"]).toMatchObject({
       sourceKind: "demo_sample",
       rowCounts: { total: 6, calculated: 1, unmapped: 2, transferOnly: 2, blocked: 1 },
     });
     expect(expansion.inputBatchHashes).toHaveLength(3);
-    expect(result.decisions.some((entry) => ["pollution", "waste", "land_use"].some((category) => entry.materialIssueId.endsWith(category)))).toBe(false);
+    expect(expansion.financialEffectSourceHashes).toHaveLength(4);
+
+    const headquartersDecision = result.decisions.find((entry) => entry.siteId === "site-042");
+    expect(headquartersDecision?.materialIssueId).toBe("site-042-mi-water");
+    expect(headquartersDecision?.financialBridge.contributionBreakdown).toHaveLength(5);
+    expect(
+      headquartersDecision?.financialBridge.contributionBreakdown
+        .filter((entry) => ["pollution", "waste", "land_use"].includes(entry.category))
+        .map((entry) => entry.category)
+    ).toEqual(["pollution", "waste", "land_use", "land_use"]);
+    expect(headquartersDecision?.financialBridge.bridge1.verifiedIncrementalBenefit).toBe(12_000);
+    expect(result.decisions.filter((entry) => entry.siteId === "site-042")).toHaveLength(1);
+
+    const yokkaichiRecords = ["pollution", "waste", "land_use"].flatMap(
+      (category) => result.valuation.valuationRecordsByMaterialIssue[`site-070-mi-${category}`] ?? []
+    );
+    expect(yokkaichiRecords.every((record) => record.valueConcept === "welfare")).toBe(true);
+    expect(result.decisions.filter((entry) => entry.siteId === "site-070")).toHaveLength(1);
+    expect(result.decisions.find((entry) => entry.siteId === "site-070")?.financialBridge.contributionBreakdown).toHaveLength(1);
+    expect(result.recalculationHash.inputs.financialEffectSourceHashes).toEqual(expansion.financialEffectSourceHashes);
   });
 
   it("PRTR入力を独立MaterialIssueとして算定し、LIME3厚生価値を企業意思決定へ混入させない", () => {
@@ -109,7 +132,7 @@ describe("追加カテゴリのM1〜M8接続", () => {
               elapsedYears: 0,
               areaScaling: 1,
             },
-            plugins: getPluginsForCategory("pollution"),
+            plugins: getPluginsForCategory("pollution").filter((plugin) => plugin.methodId === "lime3-pollution"),
             calibrationSetVersion: "jpy-identity-v1",
             reconciliationFunctionVersion: "none",
             fitnessTierThresholdVersion: "not-applicable-v1",

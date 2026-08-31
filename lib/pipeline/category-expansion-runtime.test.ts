@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { StoredInputBatch, StoredPhysicalInputRecord } from "@/lib/db/repositories/physical-inputs";
 import type { PrtrNormalizedRecord } from "@/lib/intake/prtr";
-import type { LandConversionInput, LandOccupationInput, WasteQuantityInput } from "@core/types/valuation";
+import type {
+  CorporateFinancialEffectInput,
+  LandConversionInput,
+  LandOccupationInput,
+  WasteQuantityInput,
+} from "@core/types/valuation";
 import { buildCategoryExpansionRuntime } from "./category-expansion-runtime";
 import { requiresLicenseRefresh } from "./execute-run";
 import { runDemoPipeline } from "@/lib/demo/run-demo-pipeline";
@@ -167,6 +172,53 @@ describe("buildCategoryExpansionRuntime", () => {
     expect(runtime.coverageByMaterialIssue["site-042-mi-pollution"].quantities[0]).toMatchObject({ blocked: 10, calculated: 0 });
     expect(runtime.methodAvailabilityByMaterialIssue["site-042-mi-pollution"][0].status).toBe("expired");
     expect(runtime.calculationLineItems[0].status).toBe("blocked");
+  });
+
+  it("企業交換価値をLIME3厚生価値と別レコードにし、LIME3期限後も財務入力を維持する", async () => {
+    const record = prtrRecord("row-air", "air", 10);
+    const effect: CorporateFinancialEffectInput = {
+      id: "effect-pollution",
+      siteId: "site-042",
+      category: "pollution",
+      linkedPhysicalQuantityId: record.id,
+      grossCost: 18_000_000,
+      alreadyInternalizedCost: 3_000_000,
+      verifiedIncrementalBenefit: 0,
+      amountBasis: "annual",
+      internalizationScenarios: [
+        { scenario: "pollution_regulation_and_remediation", probability: 0.65, period: 3 },
+      ],
+      doubleCountKey: "site-042:pollution:air",
+      sourceKind: "company_input",
+      sourceLabel: "test ledger",
+      sourceHash: "f".repeat(64),
+      dataVersion: "effects-v1",
+      uncertaintySigma: 0.15,
+    };
+    const withEffect = { ...record, data: { ...record.data, corporateFinancialEffect: effect } };
+    const current = await buildCategoryExpansionRuntime([withEffect], [batch]);
+
+    expect(current.deepDiveConfigsByMaterialIssue["site-042-mi-pollution"]).toHaveLength(2);
+    expect(current.methodAvailabilityByMaterialIssue["site-042-mi-pollution"].map((entry) => entry.methodId)).toEqual([
+      "lime3-pollution",
+      "company-exchange-value",
+    ]);
+    expect(current.financialEffectSourceHashes).toHaveLength(1);
+    expect(current.calculationLineItems.map((entry) => entry.methodId)).toEqual([
+      "lime3-pollution",
+      "company-exchange-value",
+    ]);
+
+    const expired = await buildCategoryExpansionRuntime(
+      [withEffect],
+      [batch],
+      new Date("2027-07-01T00:00:00+09:00")
+    );
+    expect(expired.deepDiveConfigsByMaterialIssue["site-042-mi-pollution"]).toHaveLength(1);
+    expect(expired.deepDiveConfigsByMaterialIssue["site-042-mi-pollution"][0].plugins[0].methodId).toBe(
+      "company-exchange-value"
+    );
+    expect(expired.calculationLineItems.map((entry) => entry.status)).toEqual(["blocked", "calculated"]);
   });
 });
 

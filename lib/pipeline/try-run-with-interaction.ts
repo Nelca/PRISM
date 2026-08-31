@@ -83,6 +83,7 @@ function runWithExpansion(
     coverageByMaterialIssue: expansion.coverageByMaterialIssue,
     methodAvailabilityByMaterialIssue: expansion.methodAvailabilityByMaterialIssue,
     inputBatchHashes: expansion.inputBatchHashes,
+    financialEffectSourceHashes: expansion.financialEffectSourceHashes,
   });
 }
 

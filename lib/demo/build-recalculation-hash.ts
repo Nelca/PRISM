@@ -10,6 +10,7 @@ export interface ExpansionHashEvidence {
   activeInputBatchHashes: string[];
   inputMappingHashes: string[];
   valueFactorSourceHashes: string[];
+  financialEffectSourceHashes: string[];
   methodPluginVersions?: Record<string, string>;
 }
 
@@ -33,7 +34,7 @@ export function buildDemoRecalculationHash(
     m4_decompositionAlgorithmVersion: decomposition.algorithmVersion,
     m4_cicesMatchLevel: decomposition.cicesMatchLevel,
     m4_aopMappingVersion: decomposition.aopMappingVersion,
-    m5_carbonPriceScenarioSetVersion: "carbon-price-v2",
+    m5_carbonPriceScenarioSetVersion: "nature-internalization-v3",
     m6_bindingMechanismDefinitionVersion: "binding-mechanism-v1",
     m7_gapDetectionRuleVersion: "gap-detection-v1",
     ...(expansion && expansion.activeInputBatchHashes.length > 0
@@ -44,6 +45,9 @@ export function buildDemoRecalculationHash(
       : {}),
     ...(expansion && expansion.valueFactorSourceHashes.length > 0
       ? { valueFactorSourceHashes: [...new Set(expansion.valueFactorSourceHashes)].sort() }
+      : {}),
+    ...(expansion && expansion.financialEffectSourceHashes.length > 0
+      ? { financialEffectSourceHashes: [...new Set(expansion.financialEffectSourceHashes)].sort() }
       : {}),
   });
 }

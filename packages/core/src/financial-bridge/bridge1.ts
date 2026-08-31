@@ -14,16 +14,21 @@ import { buildNonGaapLabel } from "./non-gaap-label";
 export function buildBridge1NatureAdjustedProfit(
   reportedOperatingProfit: ExchangeAmount,
   dependencyRiskNormalization: ExchangeAmount,
-  futureInternalizationCost: ExchangeAmount
+  futureInternalizationCost: ExchangeAmount,
+  verifiedIncrementalBenefit: ExchangeAmount = exchangeAmount(0)
 ): Bridge1NatureAdjustedProfit {
   const natureAdjustedOperatingProfit = exchangeAmount(
-    (reportedOperatingProfit as number) - (dependencyRiskNormalization as number) - (futureInternalizationCost as number)
+    (reportedOperatingProfit as number) -
+      (dependencyRiskNormalization as number) -
+      (futureInternalizationCost as number) +
+      (verifiedIncrementalBenefit as number)
   );
 
   return {
     reportedOperatingProfit,
     dependencyRiskNormalization,
     futureInternalizationCost,
+    verifiedIncrementalBenefit,
     natureAdjustedOperatingProfit,
     nonGaapLabel: buildNonGaapLabel(["natureAdjustedOperatingProfit"]),
   };
@@ -44,6 +49,7 @@ export function buildWaterfallSteps(bridge1: Bridge1NatureAdjustedProfit): Water
     { label: "報告営業利益", value: bridge1.reportedOperatingProfit, isTotal: true },
     { label: "依存リスク正常化調整", value: exchangeAmount(-(bridge1.dependencyRiskNormalization as number)), isTotal: false },
     { label: "将来内部化見込みコスト", value: exchangeAmount(-(bridge1.futureInternalizationCost as number)), isTotal: false },
+    { label: "確認済み増分便益", value: bridge1.verifiedIncrementalBenefit, isTotal: false },
     { label: "自然調整後営業利益", value: bridge1.natureAdjustedOperatingProfit, isTotal: true },
   ];
 }

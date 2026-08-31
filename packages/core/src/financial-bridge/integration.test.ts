@@ -96,7 +96,7 @@ describe("M5統合テスト:M3のValuationRecordから2ブリッジ・自然債�
     );
 
     expect(bridge1.natureAdjustedOperatingProfit).toBeLessThan(bridge1.reportedOperatingProfit as number);
-    expect(buildWaterfallSteps(bridge1)).toHaveLength(4);
+    expect(buildWaterfallSteps(bridge1)).toHaveLength(5);
 
     const comparisonTargets = computeComparisonTargets({
       reportedOperatingProfit: exchangeAmount(1_000_000_000),

@@ -46,8 +46,7 @@ describe("computeComparisonTargets", () => {
     expect(result.impairmentTestImpact.details).toContain("範囲内");
   });
 
-  it("自然債務が負値(損失を負で持つ符号規約)でも、絶対額が閾値を上回ればchangesAssumption=true", () => {
-    // 未内部化コスト=中心値−既内部化コストが負になる経路(2026-08-23レビューで発見)。
+  it("負値を便益として損失の絶対額へ読み替えず、減損リスクを発火させない", () => {
     const negativeDebt = computeNatureDebt(
       exchangeAmount(-1_000_000),
       [{ scenario: "ngfs_net_zero_2050_gcam", probability: 1, period: 0 }],
@@ -57,12 +56,12 @@ describe("computeComparisonTargets", () => {
       input({ natureDebt: negativeDebt, existingImpairmentThreshold: exchangeAmount(500_000) })
     );
 
-    expect(result.impairmentTestImpact.changesAssumption).toBe(true);
-    // 表示は絶対額で行う(負値と正の閾値をそのまま並べると比較が読めないため)。
-    expect(result.impairmentTestImpact.details).toContain("1,000,000円");
+    expect(result.impairmentTestImpact.changesAssumption).toBe(false);
+    expect(result.impairmentTestImpact.details).toContain("0円");
+    expect(result.ratingCostOfCapitalImpact.ratios[0].after).toBe(result.ratingCostOfCapitalImpact.ratios[0].before);
   });
 
-  it("負の自然債務でも、絶対額が閾値以下なら範囲内のまま", () => {
+  it("負の自然債務は閾値の大小にかかわらず範囲内のまま", () => {
     const negativeDebt = computeNatureDebt(
       exchangeAmount(-1_000_000),
       [{ scenario: "ngfs_net_zero_2050_gcam", probability: 1, period: 0 }],

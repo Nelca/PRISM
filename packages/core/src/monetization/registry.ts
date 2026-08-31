@@ -12,6 +12,7 @@ import { ghgCarbonPriceConversionPlugin } from "./plugins/ghg-carbon-price-conve
 import { lime3PollutionPlugin } from "./plugins/lime3-pollution";
 import { lime3WastePlugin } from "./plugins/lime3-waste";
 import { lime3LandUsePlugin } from "./plugins/lime3-land-use";
+import { companyExchangeValuePlugin } from "./plugins/company-exchange-value";
 
 /** MVP水パイロット(build-plan §5.2)の3手法 + 気候カテゴリ変換(GAP-14)。 */
 export const ALL_PLUGINS: MonetizationMethodPlugin[] = [
@@ -22,6 +23,7 @@ export const ALL_PLUGINS: MonetizationMethodPlugin[] = [
   lime3PollutionPlugin,
   lime3WastePlugin,
   lime3LandUsePlugin,
+  companyExchangeValuePlugin,
 ];
 
 export function getPluginsForCategory(category: ImpactCategory): MonetizationMethodPlugin[] {

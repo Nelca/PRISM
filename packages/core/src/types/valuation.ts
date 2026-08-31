@@ -96,6 +96,41 @@ export interface LandOccupationInput extends PhysicalQuantityInputBase {
   sourceRecordHash: string;
 }
 
+/**
+ * 企業が実際に負担する交換価値の入力。LIME3の厚生価値とは別の入力として保持し、
+ * 同じ物理量へ紐づけても両者を相互変換しない。
+ */
+export type CorporateFinancialScenario =
+  | "pollution_regulation_and_remediation"
+  | "waste_epr_and_treatment"
+  | "land_restoration_and_offset";
+
+export interface CorporateFinancialEffectInput {
+  id: string;
+  siteId: string;
+  category: "pollution" | "waste" | "land_use";
+  linkedPhysicalQuantityId: string;
+  /** 企業が負担しうる費用の総額。0以上。 */
+  grossCost: number;
+  /** 既に報告営業利益へ織り込み済みの額。利益から再度控除しない。 */
+  alreadyInternalizedCost: number;
+  /** 報告営業利益へ未反映で、契約等により確認できる増分便益。自然債務とは相殺しない。 */
+  verifiedIncrementalBenefit: number;
+  amountBasis: "annual" | "one_time";
+  internalizationScenarios: Array<{
+    scenario: CorporateFinancialScenario;
+    probability: number;
+    period: number;
+  }>;
+  /** 同一費用をPRTR移動量・廃棄物等の複数経路から二重計上しないためのキー。 */
+  doubleCountKey: string;
+  sourceKind: "company_input" | "demo_company_input";
+  sourceLabel: string;
+  sourceHash: string;
+  dataVersion: string;
+  uncertaintySigma: number;
+}
+
 export type PhysicalQuantityInput =
   | ClimateQuantityInput
   | WaterQuantityInput
@@ -157,6 +192,8 @@ export interface MethodConfig {
   /** 追加カテゴリで使う、レビュー済み対応表から解決済みの構造化係数。 */
   factorResolution?: FactorResolution;
   currencyConversion?: CurrencyConversionRecord;
+  /** 追加カテゴリの企業負担額。LIME3の厚生価値とは別プラグインが交換価値として処理する。 */
+  corporateFinancialEffect?: CorporateFinancialEffectInput;
   /**
    * IFVIのVFes深掘り評価(D-6)で使う5次元適合度スコア。ESVD個別レコード照合の実装は
    * MVPスコープ外のため、外部(将来的なESVD検索機能)から渡される値として受け取る。
@@ -343,6 +380,8 @@ interface ValuationRecordCommon {
   factorSnapshot?: ValueFactorRecord;
   mappingSnapshot?: Pick<FactorResolution, "mappingId" | "mappingVersion" | "mappingHash">;
   currencyConversion?: CurrencyConversionRecord;
+  /** 企業提供の交換価値を使った場合の入力スナップショット。 */
+  financialEffectSnapshot?: CorporateFinancialEffectInput;
 }
 
 interface ModeledUncertaintyFields {

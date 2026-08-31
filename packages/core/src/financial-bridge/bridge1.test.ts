@@ -29,7 +29,20 @@ describe("buildWaterfallSteps", () => {
       { label: "報告営業利益", value: 1_000_000_000, isTotal: true },
       { label: "依存リスク正常化調整", value: -100_000_000, isTotal: false },
       { label: "将来内部化見込みコスト", value: -50_000_000, isTotal: false },
+      { label: "確認済み増分便益", value: 0, isTotal: false },
       { label: "自然調整後営業利益", value: 850_000_000, isTotal: true },
     ]);
+  });
+
+  it("確認済み増分便益を費用と相殺せず別段で加算する", () => {
+    const bridge1 = buildBridge1NatureAdjustedProfit(
+      exchangeAmount(1_000_000_000),
+      exchangeAmount(100_000_000),
+      exchangeAmount(50_000_000),
+      exchangeAmount(20_000_000)
+    );
+
+    expect(bridge1.verifiedIncrementalBenefit).toBe(20_000_000);
+    expect(bridge1.natureAdjustedOperatingProfit).toBe(870_000_000);
   });
 });

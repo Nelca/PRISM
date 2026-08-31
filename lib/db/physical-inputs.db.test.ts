@@ -66,9 +66,12 @@ describe("追記専用の物理入力バッチ", () => {
     const tenantId = `${TENANT}-demo-fallback`;
     const result = await executeAndPersistRun(tenantId);
 
-    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-pollution"]).toHaveLength(1);
-    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-waste"]).toHaveLength(1);
-    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-land_use"]).toHaveLength(2);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-pollution"]).toHaveLength(2);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-waste"]).toHaveLength(2);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-042-mi-land_use"]).toHaveLength(4);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-070-mi-pollution"]).toHaveLength(1);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-070-mi-waste"]).toHaveLength(1);
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-070-mi-land_use"]).toHaveLength(2);
     expect(result.valuation.coverageByMaterialIssue["site-042-mi-pollution"].sourceKind).toBe("demo_sample");
     expect(await listActiveInputBatches(tenantId)).toEqual([]);
     const latest = await getLatestRun(tenantId);

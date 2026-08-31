@@ -127,6 +127,26 @@ export function deriveM3InputMappingPayload(
   };
 }
 
+/** 企業提供の交換価値入力を、費用・既計上額・便益を分離したまま台帳へ転記する。 */
+export function deriveM3CorporateFinancialEffectPayload(
+  record: ValuationRecord
+): Extract<AssumptionEntryPayload, { module: "M3"; kind: "corporate_financial_effect" }> | null {
+  const effect = record.financialEffectSnapshot;
+  if (!effect) return null;
+  return {
+    module: "M3",
+    kind: "corporate_financial_effect",
+    financialEffectId: effect.id,
+    grossCost: effect.grossCost,
+    alreadyInternalizedCost: effect.alreadyInternalizedCost,
+    verifiedIncrementalBenefit: effect.verifiedIncrementalBenefit,
+    amountBasis: effect.amountBasis,
+    doubleCountKey: effect.doubleCountKey,
+    sourceHash: effect.sourceHash,
+    dataVersion: effect.dataVersion,
+  };
+}
+
 // --- M4 ---
 
 export interface M4DecompositionVersions {

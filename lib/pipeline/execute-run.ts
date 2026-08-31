@@ -44,6 +44,7 @@ export async function executeAndPersistRun(tenantId: string, db?: DbExecutor): P
     coverageByMaterialIssue: expansion.coverageByMaterialIssue,
     methodAvailabilityByMaterialIssue: expansion.methodAvailabilityByMaterialIssue,
     inputBatchHashes: expansion.inputBatchHashes,
+    financialEffectSourceHashes: expansion.financialEffectSourceHashes,
   });
   // デモレコードはDBのphysical_input_recordに存在しないため、外部キーを持つ算定行は
   // 保存しない。run内の入力ハッシュ・カバレッジ・仮定台帳には出所を残す。

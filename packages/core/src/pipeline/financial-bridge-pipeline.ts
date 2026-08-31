@@ -24,6 +24,7 @@ import { computeComparisonTargets } from "../financial-bridge/comparison-targets
 import type { CompanyFinancials } from "../financial-bridge/comparison-targets";
 import { exchangeAmount } from "../types/common";
 import type { ExchangeAmount } from "../types/common";
+import type { ImpactCategory } from "../types/common";
 import type {
   Bridge1NatureAdjustedProfit,
   Bridge2SocialCostView,
@@ -31,6 +32,7 @@ import type {
   InternalizationProbability,
   InternalizationStatus,
   NatureDebt,
+  FinancialBridgeContributionSummary,
 } from "../types/financial-bridge";
 import type { ExchangeValuationRecord, WelfareValuationRecord } from "../types/valuation";
 
@@ -62,6 +64,23 @@ export interface FinancialBridgePipelineOptions {
    * (`computeNatureDebt()`の第4引数、後方互換)。
    */
   uninternalizedCostByScenario?: Partial<Record<InternalizationProbability["scenario"], ExchangeAmount>>;
+
+  /** 複数カテゴリを1拠点の財務ブリッジへ集約する場合の内訳。指定時は単一レコード入力を置き換える。 */
+  exchangeContributions?: FinancialBridgeExchangeContribution[];
+}
+
+export interface FinancialBridgeExchangeContribution {
+  record: ExchangeValuationRecord;
+  materialIssueId: string;
+  category: ImpactCategory;
+  alreadyInternalizedCost: ExchangeAmount;
+  verifiedIncrementalBenefit: ExchangeAmount;
+  amountBasis: "annual" | "one_time";
+  doubleCountKey: string;
+  internalizationProbabilities: InternalizationProbability[];
+  uninternalizedCostByScenario?: Partial<Record<InternalizationProbability["scenario"], ExchangeAmount>>;
+  sourceHash?: string;
+  dataVersion?: string;
 }
 
 export interface FinancialBridgePipelineResult {
@@ -71,27 +90,88 @@ export interface FinancialBridgePipelineResult {
   internalizationStatus: InternalizationStatus;
   natureDebt: NatureDebt;
   comparisonTargets: ComparisonTargets;
+  contributionBreakdown: FinancialBridgeContributionSummary[];
 }
 
 export function runFinancialBridgePipeline(options: FinancialBridgePipelineOptions): FinancialBridgePipelineResult {
-  const internalizationStatus = computeInternalizationStatus(
-    options.exchangeRecord.centralValue,
-    options.currentlyInternalizedCost
-  );
+  const contributions: FinancialBridgeExchangeContribution[] = options.exchangeContributions ?? [{
+    record: options.exchangeRecord,
+    materialIssueId: `legacy-${options.exchangeRecord.siteId}`,
+    category: options.exchangeRecord.inputSnapshot?.category ?? "water",
+    alreadyInternalizedCost: options.currentlyInternalizedCost,
+    verifiedIncrementalBenefit: exchangeAmount(0),
+    amountBasis: "annual",
+    doubleCountKey: options.exchangeRecord.id,
+    internalizationProbabilities: options.internalizationProbabilities,
+    uninternalizedCostByScenario: options.uninternalizedCostByScenario,
+  }];
+  const duplicateKeys = contributions
+    .map((entry) => entry.doubleCountKey)
+    .filter((key, index, all) => all.indexOf(key) !== index);
+  if (duplicateKeys.length > 0) {
+    throw new Error(`財務ブリッジの二重計上防止キーが重複しています: ${[...new Set(duplicateKeys)].join(", ")}`);
+  }
 
-  const natureDebt = computeNatureDebt(
-    internalizationStatus.uninternalizedCost,
-    options.internalizationProbabilities,
-    options.discountRate,
-    options.uninternalizedCostByScenario
+  const calculated = contributions.map((contribution) => {
+    const status = computeInternalizationStatus(contribution.record.centralValue, contribution.alreadyInternalizedCost);
+    const debt = computeNatureDebt(
+      status.uninternalizedCost,
+      contribution.internalizationProbabilities,
+      options.discountRate,
+      contribution.uninternalizedCostByScenario
+    );
+    return { contribution, status, debt };
+  });
+
+  const internalizationStatus: InternalizationStatus = {
+    totalExternalCost: exchangeAmount(calculated.reduce((sum, entry) => sum + Number(entry.status.totalExternalCost), 0)),
+    currentlyInternalizedCost: exchangeAmount(
+      calculated.reduce((sum, entry) => sum + Number(entry.status.currentlyInternalizedCost), 0)
+    ),
+    uninternalizedCost: exchangeAmount(calculated.reduce((sum, entry) => sum + Number(entry.status.uninternalizedCost), 0)),
+    internalizationRate: 0,
+  };
+  internalizationStatus.internalizationRate = Number(internalizationStatus.totalExternalCost) === 0
+    ? 0
+    : Number(internalizationStatus.currentlyInternalizedCost) / Number(internalizationStatus.totalExternalCost);
+
+  const natureDebt: NatureDebt = {
+    totalDebt: exchangeAmount(calculated.reduce((sum, entry) => sum + Number(entry.debt.totalDebt), 0)),
+    breakdown: calculated.flatMap(({ contribution, debt }) =>
+      debt.breakdown.map((entry) => ({
+        ...entry,
+        sourceValuationRecordId: contribution.record.id,
+        materialIssueId: contribution.materialIssueId,
+        category: contribution.category,
+      }))
+    ),
+    nonGaapLabel: calculated[0]?.debt.nonGaapLabel ?? computeNatureDebt(exchangeAmount(0), [], options.discountRate).nonGaapLabel,
+  };
+  const verifiedIncrementalBenefit = exchangeAmount(
+    contributions.reduce((sum, entry) => sum + Number(entry.verifiedIncrementalBenefit), 0)
   );
+  const contributionBreakdown: FinancialBridgeContributionSummary[] = calculated.map(({ contribution, status, debt }) => ({
+    sourceValuationRecordId: contribution.record.id,
+    materialIssueId: contribution.materialIssueId,
+    category: contribution.category,
+    grossCost: status.totalExternalCost,
+    alreadyInternalizedCost: status.currentlyInternalizedCost,
+    uninternalizedCost: status.uninternalizedCost,
+    verifiedIncrementalBenefit: contribution.verifiedIncrementalBenefit,
+    natureDebt: debt.totalDebt,
+    amountBasis: contribution.amountBasis,
+    doubleCountKey: contribution.doubleCountKey,
+    sourceHash: contribution.sourceHash,
+    dataVersion: contribution.dataVersion,
+  }));
 
   // ブリッジ1の「将来内部化見込みコスト」は自然債務そのもの(M5 D-1が §4 の自然債務と
   // 接続すると明記している)。デモ層が0を渡していたのをここで正しく接続する。
   const bridge1 = buildBridge1NatureAdjustedProfit(
     options.reportedOperatingProfit,
     exchangeAmount(0), // 依存リスクの正常化調整:企業提供の入力がまだないため0(推定で埋めない)
-    natureDebt.totalDebt
+    natureDebt.totalDebt,
+    verifiedIncrementalBenefit
   );
 
   const bridge2 = options.welfareRecord
@@ -106,5 +186,5 @@ export function runFinancialBridgePipeline(options: FinancialBridgePipelineOptio
     financials: options.financials,
   });
 
-  return { bridge1, bridge2, internalizationStatus, natureDebt, comparisonTargets };
+  return { bridge1, bridge2, internalizationStatus, natureDebt, comparisonTargets, contributionBreakdown };
 }

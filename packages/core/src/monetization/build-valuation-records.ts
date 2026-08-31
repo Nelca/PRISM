@@ -104,11 +104,13 @@ function buildValuationRecordFromOutput(
   input: PhysicalQuantityInput,
   factorResolution: MethodConfig["factorResolution"],
   currencyConversion: MethodConfig["currencyConversion"],
+  corporateFinancialEffect: MethodConfig["corporateFinancialEffect"],
   siteId: string,
   calibration: GeographicCalibrationRecord,
   versions: ValuationRecordVersions,
   rng?: () => number
 ): ValuationRecord {
+  const financialEffectSnapshot = methodId === "company-exchange-value" ? corporateFinancialEffect : undefined;
   // 較正が不要な値(すでに現地通貨で表現された値)はスキップする(D-127・D-128)。
   const factorCurrency = factorResolution?.factor.currency ?? "JPY";
   let currencyAdjustedValue = output.centralValue;
@@ -158,6 +160,7 @@ function buildValuationRecordFromOutput(
         }
       : undefined,
     currencyConversion: factorCurrency === "JPY" ? undefined : currencyConversion,
+    financialEffectSnapshot,
     recalculability: deriveRecalculability(output),
     assumptionEntryIds: [] as string[], // パイプライン層(valuation-pipeline.ts)が実配線する
     /**
@@ -173,6 +176,7 @@ function buildValuationRecordFromOutput(
       input,
       factorResolution,
       currencyConversion,
+      corporateFinancialEffect: financialEffectSnapshot,
       calibration,
       versions,
     }),
@@ -264,6 +268,7 @@ export function buildValuationRecordsForPlugin(
       input,
       config.factorResolution,
       config.currencyConversion,
+      config.corporateFinancialEffect,
       input.siteId,
       calibration,
       versions,

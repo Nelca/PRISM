@@ -284,9 +284,19 @@ export default async function FinancialBridgePage({
         const expectedLoss = financialBridge.natureDebt.totalDebt;
         const operatingProfit = financialBridge.bridge1.reportedOperatingProfit;
         const uninternalizedCost = financialBridge.internalizationStatus.uninternalizedCost;
+        const verifiedBenefit = financialBridge.bridge1.verifiedIncrementalBenefit;
         // 指示09:「期待損失」カード内の未内部化コストと自然債務で単位を揃える(拠点によっては
         // 一方が百万円台・もう一方が億円台になり、そのまま自動判定すると単位が割れる)。
-        const lossScale = pickYenScale(uninternalizedCost, expectedLoss);
+        const lossScale = pickYenScale(uninternalizedCost, expectedLoss, verifiedBenefit);
+        const contributionScale = pickYenScale(
+          ...financialBridge.contributionBreakdown.flatMap((entry) => [
+            entry.grossCost,
+            entry.alreadyInternalizedCost,
+            entry.uninternalizedCost,
+            entry.verifiedIncrementalBenefit,
+            entry.natureDebt,
+          ])
+        );
 
         return (
           <details key={siteId} id={`site-${siteId}`} className="foldout" open>
@@ -317,7 +327,7 @@ export default async function FinancialBridgePage({
                 />
                 {/* D-12:図の中の独自用語はhoverできないため、直下に用語説明を常設する。 */}
                 <p className="tooltip-note">
-                  {term("依存リスク正常化調整")} ・ {term("将来内部化見込みコスト")}
+                  {term("依存リスク正常化調整")} ・ {term("将来内部化見込みコスト")} ・ {term("確認済み増分便益")}
                   (点線の用語にマウスを載せると説明が出ます)
                 </p>
               </Card>
@@ -331,6 +341,7 @@ export default async function FinancialBridgePage({
                   />
                   <hr className="rule" />
                   <KV k={term("自然債務(期待損失)")} v={<Num value={expectedLoss} unit="円" scale={lossScale} />} />
+                  <KV k={term("確認済み増分便益")} v={<Num value={verifiedBenefit} unit="円" scale={lossScale} />} />
                 </Card>
 
                 <Card
@@ -354,6 +365,43 @@ export default async function FinancialBridgePage({
                   )}
                 </Card>
               </div>
+
+              <Card
+                title="財務ブリッジのカテゴリ別内訳"
+                subtitle="企業負担額・既計上額・便益を分離し、同じ拠点について1回だけ集約します"
+                padBody={false}
+                foot="二重計上防止キーと出典ハッシュは保存run・仮定台帳・再計算ハッシュに記録されます"
+              >
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>カテゴリ</th>
+                      <th>企業負担総額</th>
+                      <th>既に利益へ反映済み</th>
+                      <th>未内部化コスト</th>
+                      <th>確認済み増分便益</th>
+                      <th>自然債務</th>
+                      <th>基準</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {financialBridge.contributionBreakdown.map((entry) => (
+                      <tr key={entry.sourceValuationRecordId}>
+                        <td>
+                          <b>{categoryLabel(entry.category)}</b>
+                          {entry.dataVersion && <span className="id-note">{entry.dataVersion}</span>}
+                        </td>
+                        <td className="num"><Num value={entry.grossCost} unit="円" scale={contributionScale} /></td>
+                        <td className="num"><Num value={entry.alreadyInternalizedCost} unit="円" scale={contributionScale} /></td>
+                        <td className="num"><Num value={entry.uninternalizedCost} unit="円" scale={contributionScale} /></td>
+                        <td className="num"><Num value={entry.verifiedIncrementalBenefit} unit="円" scale={contributionScale} /></td>
+                        <td className="num"><Num value={entry.natureDebt} unit="円" scale={contributionScale} /></td>
+                        <td>{entry.amountBasis === "annual" ? "年額" : "一時費用"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
 
               {/*
                 M5の位置づけ:金額を単独で出さず、必ず比較先とセットで出す(build-plan §5.6)。

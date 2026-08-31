@@ -50,6 +50,18 @@ export type AssumptionEntryPayload =
       } | null;
     }
   | {
+      module: "M3";
+      kind: "corporate_financial_effect";
+      financialEffectId: string;
+      grossCost: number;
+      alreadyInternalizedCost: number;
+      verifiedIncrementalBenefit: number;
+      amountBasis: "annual" | "one_time";
+      doubleCountKey: string;
+      sourceHash: string;
+      dataVersion: string;
+    }
+  | {
       module: "M4";
       kind: "decomposition";
       algorithmVersion: string;
@@ -92,6 +104,8 @@ export interface RecalculationHashInputs {
   activeInputBatchHashes?: string[];
   inputMappingHashes?: string[];
   valueFactorSourceHashes?: string[];
+  /** 企業提供の交換価値入力。値が変われば再計算ハッシュも変わる。 */
+  financialEffectSourceHashes?: string[];
 }
 
 export interface RecalculationHash {

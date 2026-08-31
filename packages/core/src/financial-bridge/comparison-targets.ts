@@ -76,18 +76,13 @@ export function computeComparisonTargets(input: ComparisonTargetsInput): Compari
   // (0除算を避ける構造的な既定値であり、ドメイン上の推定ではない)。
   const operatingProfitRatio = reportedOperatingProfit === 0 ? 0 : totalDebt / reportedOperatingProfit;
 
-  /**
-   * 減損テスト前提との比較は自然債務の**絶対額**で行う(2026-08-23レビュー、D-5補足)。
-   * 呼び出し側の符号規約では損失を負値で持つ経路がある(未内部化コスト=中心値−既内部化コスト
-   * が負になるケース)ため、符号付きのまま `totalDebt > threshold` と比較すると、損失見込みが
-   * どれだけ大きくても負値である限り「範囲内」になってしまう。閾値の意味は
-   * 「自然関連の損失見込みがこれを超えると前提の見直しが必要」(④の財務データ入力のヒント)
-   * なので、損失の大きさ(絶対額)と閾値を比べる。
-   */
-  const changesAssumption = Math.abs(totalDebt) > threshold;
+  // 減損テストでは正の損失エクスポージャーだけを比較する。便益はブリッジ1の
+  // 別フィールドで扱い、負値を絶対値化して損失へ読み替えない。
+  const lossExposure = Math.max(totalDebt, 0);
+  const changesAssumption = lossExposure > threshold;
   const details = changesAssumption
-    ? `自然債務の絶対額(${yen(Math.abs(totalDebt))})が、既存の減損テスト前提の閾値(${yen(threshold)})を上回るため、減損テストの前提を見直す必要があります。`
-    : `自然債務の絶対額(${yen(Math.abs(totalDebt))})は、既存の減損テスト前提の閾値(${yen(threshold)})の範囲内であり、前提を変える結果にはなっていません。`;
+    ? `自然債務の損失額(${yen(lossExposure)})が、既存の減損テスト前提の閾値(${yen(threshold)})を上回るため、減損テストの前提を見直す必要があります。`
+    : `自然債務の損失額(${yen(lossExposure)})は、既存の減損テスト前提の閾値(${yen(threshold)})の範囲内であり、前提を変える結果にはなっていません。`;
 
   const ratios: CreditRatioChange[] = [
     {
@@ -95,7 +90,7 @@ export function computeComparisonTargets(input: ComparisonTargetsInput): Compari
       before: ratio(netDebt, ebitda),
       // 自然債務を有利子負債に上乗せしたときの比率。単純な算術であり、内部化の確率や
       // 割引はD-4のnatureDebt側で既に織り込まれている。
-      after: ratio(netDebt + totalDebt, ebitda),
+      after: ratio(netDebt + lossExposure, ebitda),
     },
     {
       label: "インタレストカバレッジ比率",

@@ -105,6 +105,9 @@ export default async function ValuationPage({
   const methodAvailability = result.valuation.methodAvailabilityByMaterialIssue[selectedIssueId] ?? [];
   const isLime3Pilot = isLime3SingleMethodPilot(records);
   const exchangeRecords = records.filter((record) => record.valueConcept === "exchange");
+  const corporateExchangeRecords = exchangeRecords.filter((record) => record.methodId === "company-exchange-value");
+  const usesCorporateContributionModel =
+    exchangeRecords.length > 0 && corporateExchangeRecords.length === exchangeRecords.length;
 
   // 指示09:③のこの画面では同じ対象の中心値・幅・代表値選択の各表に同じ金額群が繰り返し出る。
   // 行ごとに単位が割れないよう(百万円の行と億円の行が混ざらないよう)、この対象に出てくる
@@ -412,6 +415,13 @@ export default async function ValuationPage({
                         </span>
                       )}
                     </>
+                  ) : r.financialEffectSnapshot ? (
+                    <>
+                      <b>{r.financialEffectSnapshot.sourceLabel}</b>
+                      <span className="id-note">{r.financialEffectSnapshot.dataVersion}</span>
+                      <span className="id-note">出典 {r.financialEffectSnapshot.sourceHash.slice(0, 12)}</span>
+                      <span className="id-note">二重計上防止 {r.financialEffectSnapshot.doubleCountKey}</span>
+                    </>
                   ) : (
                     "既存手法の係数"
                   )}
@@ -624,7 +634,44 @@ export default async function ValuationPage({
       </div>
 
       {/* (5) 代表値の選択 = この画面の出口(必須アクション) */}
-      {exchangeRecords.length > 0 ? <Card
+      {usesCorporateContributionModel ? (
+        <Card
+          id="representative-selection"
+          title="財務ブリッジへ渡す企業交換価値"
+          subtitle="同じカテゴリ内の費用項目は代替案ではないため、すべて拠点別内訳へ合算します"
+          padBody={false}
+          headExtra={<Tag variant="exchange">財務反映済み</Tag>}
+        >
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>入力</th>
+                <th>企業負担総額</th>
+                <th>既に利益へ反映済み</th>
+                <th>確認済み増分便益</th>
+                <th>金額の基準</th>
+              </tr>
+            </thead>
+            <tbody>
+              {corporateExchangeRecords.map((record) => {
+                const effect = record.financialEffectSnapshot!;
+                return (
+                  <tr key={record.id}>
+                    <td><b>{inputDetail(record.inputSnapshot) ?? methodLabel(record.methodId)}</b></td>
+                    <td className="num"><Num value={effect.grossCost} unit="円" scale={recordScale} /></td>
+                    <td className="num"><Num value={effect.alreadyInternalizedCost} unit="円" scale={recordScale} /></td>
+                    <td className="num"><Num value={effect.verifiedIncrementalBenefit} unit="円" scale={recordScale} /></td>
+                    <td>{effect.amountBasis === "annual" ? "年額" : "一時費用"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p style={{ padding: "12px 18px", margin: 0, color: "var(--ink-soft)" }}>
+            LIME3の厚生価値はこの合計へ含めません。既に利益へ反映済みの額は再控除せず、増分便益は自然債務・減損リスクと相殺しません。
+          </p>
+        </Card>
+      ) : exchangeRecords.length > 0 ? <Card
         id="representative-selection"
         title="投資判断に使う代表値の選択"
         subtitle="この画面ですべきこと。推奨値は表示しません"

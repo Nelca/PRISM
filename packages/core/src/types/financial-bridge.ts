@@ -10,7 +10,8 @@
  * (フィールド名が重複せず、同じ配列に混在させる操作自体が存在しないため、判別用タグは不要と判断)。
  */
 
-import type { ExchangeAmount, WelfareAmount } from "./common";
+import type { ExchangeAmount, ImpactCategory, WelfareAmount } from "./common";
+import type { CorporateFinancialScenario } from "./valuation";
 
 /** 全出力に構造的に付与する(M5 D-6)。Optionalにしない。 */
 export interface NonGaapLabel {
@@ -31,6 +32,8 @@ export interface Bridge1NatureAdjustedProfit {
   reportedOperatingProfit: ExchangeAmount;
   dependencyRiskNormalization: ExchangeAmount;
   futureInternalizationCost: ExchangeAmount;
+  /** 報告営業利益へ未反映の確認済み増分便益。損失・減損リスクとは相殺しない。 */
+  verifiedIncrementalBenefit: ExchangeAmount;
   natureAdjustedOperatingProfit: ExchangeAmount;
   nonGaapLabel: NonGaapLabel;
 }
@@ -67,9 +70,11 @@ export type CarbonPriceScenario =
   | "ngfs_current_policies_remind"
   | "gx_ets_official";
 
+export type NatureDebtScenario = CarbonPriceScenario | CorporateFinancialScenario;
+
 /** 企業が主観的に設定する。デフォルトは均等割り(各1/3)、PRISMは特定シナリオを推奨しない(M5 D-4.3)。 */
 export interface InternalizationProbability {
-  scenario: CarbonPriceScenario;
+  scenario: NatureDebtScenario;
   probability: number;
   period: number;
 }
@@ -83,12 +88,30 @@ export interface InternalizationProbability {
 export interface NatureDebt {
   totalDebt: ExchangeAmount;
   breakdown: {
-    scenario: CarbonPriceScenario;
+    scenario: NatureDebtScenario;
     period: number;
     probability: number;
     discountedAmount: ExchangeAmount;
+    sourceValuationRecordId?: string;
+    materialIssueId?: string;
+    category?: ImpactCategory;
   }[];
   nonGaapLabel: NonGaapLabel;
+}
+
+export interface FinancialBridgeContributionSummary {
+  sourceValuationRecordId: string;
+  materialIssueId: string;
+  category: ImpactCategory;
+  grossCost: ExchangeAmount;
+  alreadyInternalizedCost: ExchangeAmount;
+  uninternalizedCost: ExchangeAmount;
+  verifiedIncrementalBenefit: ExchangeAmount;
+  natureDebt: ExchangeAmount;
+  amountBasis: "annual" | "one_time";
+  doubleCountKey: string;
+  sourceHash?: string;
+  dataVersion?: string;
 }
 
 /**

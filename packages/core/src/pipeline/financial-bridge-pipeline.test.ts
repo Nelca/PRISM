@@ -90,4 +90,71 @@ describe("runFinancialBridgePipeline", () => {
     // 返り値にassumptionEntriesが存在しないこと自体が仕様(判断が発生しないため)
     expect("assumptionEntries" in run()).toBe(false);
   });
+
+  it("複数カテゴリを1拠点の財務ブリッジへ1回だけ集約し、費用と便益を分離する", () => {
+    const pollutionRecord = {
+      ...makeValuationRecord({ methodId: "company-exchange-value", centralValue: 10_000_000, valueConcept: "exchange" }),
+      id: "vr-pollution",
+    };
+    const wasteRecord = {
+      ...makeValuationRecord({ methodId: "company-exchange-value", centralValue: 4_000_000, valueConcept: "exchange" }),
+      id: "vr-waste",
+    };
+    const result = run({
+      exchangeContributions: [
+        {
+          record: pollutionRecord,
+          materialIssueId: "site-042-mi-pollution",
+          category: "pollution",
+          alreadyInternalizedCost: exchangeAmount(2_000_000),
+          verifiedIncrementalBenefit: exchangeAmount(0),
+          amountBasis: "annual",
+          doubleCountKey: "site-042:pollution",
+          internalizationProbabilities: [
+            { scenario: "pollution_regulation_and_remediation", probability: 1, period: 0 },
+          ],
+        },
+        {
+          record: wasteRecord,
+          materialIssueId: "site-042-mi-waste",
+          category: "waste",
+          alreadyInternalizedCost: exchangeAmount(1_000_000),
+          verifiedIncrementalBenefit: exchangeAmount(500_000),
+          amountBasis: "annual",
+          doubleCountKey: "site-042:waste",
+          internalizationProbabilities: [
+            { scenario: "waste_epr_and_treatment", probability: 1, period: 0 },
+          ],
+        },
+      ],
+    });
+
+    expect(result.contributionBreakdown).toHaveLength(2);
+    expect(result.internalizationStatus).toMatchObject({
+      totalExternalCost: 14_000_000,
+      currentlyInternalizedCost: 3_000_000,
+      uninternalizedCost: 11_000_000,
+    });
+    expect(result.natureDebt.totalDebt).toBe(11_000_000);
+    expect(result.bridge1.futureInternalizationCost).toBe(11_000_000);
+    expect(result.bridge1.verifiedIncrementalBenefit).toBe(500_000);
+    expect(result.bridge1.natureAdjustedOperatingProfit).toBe(1_189_500_000);
+  });
+
+  it("同じ費用の二重計上防止キーが重複した場合は集約を拒否する", () => {
+    const contribution = {
+      record: exchangeRecord,
+      materialIssueId: "site-042-mi-pollution",
+      category: "pollution" as const,
+      alreadyInternalizedCost: exchangeAmount(0),
+      verifiedIncrementalBenefit: exchangeAmount(0),
+      amountBasis: "annual" as const,
+      doubleCountKey: "duplicate-key",
+      internalizationProbabilities: [
+        { scenario: "pollution_regulation_and_remediation" as const, probability: 1, period: 0 },
+      ],
+    };
+
+    expect(() => run({ exchangeContributions: [contribution, contribution] })).toThrow("二重計上防止キー");
+  });
 });

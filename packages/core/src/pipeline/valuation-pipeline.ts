@@ -15,6 +15,7 @@ import type { RepresentativeValueSelectionResult } from "../divergence/represent
 import {
   buildAssumptionEntry,
   deriveM3CoefficientCalibrationPayload,
+  deriveM3CorporateFinancialEffectPayload,
   deriveM3FitnessTierPayload,
   deriveM3InputMappingPayload,
   deriveM3ReconciliationCheckPayload,
@@ -178,6 +179,18 @@ export function runValuationPipeline(options: ValuationPipelineOptions): Valuati
             const mappingEntry = buildAssumptionEntry(options.idSequence(), options.now, "M3", record.id, mappingPayload);
             assumptionEntries.push(mappingEntry);
             entryIds.push(mappingEntry.id);
+          }
+          const financialEffectPayload = deriveM3CorporateFinancialEffectPayload(record);
+          if (financialEffectPayload) {
+            const financialEntry = buildAssumptionEntry(
+              options.idSequence(),
+              options.now,
+              "M3",
+              record.id,
+              financialEffectPayload
+            );
+            assumptionEntries.push(financialEntry);
+            entryIds.push(financialEntry.id);
           }
           quantityRecords.push({ ...record, assumptionEntryIds: entryIds });
         }

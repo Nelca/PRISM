@@ -18,7 +18,7 @@
 
 import { exchangeAmount } from "../types/common";
 import type { ExchangeAmount } from "../types/common";
-import type { CarbonPriceScenario, InternalizationProbability, NatureDebt } from "../types/financial-bridge";
+import type { InternalizationProbability, NatureDebt, NatureDebtScenario } from "../types/financial-bridge";
 import { buildNonGaapLabel } from "./non-gaap-label";
 
 function discountFactor(discountRate: number, period: number): number {
@@ -29,7 +29,7 @@ export function computeNatureDebt(
   uninternalizedCost: ExchangeAmount,
   probabilities: InternalizationProbability[],
   discountRate: number,
-  uninternalizedCostByScenario?: Partial<Record<CarbonPriceScenario, ExchangeAmount>>
+  uninternalizedCostByScenario?: Partial<Record<NatureDebtScenario, ExchangeAmount>>
 ): NatureDebt {
   const defaultCost = uninternalizedCost as number;
 

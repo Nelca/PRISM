@@ -120,6 +120,7 @@ export interface RunPipelineInput {
   coverageByMaterialIssue?: Record<string, InputCoverageSummary>;
   methodAvailabilityByMaterialIssue?: Record<string, MethodAvailability[]>;
   inputBatchHashes?: string[];
+  financialEffectSourceHashes?: string[];
   activeMaterialIssueTargets?: { siteId: string; category: PhysicalQuantityInput["category"] }[];
 }
 
@@ -360,12 +361,17 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   const physicalQuantitiesByMaterialIssue = Object.fromEntries(
     Object.keys(valuation.valuationRecordsByMaterialIssue).map((materialIssueId) => [
       materialIssueId,
-      quantitiesInDeepDiveConfig(valuationOptions.deepDiveConfigForMaterialIssue(materialIssueId)).map((entry) => ({
-        physicalQuantityId: entry.physicalQuantityId,
-        category: entry.input.category,
-        quantity: entry.input.physicalQuantity,
-        unit: entry.input.unit,
-      })),
+      [...new Map(
+        quantitiesInDeepDiveConfig(valuationOptions.deepDiveConfigForMaterialIssue(materialIssueId)).map((entry) => [
+          entry.physicalQuantityId,
+          {
+            physicalQuantityId: entry.physicalQuantityId,
+            category: entry.input.category,
+            quantity: entry.input.physicalQuantity,
+            unit: entry.input.unit,
+          },
+        ])
+      ).values()],
     ])
   );
 
@@ -417,9 +423,23 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     return (overridden ?? fallback) as ExchangeValuationRecord | undefined;
   }
 
-  // --- M5:財務接続、M6:対策案比較と意思決定(深掘りに進んだMaterialIssueごと) ---
-  const decisions = promoted.flatMap(({ materialIssueId }) => {
+  // --- M5:財務接続、M6:対策案比較と意思決定(1拠点1ポートフォリオ) ---
+  // 同じ拠点に複数カテゴリがある場合、財務ブリッジと減損閾値の比較は1回だけ行う。
+  // 水・気候を対策案の主課題とし、追加カテゴリの企業交換価値は内訳として合算する。
+  const promotedIssueIdsBySite = new Map<string, string[]>();
+  for (const { materialIssueId } of promoted) {
     const siteId = siteIdFromMaterialIssueId(materialIssueId);
+    promotedIssueIdsBySite.set(siteId, [...(promotedIssueIdsBySite.get(siteId) ?? []), materialIssueId]);
+  }
+  const decisionTargets = [...promotedIssueIdsBySite].flatMap(([siteId, materialIssueIds]) => {
+    const primaryMaterialIssueId =
+      materialIssueIds.find((id) => id.endsWith("-mi-water") && representativeRecordForMaterialIssue(id)) ??
+      materialIssueIds.find((id) => id.endsWith("-mi-climate") && representativeRecordForMaterialIssue(id)) ??
+      materialIssueIds.find((id) => representativeRecordForMaterialIssue(id));
+    return primaryMaterialIssueId ? [{ siteId, materialIssueId: primaryMaterialIssueId, materialIssueIds }] : [];
+  });
+
+  const decisions = decisionTargets.flatMap(({ siteId, materialIssueId, materialIssueIds }) => {
     const siteRecords = valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [];
     const representative = representativeRecordForMaterialIssue(materialIssueId);
     if (!representative) return [];
@@ -464,6 +484,20 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
 
     const isFlagshipSite = siteId === "site-042";
     const isClimateShowcaseSite = siteId === CLIMATE_SITE_ID;
+    const representativeCategory = assessment.materialIssues.find((issue) => issue.id === materialIssueId)?.impactCategory;
+    if (!representativeCategory) return [];
+    const additionalExchangeRecords = materialIssueIds.flatMap((issueId) => {
+      const category = assessment.materialIssues.find((issue) => issue.id === issueId)?.impactCategory;
+      if (!category) return [];
+      return (valuation.valuationRecordsByMaterialIssue[issueId] ?? [])
+        .filter(
+          (record): record is ExchangeValuationRecord =>
+            record.valueConcept === "exchange" &&
+            record.methodId === "company-exchange-value" &&
+            record.id !== representative.id
+        )
+        .map((record) => ({ record, materialIssueId: issueId, category }));
+    });
 
     // ブリッジ2(厚生価値ビュー)の情報源。水はlime3-water、気候は社会的費用(GAP-11・D-128)。
     // いずれも常にwelfare概念を返す(monetization/plugins/lime3-water.ts・ghg-carbon-price-conversion.ts)。
@@ -485,6 +519,9 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
 
     const { financialBridge, comparisonTargets } = buildFinancialBridge({
       representative,
+      representativeMaterialIssueId: materialIssueId,
+      representativeCategory,
+      additionalExchangeRecords,
       ...(lime3 ? { welfareRecord: lime3 } : {}),
       baselineNpv,
       companyFinancials,
@@ -502,10 +539,10 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
      * coreが `avoidedNatureCost[].sourceValuationRecordId` を解決するための辞書。
      * 代表値と出典レコードが別になりうる(上記)ため両方を入れる。
      */
-    const valuationRecordsById: Record<string, ExchangeValuationRecord> = {
-      [representative.id]: representative,
-      [costSourceRecord.id]: costSourceRecord,
-    };
+    const relatedExchangeRecords = [representative, ...additionalExchangeRecords.map((entry) => entry.record)];
+    const valuationRecordsById: Record<string, ExchangeValuationRecord> = Object.fromEntries(
+      [costSourceRecord, ...relatedExchangeRecords].map((record) => [record.id, record])
+    );
 
     const bindingState = interactions.bindingMechanismState.get(siteId);
     const bindingMechanism: BindingMechanism = bindingState?.mechanism ?? { kind: "weak_reference" };
@@ -515,7 +552,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       decisionMaker: DECISION_MAKER,
       decisionDate: "2027-02-14",
       approvalThreshold,
-      relatedValuationRecords: [representative],
+      relatedValuationRecords: relatedExchangeRecords,
       baselineNpv,
       valuationRecordsById,
       bindingMechanism,
@@ -658,6 +695,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     valueFactorSourceHashes: additionalConfigs.flatMap((entry) =>
       entry.config.factorResolution ? [entry.config.factorResolution.factor.sourceHash] : []
     ),
+    financialEffectSourceHashes: input.financialEffectSourceHashes ?? [],
     methodPluginVersions: Object.fromEntries(
       additionalConfigs.flatMap((entry) => entry.plugins.map((plugin) => [plugin.methodId, plugin.version]))
     ),
@@ -723,6 +761,7 @@ export const DEFAULT_RNG_SEED = 42;
  */
 // 9: 入力未登録時のPRTR・廃棄物・土地利用デモ算定を追加。保存済みrunも追加カテゴリを
 //    表示するため、新しい入力フォールバックで再計算する。
-export const RESULT_SCHEMA_VERSION = 9;
+// 10: 追加3カテゴリの企業交換価値、拠点別財務ブリッジ内訳、確認済み増分便益を追加。
+export const RESULT_SCHEMA_VERSION = 10;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

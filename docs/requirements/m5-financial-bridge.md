@@ -4,7 +4,7 @@
 **参照元:** `docs/concept-v2.md` 8.2 / 9.3、`docs/roadmap/build-plan.md` §5.6
 **参照:** `docs/requirements/m3-monetization-engine.md`(ValuationRecordの入力元)、`docs/requirements/m6-decision-record.md`(DecisionRecordとの関係・X7の型ガード)
 **status:** 確定(D-1〜D-7ですべての論点が決定済み)
-**最終更新:** 2026-08-02
+**最終更新:** 2026-08-30
 
 ---
 
@@ -39,8 +39,10 @@ interface Bridge1_NatureAdjustedProfit {
   reportedOperatingProfit: number;   // 監査済み報告営業利益。企業提供・PRISMは検証しない(M6 D-4と同じ原則)
   dependencyRiskNormalization: number;   // 依存リスクの正常化調整。交換価値ValuationRecordから算出
   futureInternalizationCost: number;     // 将来内部化見込みコスト。§4の自然債務と接続
+  verifiedIncrementalBenefit: number;    // 営業利益へ未反映の、根拠を確認できる増分便益
   natureAdjustedOperatingProfit: number; // = reportedOperatingProfit
                                           //   - dependencyRiskNormalization - futureInternalizationCost
+                                          //   + verifiedIncrementalBenefit
   nonGaapLabel: true;                    // 常時付与(§6)
   valueConceptGuard: "exchange";         // 型レベルでexchangeのみ受け付ける(M3・M4・M6と同じbranded typeパターン)
 }
@@ -80,6 +82,8 @@ interface InternalizationStatus {
 ```
 
 **理由:** 「未内部化コスト」はM3が算出する交換価値の総額そのものであり、そこから企業が既に負担している実費(内部化済み分)を差し引いたものと定義する。新しい評価ロジックを追加するのではなく、既存の交換価値ValuationRecordと企業提供の実費データの差分として構成する。
+
+**拠点別集約:** 汚染・廃棄物・土地利用を含む複数カテゴリの交換価値は、カテゴリごとにM5を繰り返さず、1拠点1ポートフォリオとして集約する。各入力は`doubleCountKey`を必須とし、同じキーが複数経路(PRTR移動量と廃棄物入力など)から渡された場合は算定を拒否する。カテゴリ別の総額・内部化済み額・未内部化額・自然債務は内訳として保持する。
 
 ---
 
@@ -173,13 +177,17 @@ MVPでは、レバレッジ比率・インタレストカバレッジ比率等�
 
 ---
 
-### 5.3 減損テスト前提との比較は自然債務の絶対額で行う(2026-08-23追記)
+### 5.3 減損テスト前提との比較は正の損失エクスポージャーだけで行う(2026-08-30改定)
 
-`changesAssumption` の比較式は当初、符号付きの `totalDebt > threshold` だった。しかし自然債務は「未内部化コスト(=中心値−既内部化コスト)×内部化確率×割引係数」の合算であり、既内部化コストが試算の中心値を上回ると**損失が負値で表現される**。符号付き比較では、この経路の損失見込みがどれだけ大きくても閾値判定が常に「範囲内」になる。
+`changesAssumption`は、`lossExposure = Math.max(totalDebt, 0)`としたうえで、`lossExposure > threshold`を比較する。負値を`Math.abs`で正の損失へ読み替えない。
 
-閾値の意味は「自然関連の損失見込みがこれを超えると前提の見直しが必要になりえる」(④の財務データ入力フォームのヒント文)であるため、比較は**自然債務の絶対額 `Math.abs(totalDebt) > threshold`** で行い、`details` の文言も絶対額で表示する(負値と正の閾値をそのまま並べると比較が読めないため)。
+企業負担費用と便益を同じ符号付きフィールドで表すと、便益の絶対値が減損リスクとして発火するためである。費用は自然債務へ、根拠を確認できる増分便益は`verifiedIncrementalBenefit`へ分離し、便益は自然債務・減損閾値・レバレッジ比率と相殺しない。ブリッジ1では営業利益への加算として別段表示する。
 
 また§5.2の表示例にあった比率差分の単位「pt」は「倍」に統一した。ptは%表示の指標のための単位であり、倍率の差分には使わない(同日追記)。
+
+### 5.4 非炭素カテゴリの内部化シナリオと監査証跡(2026-08-30追記)
+
+汚染・廃棄物・土地利用の交換価値には、それぞれ企業入力の`pollution_regulation_and_remediation`、`waste_epr_and_treatment`、`land_restoration_and_offset`シナリオを使用する。総費用、既計上額、確認済み増分便益、確率、時期、金額基準、出典ハッシュ、データ版、二重計上防止キーを入力スナップショットと仮定台帳へ記録する。正規化済み入力全体のハッシュを再計算ハッシュへ含め、値の変更時に保存済み算定結果を再利用しない。
 
 ## 6. 決定事項 D-6:非GAAPラベルは全出力に構造的に付与する
 
