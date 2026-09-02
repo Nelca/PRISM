@@ -89,7 +89,7 @@ export function DepthToggle({ materialIssueId, currentDepth }: { materialIssueId
           )}
         </p>
       )}
-      {state?.error && <span className="form-error">{state.error}</span>}
+      {state?.error && <span className="form-error" role="alert">{state.error}</span>}
     </div>
   );
 }

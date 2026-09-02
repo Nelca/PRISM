@@ -1,5 +1,9 @@
 import type { DemoPipelineResult } from "@/lib/demo/run-demo-pipeline";
-import { materialIssueIdsWithoutRepresentativeSelection } from "./valuation-insights";
+import {
+  materialIssueIdsRequiringRepresentativeSelection,
+  materialIssueIdsWithWelfareOnlyValuation,
+  materialIssueIdsWithoutRepresentativeSelection,
+} from "./valuation-insights";
 
 export interface StepProgress {
   order: number;
@@ -11,34 +15,49 @@ export interface StepProgress {
 
 export interface OutcomeSummary {
   siteCount: number;
-  valuation: { total: number; selected: number };
+  valuation: {
+    total: number;
+    prioritized: number;
+    deepDive: number;
+    valued: number;
+    representativeRequired: number;
+    selected: number;
+    welfareOnly: number;
+  };
   verdicts: { total: number; crosses: number; doesNotCross: number; pending: number };
   disclosure: { total: number; handled: number };
   assumptionEntryCount: number;
 }
 
-interface ProgressCounts {
+export interface ProgressCounts {
   siteCount: number;
-  issueCount: number;
-  promoted: number;
-  decompositionCount: number;
+  total: number;
+  prioritized: number;
+  deepDive: number;
+  valued: number;
+  representativeRequired: number;
   selected: number;
+  welfareOnly: number;
   decisionCount: number;
   confirmed: number;
   gapCount: number;
   handledGaps: number;
 }
 
-function countProgress(result: DemoPipelineResult): ProgressCounts {
+export function countProgress(result: DemoPipelineResult): ProgressCounts {
   const { assessment, decisions, disclosure, valuation } = result;
   const gapFindings = disclosure.gapFindings;
+  const representativeRequired = materialIssueIdsRequiringRepresentativeSelection(result).length;
+  const unselected = materialIssueIdsWithoutRepresentativeSelection(result).length;
   return {
     siteCount: assessment.sites.length,
-    issueCount: assessment.priorityScores.length,
-    promoted: assessment.depthDecisions.filter((decision) => decision.depth === "deep_dive").length,
-    decompositionCount: valuation.divergenceDecompositions.length,
-    selected:
-      valuation.divergenceDecompositions.length - materialIssueIdsWithoutRepresentativeSelection(result).length,
+    total: assessment.materialIssues.length,
+    prioritized: assessment.priorityScores.length,
+    deepDive: assessment.depthDecisions.filter((decision) => decision.depth === "deep_dive").length,
+    valued: Object.values(valuation.valuationRecordsByMaterialIssue).filter((records) => records.length > 0).length,
+    representativeRequired,
+    selected: representativeRequired - unselected,
+    welfareOnly: materialIssueIdsWithWelfareOnlyValuation(result).length,
     decisionCount: decisions.length,
     confirmed: decisions.filter((decision) => decision.decision.decisionRecord.verdict !== "pending").length,
     gapCount: gapFindings.length,
@@ -58,18 +77,20 @@ export function deriveStepProgress(result: DemoPipelineResult): StepProgress[] {
       order: 2,
       href: "/assessment",
       label: "評価対象の絞り込み",
-      note: `評価対象${counts.issueCount}件・詳細評価${counts.promoted}件`,
-      done: counts.issueCount > 0,
+      note: `全課題${counts.total}件・優先度算定済み${counts.prioritized}件・詳細評価${counts.deepDive}件`,
+      done: counts.total > 0 && counts.prioritized > 0,
     },
     {
       order: 3,
       href: "/valuation",
       label: "価値の算定",
       note:
-        counts.decompositionCount > 0
-          ? `代表値の選択 ${counts.selected}/${counts.decompositionCount}件`
+        counts.valued > 0
+          ? counts.representativeRequired > 0
+            ? `算定済み${counts.valued}件・代表値 ${counts.selected}/${counts.representativeRequired}件・厚生価値のみ${counts.welfareOnly}件`
+            : `算定済み${counts.valued}件・代表値選択は不要・厚生価値のみ${counts.welfareOnly}件`
           : "算定結果はまだありません",
-      done: counts.decompositionCount > 0 && counts.selected === counts.decompositionCount,
+      done: counts.valued > 0 && counts.selected === counts.representativeRequired,
     },
     {
       order: 4,
@@ -103,7 +124,15 @@ export function deriveOutcomeSummary(result: DemoPipelineResult): OutcomeSummary
   const verdicts = result.decisions.map((entry) => entry.decision.decisionRecord.verdict);
   return {
     siteCount: counts.siteCount,
-    valuation: { total: counts.decompositionCount, selected: counts.selected },
+    valuation: {
+      total: counts.total,
+      prioritized: counts.prioritized,
+      deepDive: counts.deepDive,
+      valued: counts.valued,
+      representativeRequired: counts.representativeRequired,
+      selected: counts.selected,
+      welfareOnly: counts.welfareOnly,
+    },
     verdicts: {
       total: verdicts.length,
       crosses: verdicts.filter((verdict) => verdict === "crosses").length,
@@ -121,9 +150,9 @@ export function deriveStepContext(result: DemoPipelineResult, href: string): str
     case "/sites":
       return c.siteCount > 0 ? `登録済みの拠点${c.siteCount}件を確認し、必要なら追加・修正します。` : "評価の対象になる拠点をまず登録します。";
     case "/assessment":
-      return c.issueCount > 0 ? `評価対象${c.issueCount}件の優先度を確認し、詳細評価に進める課題を指定します(現在${c.promoted}件)。` : "評価対象がまだありません。拠点を登録すると優先度が算定されます。";
+      return c.total > 0 ? `全課題${c.total}件のうち優先度算定済み${c.prioritized}件を確認し、詳細評価に進める課題を指定します(現在${c.deepDive}件)。` : "評価対象がまだありません。拠点を登録すると優先度が算定されます。";
     case "/valuation":
-      return c.promoted > 0 ? `詳細評価に指定した${c.promoted}件の算定結果を確認し、代表値を選びます(選択済み${c.selected}/${c.decompositionCount}件)。` : "詳細評価に指定した課題がないため、算定結果はまだありません。";
+      return c.deepDive > 0 ? `詳細評価に指定した${c.deepDive}件の算定結果を確認し、代表値が必要な${c.representativeRequired}件を選びます(選択済み${c.selected}件)。` : "詳細評価に指定した課題がないため、算定結果はまだありません。";
     case "/financial-bridge":
       return c.decisionCount > 0 ? `${c.decisionCount}拠点について、選んだ代表値が利益・リスクにどう効くかを確認します。` : "試算の対象がまだありません。";
     case "/decision":

@@ -7,10 +7,14 @@ import { deriveOpenTasks } from "./open-actions";
 import { deriveFindings } from "./pipeline-findings";
 import {
   decompositionForMaterialIssue,
+  countProgress,
   deriveMoneySummary,
   deriveStepProgress,
   hasRepresentativeSelection,
+  materialIssueIdsRequiringRepresentativeSelection,
+  materialIssueIdsWithWelfareOnlyValuation,
   materialIssueIdsWithoutRepresentativeSelection,
+  pairDivergenceRatio,
   sitesWithDegenerateRepresentative,
 } from "./open-tasks";
 
@@ -41,15 +45,16 @@ describe("deriveOpenTasks", () => {
     expect(ids).not.toContain("approval-threshold");
     // すべてのタスクが遷移先とリンクラベルを持つ(ホームのチェックリストから直接飛べる)。
     expect(tasks.every((task) => task.href.startsWith("/") && task.linkLabel.length > 0)).toBe(true);
+    expect(tasks.every((task) => task.section.startsWith("/"))).toBe(true);
   });
 
-  test("投資の承認ラインが未入力なら、誰に聞けばよいかまで書いたタスクを出す", () => {
+  test("投資の承認ラインが未入力なら、確認先を短く示す", () => {
     const tasks = deriveOpenTasks(run(withPendingThreshold()));
     const pending = tasks.find((task) => task.id === "approval-threshold");
 
     expect(pending).toBeDefined();
-    expect(pending!.text).toContain("投資の承認ラインが未入力のため判定が保留中です(財務・経営企画部門への確認が必要)");
-    expect(pending!.href).toBe("/decision");
+    expect(pending!.text).toContain("承認ラインが未入力(財務・経営企画部門へ確認)");
+    expect(pending!.href).toMatch(/^\/decision\//);
   });
 });
 
@@ -67,9 +72,52 @@ describe("deriveStepProgress", () => {
     expect(byHref.get("/decision")!.done).toBe(true);
   });
 
+  test("進捗件数は全課題・優先度算定済み・詳細評価・代表値対象・厚生価値のみを分けて返す", () => {
+    const result = run();
+    const counts = countProgress(result);
+    const representativeRequired = materialIssueIdsRequiringRepresentativeSelection(result);
+    const welfareOnly = materialIssueIdsWithWelfareOnlyValuation(result);
+
+    expect(counts.total).toBe(result.assessment.materialIssues.length);
+    expect(counts.prioritized).toBe(result.assessment.priorityScores.length);
+    expect(counts.deepDive).toBe(result.assessment.depthDecisions.filter((decision) => decision.depth === "deep_dive").length);
+    expect(counts.representativeRequired).toBe(representativeRequired.length);
+    expect(counts.welfareOnly).toBe(welfareOnly.length);
+    expect(counts.selected).toBe(representativeRequired.length - materialIssueIdsWithoutRepresentativeSelection(result).length);
+  });
+
+  test("厚生価値のみで代表値選択が不要な場合も、算定工程を完了扱いにする", () => {
+    const result = run();
+    const [issueId, records] = Object.entries(result.valuation.valuationRecordsByMaterialIssue).find(([, candidates]) =>
+      candidates.some((record) => record.valueConcept === "welfare")
+    )!;
+    result.valuation.valuationRecordsByMaterialIssue = {
+      [issueId]: records.filter((record) => record.valueConcept === "welfare"),
+    };
+    result.valuation.divergenceDecompositions = [];
+    result.valuation.representativeRecordByMaterialIssue = {};
+
+    const progress = deriveStepProgress(result).find((step) => step.href === "/valuation")!;
+    expect(progress.done).toBe(true);
+    expect(progress.note).toContain("代表値選択は不要");
+    expect(progress.note).not.toContain("0/0件");
+  });
+
   test("判定が保留の拠点があれば⑤は未完了", () => {
     const steps = deriveStepProgress(run(withPendingThreshold()));
     expect(steps.find((step) => step.href === "/decision")!.done).toBe(false);
+  });
+});
+
+describe("倍率表示の共通ルール", () => {
+  test("大きい値を小さい値で割り、ペアの向きに左右されない", () => {
+    const pair = { valueA: 5, valueB: 100, ratio: 0.05 } as Parameters<typeof pairDivergenceRatio>[0];
+    expect(pairDivergenceRatio(pair)).toBe(20);
+  });
+
+  test("0円や負値が絡む場合は倍率を表示しない", () => {
+    expect(pairDivergenceRatio({ valueA: 0, valueB: 100, ratio: 0 } as Parameters<typeof pairDivergenceRatio>[0])).toBeNull();
+    expect(pairDivergenceRatio({ valueA: -10, valueB: 100, ratio: -0.1 } as Parameters<typeof pairDivergenceRatio>[0])).toBeNull();
   });
 });
 
@@ -90,7 +138,7 @@ describe("deriveFindings", () => {
     expect(impairment).toBeDefined();
     expect(impairment!.headline).toContain("減損テストの前提の見直しが必要な水準");
     expect(impairment!.exact).toMatch(/円$/);
-    expect(impairment!.href).toBe("/financial-bridge");
+    expect(impairment!.href).toMatch(/^\/financial-bridge\//);
   });
 
   test("判定が保留中の拠点は発見ではなくタスクとして扱う", () => {
@@ -212,9 +260,8 @@ describe("縮退した代表値(中心値0円)の検知", () => {
     const task = deriveOpenTasks(result).find((t) => t.id === "degenerate-representative");
     expect(task).toBeDefined();
     expect(task!.text).toContain("本社工場");
-    expect(task!.text).toContain("中心値が0円");
     expect(task!.text).toContain("未内部化コストが負");
-    expect(task!.href).toBe("/valuation");
+    expect(task!.href).toMatch(/^\/valuation\//);
   });
 });
 

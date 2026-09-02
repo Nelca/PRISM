@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { loadLedgerView } from "@/lib/views/pipeline";
 import { recalculateWithPriorParameters } from "@core/ledger/recalculate-with-prior-parameters";
 import { Mono, Num, pickYenScale } from "../components/numeric";
@@ -6,6 +7,10 @@ import { Card, ScreenLead, Stat, Tag } from "../components/ui";
 import { categoryLabel, verdictLabel } from "../components/labels";
 import { methodLabel, withMethodLabelsInText } from "../components/method-labels";
 import { DataSourceAttribution } from "../components/attribution";
+
+export const metadata: Metadata = {
+  title: "記録 | PRISM",
+};
 
 /**
  * 記録(監査証跡、指示05)。
@@ -15,7 +20,9 @@ import { DataSourceAttribution } from "../components/attribution";
  * 再計算は、日常業務では読む必要がないため「技術的な検証情報」として折りたたむ
  * (第1波が /valuation で使った details.foldout パターンを踏襲)。
  */
-export default async function LedgerPage({ searchParams }: { searchParams: Promise<{ compareWith?: string }> }) {
+type LedgerSection = "overview" | "history" | "inputs" | "parameter-versions" | "billing";
+
+export default async function LedgerPage({ searchParams, section = "overview" }: { searchParams: Promise<{ compareWith?: string }>; section?: LedgerSection }) {
   const { compareWith } = await searchParams;
   const { result, parameterVersions, runs, decisionCounts, priorRun } = await loadLedgerView(compareWith);
   const { decisions } = result;
@@ -85,13 +92,28 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">記録(監査証跡)</h1>
+          <h1 className="screen__title">{{
+            overview: "記録(監査証跡)",
+            history: "変更履歴",
+            inputs: "入力・係数の追跡",
+            "parameter-versions": "係数・パラメータの版",
+            billing: "判定件数",
+          }[section]}</h1>
         </div>
         <ScreenLead>変更履歴・使用した係数の版・課金の根拠を確認します</ScreenLead>
       </div>
 
-      <div className="grid-2">
-        <Card title="変更履歴" subtitle="誰がいつ何を選び、なぜか" padBody={false}>
+      {section === "overview" && <Card title="確認する台帳" subtitle="日常業務と技術的な検証情報を分けています">
+        <div className="action-list action-list--grid">
+          <Link href="/ledger/history" className="action-link"><b>変更履歴</b><span>誰がいつ何を選び、なぜ変更したか</span></Link>
+          <Link href="/ledger/inputs" className="action-link"><b>入力・係数の追跡</b><span>入力ハッシュ、対応表、係数を照合</span></Link>
+          <Link href="/ledger/parameter-versions" className="action-link"><b>係数・パラメータの版</b><span>現在版と旧版での再計算</span></Link>
+          <Link href="/ledger/billing" className="action-link"><b>判定件数</b><span>従量課金の根拠を確認</span></Link>
+        </div>
+      </Card>}
+
+      {(section === "overview" || section === "history" || section === "parameter-versions") && <div className={section === "overview" ? "grid-2" : undefined}>
+        {(section === "overview" || section === "history") && <Card id="history" title="変更履歴" subtitle="誰がいつ何を選び、なぜか" padBody={false}>
           <table className="data-table">
             <thead>
               <tr>
@@ -121,10 +143,11 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
               )}
             </tbody>
           </table>
-        </Card>
+        </Card>}
 
         {/* M8 D-3:係数セット・パラメータの版管理。旧版は削除せず保持し続ける。 */}
-        <Card
+        {(section === "overview" || section === "parameter-versions") && <Card
+          id="parameter-versions"
           title="係数・パラメータの版"
           subtitle="どの版がいつから有効か"
           padBody={false}
@@ -172,10 +195,11 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
               )}
             </tbody>
           </table>
-        </Card>
-      </div>
+        </Card>}
+      </div>}
 
-      <Card
+      {(section === "overview" || section === "inputs") && <Card
+        id="inputs"
         title="追加カテゴリの入力・係数の追跡"
         subtitle="算定行ごとに入力、対応表、係数を照合できます"
         padBody={false}
@@ -213,14 +237,15 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
             </tbody>
           </table>
         )}
-      </Card>
+      </Card>}
 
       {/*
         M6 D-8 / D-30:従量課金は「判定超過」1本のみで、結論の向きを問わず一律。
         構想書6.4が「課金の発生根拠が顧客にとって説明可能である」ことを設計要件としているため、
         件数だけでなく、どの判定がいつ数えられたかの明細も出す。⑤から本画面へ移設(指示05)。
       */}
-      <Card
+      {(section === "overview" || section === "billing") && <Card
+        id="billing"
         title="判定件数"
         subtitle="従量課金の根拠"
         padBody={false}
@@ -255,14 +280,14 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
             </tbody>
           </table>
         )}
-      </Card>
+      </Card>}
 
       {/*
         技術的な検証情報(指示05)。ハッシュ・レコード単位の照合・旧版係数での再計算は
         監査対応には必要だが日常業務では読む必要がないため、折りたたみに格下げする
         (第1波が /valuation で使った details.foldout パターンを踏襲)。
       */}
-      <details className="foldout">
+      {(section === "overview" || section === "parameter-versions") && <details className="foldout" open={section === "parameter-versions"}>
         <summary>
           技術的な検証情報
           <small>ハッシュ・レコード単位の照合・旧版係数での再計算(監査対応向け)</small>
@@ -346,7 +371,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
                 {runs.slice(1).map((run) => (
                   <Link
                     key={run.id}
-                    href={`/ledger?compareWith=${encodeURIComponent(run.id)}`}
+                    href={`/ledger/parameter-versions?compareWith=${encodeURIComponent(run.id)}`}
                     className={`pill-btn pill-btn--sm${run.id === priorRunId ? " pill-btn--accent" : ""}`}
                   >
                     {run.executedAt.slice(0, 16).replace("T", " ")}
@@ -420,7 +445,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
             )}
           </Card>
         </div>
-      </details>
+      </details>}
 
       <DataSourceAttribution sources={["World Bank"]} />
     </div>

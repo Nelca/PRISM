@@ -8,8 +8,6 @@ import { extractDisclosureClaims } from "@/lib/ai/extract-disclosure-claims";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { hasDisclosureClaim, hasMaterialIssue } from "@/lib/pipeline/action-targets";
 
-const REVALIDATE_PATHS = ["/", "/sites", "/assessment", "/disclosure", "/ledger"];
-
 const ACTOR = "宮里";
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
@@ -82,7 +80,7 @@ export async function extractDisclosurePdfAction(
     return { error: outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
 
   return {
     extractedCount: claims.length,
@@ -121,7 +119,7 @@ export async function weakenClaimAction(
     return { error: outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {};
 }
 
@@ -130,14 +128,14 @@ export async function acquireEvidenceAction(
   _prevState: DisclosureActionFormState,
   formData: FormData
 ): Promise<DisclosureActionFormState> {
-  const siteId = String(formData.get("siteId") ?? "");
-  if (!siteId) {
-    return { error: "対象拠点を指定してください。" };
+  const materialIssueId = String(formData.get("materialIssueId") ?? "");
+  if (!materialIssueId) {
+    return { error: "根拠を追加取得する評価対象を指定してください。" };
   }
 
   const tenantId = await getTenantId();
-  if (!hasMaterialIssue(await getOrCreateLatestResult(tenantId), `${siteId}-mi-water`)) {
-    return { error: "対象拠点の水課題が見つかりません。画面を更新してください。" };
+  if (!hasMaterialIssue(await getOrCreateLatestResult(tenantId), materialIssueId)) {
+    return { error: "対象の評価課題が見つかりません。画面を更新してください。" };
   }
   const outcome = await tryRunAndPersist(tenantId, {
     label: "詳細評価キューへの追加",
@@ -145,10 +143,10 @@ export async function acquireEvidenceAction(
       {
         actor: ACTOR,
         kind: "depth_override",
-        subjectId: `${siteId}-mi-water`,
+        subjectId: materialIssueId,
         payload: {
           mode: "promote",
-          logMessage: `開示内容の確認への対応として、${siteId}の評価を詳細評価キューへ追加`,
+          logMessage: `開示内容の確認への対応として、${materialIssueId}を詳細評価キューへ追加`,
         },
       },
     ],
@@ -157,7 +155,7 @@ export async function acquireEvidenceAction(
     return { error: outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {};
 }
 
@@ -194,6 +192,6 @@ export async function recordIntentionalDecisionAction(
     return { error: outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {};
 }

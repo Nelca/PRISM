@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { listConfirmedDecisionSnapshots } from "@/lib/db/repositories/decision-counts";
 import { detectReassessmentAlerts } from "@core/decision/reassessment";
 import { loadInteractivePipelineView } from "@/lib/views/pipeline";
@@ -13,6 +14,10 @@ import { CountermeasureSelector } from "./countermeasure-selector";
 import { BindingForm } from "./binding-form";
 import { DecisionParametersForm } from "./parameters-form";
 import { PipelineWarnings } from "../components/pipeline-warnings";
+
+export const metadata: Metadata = {
+  title: "対策と判定 | PRISM",
+};
 
 /**
  * ★判定の意味を一文にする(指示15 → 第4版 D-13で拡張)。
@@ -31,8 +36,10 @@ function verdictMeaningSentence(verdict: string): string | null {
 
 export default async function DecisionPage({
   searchParams,
+  detailOnly = false,
 }: {
   searchParams: Promise<{ site?: string }>;
+  detailOnly?: boolean;
 }) {
   const { site: siteParam } = await searchParams;
   const { tenantId, result, interactions } = await loadInteractivePipelineView();
@@ -128,25 +135,18 @@ export default async function DecisionPage({
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">対策と判定</h1>
-          <GuideButton />
+          <h1 className="screen__title">{detailOnly ? "拠点の対策と判定" : "対策と判定"}</h1>
+          {!detailOnly && <GuideButton />}
         </div>
         <ScreenLead>対策を選び、投資の結論が変わるかの判定を確定します</ScreenLead>
+        {detailOnly && <p className="page-back"><Link href="/decision">← 拠点一覧へ戻る</Link></p>}
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
-        <GuideBox>
-          この画面では、投資の承認ラインと照らした判定を確定させます。<b>1.</b>{" "}
-          拠点サマリーで判定と残タスクを確認し、対象拠点の詳細を開きます → <b>2.</b>{" "}
-          「投資判断の前提」で投資価値(NPV)・割引率・投資の承認ラインを入力します → <b>3.</b>{" "}
-          「対策案の比較」で対策を1つ選ぶと、投資対効果が自然への影響を加味して再計算されます → <b>4.</b>{" "}
-          「この結果の反映先」で、この結果を社内のどの仕組みで使うかを決めます(変更には理由の入力が必須です) →{" "}
-          <b>5.</b> 確定したら「開示への反映」へ進みます。
-          {/* D-13:3値の読み方。投資可否は断定しない(「結論が変わるか」の言い回しに徹する)。 */}
-          判定は3値です:「結論は変わらない」=自然関連コストを織り込んでも投資判断の結論は変わらないと確定/
-          「結論が変わる可能性」=承認ラインを上回るか下回るかが変わりうるため、前提の詳細調査が必要/
-          「保留」=承認ラインが未入力のため未確定。未入力の間は、仮の値を置かず判定を保留にします。
-          保留を解くには財務・経営企画部門への確認が必要です。
-        </GuideBox>
+        {!detailOnly && <GuideBox>
+          承認ラインを入力し、対策を選び、結果を反映する社内制度を指定します。
+        </GuideBox>}
       </div>
+
+      {!detailOnly && <>
 
       {/* D-01-3:保存済みの操作のうち、今回の計算に反映できなかったものを黙って捨てない。 */}
       <PipelineWarnings warnings={result.warnings} screen="/decision" />
@@ -166,7 +166,7 @@ export default async function DecisionPage({
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {welfareOnlyIssues.map((issue) => (
               <li key={issue.id}>
-                <Link href={`/valuation?issue=${encodeURIComponent(issue.id)}`}>
+                <Link href={`/valuation/${encodeURIComponent(issue.id)}`}>
                   {materialIssueLabel(siteNameById.get(issue.siteId), issue.impactCategory, issue.id)}
                 </Link>
                 <span className="cell-note">{categoryLabel(issue.impactCategory)}</span>
@@ -210,7 +210,7 @@ export default async function DecisionPage({
                 <td style={{ fontSize: 12 }}>{row.remaining.length > 0 ? row.remaining.join("・") : "—"}</td>
                 <td>
                   <Link
-                    href={`/decision?site=${encodeURIComponent(row.siteId)}#site-${row.siteId}`}
+                    href={`/decision/${encodeURIComponent(row.siteId)}`}
                     className="pill-btn pill-btn--sm"
                   >
                     詳細 →
@@ -221,6 +221,7 @@ export default async function DecisionPage({
           </tbody>
         </table>
       </Card>
+      </>}
 
       {/*
         拠点別詳細(D-11 → 第6版D-23で改稿)。**選択中の1拠点だけを描画する。**
@@ -375,11 +376,22 @@ export default async function DecisionPage({
                 </Card>
               )}
 
-              {/* (2) 対策案の比較:表→散布図の順(指示15) */}
-              <Card
-                title="対策案の比較"
-                foot="縦軸:投資1億円あたりの回避物理量 ・ 横軸:投資1億円あたりの追加リターン(投資価値の純増)。「対策を実施しない」案は追加投資も追加効果もないため原点付近になります"
-              >
+              {/* (2) 対策案の比較:一覧画面では要点、拠点画面では専用分析へ分離する。 */}
+              {detailOnly ? (
+                <Card title="対策案を詳しく比較する" subtitle="候補ごとの投資額・回避物理量・投資価値を確認します">
+                  <p style={{ marginTop: 0, color: "var(--ink-soft)" }}>
+                    分析画面は読み取り専用です。比較後の候補選択は、この画面に戻って変更できます。
+                  </p>
+                  <Link href={`/decision/${encodeURIComponent(siteId)}/analysis`} className="pill-btn">
+                    対策案の分析を見る →
+                  </Link>
+                </Card>
+              ) : (
+                <Card
+                  id="countermeasure-analysis"
+                  title="対策案の比較"
+                  foot="縦軸:投資1億円あたりの回避物理量 ・ 横軸:投資1億円あたりの追加リターン(投資価値の純増)。「対策を実施しない」案は追加投資も追加効果もないため原点付近になります"
+                >
                 <table className="data-table" style={{ margin: "0 0 16px" }}>
                   <thead>
                     <tr>
@@ -405,7 +417,7 @@ export default async function DecisionPage({
                           <td className="num">
                             <Num value={c.avoidedPhysicalQuantity} unit="m3" />
                           </td>
-                          <td className="num" style={{ fontWeight: 700 }}>
+                          <td className="num" style={{ fontWeight: 600 }}>
                             <Num value={c.decisionRecord.natureAdjustedNpv.central} unit="円" scale={npvScale} />(
                             {verdictLabel(c.decisionRecord.verdict)})
                           </td>
@@ -423,12 +435,13 @@ export default async function DecisionPage({
                     x: invPerOku(c),
                     y: avoidedPerOku(c),
                     label: c.label,
-                    color: c.key === selectedCountermeasureKey ? "#33564A" : "#8B8F86",
+                    color: c.key === selectedCountermeasureKey ? "#2F68F6" : "#8B8F86",
                   }))}
                   xLabel="投資1億円あたりの追加リターン"
                   yLabel="投資1億円あたりの回避物理量"
                 />
-              </Card>
+                </Card>
+              )}
 
               {/* (3) この結果の反映先(指示15) */}
               <Card title="この結果の反映先">
@@ -455,7 +468,7 @@ export default async function DecisionPage({
         黙って消さないための安全弁。拠点に紐づくアラートは、判定結果カード直下(選択中の拠点)
         またはサマリーテーブルの残タスク列(その他の拠点)で伝わる(D-23)。
       */}
-      {orphanAlerts.length > 0 && (
+      {!detailOnly && orphanAlerts.length > 0 && (
         <Card
           title="前提が変わった判定(その他)"
           padBody={false}

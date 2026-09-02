@@ -6,7 +6,6 @@ import { tryRunAndPersist } from "@/lib/pipeline/try-run-with-interaction";
 import type { CompanyFinancialsInput } from "@/lib/demo/interaction-state";
 import { parseRequiredNumber } from "@/lib/forms/number";
 
-const REVALIDATE_PATHS = ["/", "/financial-bridge", "/decision", "/ledger"];
 const ACTOR = "宮里";
 
 export interface CompanyFinancialsFormState {
@@ -57,6 +56,6 @@ export async function saveCompanyFinancialsAction(
     return { error: outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return { saved: true };
 }

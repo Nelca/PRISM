@@ -40,7 +40,9 @@ export function Football({ methods, threshold, thresholdLabel }: { methods: Foot
   const gridlines = Array.from({ length: steps + 1 }, (_, i) => min + ((max - min) * i) / steps);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ overflow: "visible" }}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ overflow: "visible" }} role="img">
+      <title>算定方法ごとの試算幅</title>
+      <desc>{methods.map((method) => `${method.name}: ${fmt(method.low)}円から${fmt(method.high)}円、中心値${fmt(method.mid)}円`).join("。")}</desc>
       {gridlines.map((v, i) => (
         <g key={i}>
           <line x1={x(v)} x2={x(v)} y1={top - 6} y2={H - 24} stroke="#E1E3DC" strokeWidth={1} />

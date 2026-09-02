@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Children, isValidElement, type ReactNode } from "react";
 import type { TagVariant } from "./tag-utils";
 
 /**
@@ -13,6 +13,15 @@ import type { TagVariant } from "./tag-utils";
  * ここでは再エクスポートするだけにする(既存のimport元は変更不要)。
  */
 export { GuideBox, GuideButton, ModalForm, PillButton } from "./ui-client";
+
+function containsUnwrappedDataTable(node: ReactNode): boolean {
+  return Children.toArray(node).some((child) => {
+    if (!isValidElement<{ children?: ReactNode; className?: string }>(child)) return false;
+    if (child.type === TableScroll || child.props.className?.split(" ").includes("table-scroll")) return false;
+    if (child.type === "table" && child.props.className?.split(" ").includes("data-table")) return true;
+    return containsUnwrappedDataTable(child.props.children);
+  });
+}
 
 export function Card({
   id,
@@ -32,21 +41,42 @@ export function Card({
   children: ReactNode;
   padBody?: boolean;
 }) {
+  const titleId = id && title ? `${id}-title` : undefined;
+  const hasDataTable = containsUnwrappedDataTable(children);
   return (
-    <div className="card" id={id}>
+    <section className="card" id={id} aria-labelledby={titleId}>
       {(title || headExtra) && (
         <div className="card__head">
-          <div className="card__title">
+          <h2 className="card__title" id={titleId}>
             {title}
             {subtitle && <small>{subtitle}</small>}
-          </div>
+          </h2>
           {headExtra}
         </div>
       )}
-      <div className="card__body" style={padBody ? undefined : { padding: 0 }}>
+      <div
+        className="card__body"
+        style={padBody ? undefined : { padding: 0 }}
+        role={hasDataTable ? "region" : undefined}
+        aria-label={hasDataTable ? `${typeof title === "string" ? title : "データ"}の表（横スクロールできます）` : undefined}
+        tabIndex={hasDataTable ? 0 : undefined}
+      >
         {children}
       </div>
-      {foot && <div className="card__foot">{foot}</div>}
+      {foot && (
+        <details className="card__foot">
+          <summary>補足</summary>
+          <div>{foot}</div>
+        </details>
+      )}
+    </section>
+  );
+}
+
+export function TableScroll({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="table-scroll" role="region" aria-label={label} tabIndex={0}>
+      {children}
     </div>
   );
 }
@@ -71,7 +101,13 @@ export function ScreenLead({ children }: { children: ReactNode }) {
  */
 export function Term({ children, note }: { children: ReactNode; note: string }) {
   return (
-    <span className="term" title={note}>
+    <span
+      className="term"
+      title={note}
+      data-note={note}
+      tabIndex={0}
+      aria-label={typeof children === "string" ? `${children}: ${note}` : note}
+    >
       {children}
     </span>
   );

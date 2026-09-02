@@ -20,12 +20,14 @@ function FileField({
   accept,
   label,
   hint,
+  onSelectedChange,
 }: {
   id: string;
   name: string;
   accept: string;
   label: string;
   hint: string;
+  onSelectedChange: (selected: boolean) => void;
 }) {
   const [fileName, setFileName] = useState<string | null>(null);
 
@@ -39,7 +41,12 @@ function FileField({
           type="file"
           accept={accept}
           className="file-input__control"
-          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          required
+          onChange={(e) => {
+            const nextName = e.target.files?.[0]?.name ?? null;
+            setFileName(nextName);
+            onSelectedChange(Boolean(nextName));
+          }}
         />
         <label htmlFor={id} className="pill-btn pill-btn--sm file-input__label">
           ファイルを選ぶ
@@ -53,6 +60,14 @@ function FileField({
 
 export function ImportForm() {
   const [state, formAction, pending] = useActionState(importCompanyDatasetAction, initialState);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set());
+  const trackFile = (name: string) => (selected: boolean) => {
+    setSelectedFiles((current) => {
+      const next = new Set(current);
+      if (selected) next.add(name); else next.delete(name);
+      return next;
+    });
+  };
 
   return (
     <form action={formAction}>
@@ -62,6 +77,7 @@ export function ImportForm() {
         accept=".csv,text/csv"
         label="① 拠点一覧(sites.csv)"
         hint="顧客のサステナビリティ/IR部門が記入します。"
+        onSelectedChange={trackFile("sitesCsv")}
       />
 
       <FileField
@@ -70,6 +86,7 @@ export function ImportForm() {
         accept=".csv,text/csv"
         label="② 自然との接点の調査結果(nature-interfaces.csv)"
         hint="PRISM運用チームが外部データベースを照会して記入します。"
+        onSelectedChange={trackFile("natureInterfacesCsv")}
       />
 
       <FileField
@@ -78,14 +95,15 @@ export function ImportForm() {
         accept=".json,application/json"
         label="③ 評価・判断の設定(engagement-config.json)"
         hint="詳細評価の対象・投資判断の前提など。財務部門への確認が必要な項目を含みます。"
+        onSelectedChange={trackFile("engagementConfigJson")}
       />
 
-      <button type="submit" className="pill-btn pill-btn--primary" disabled={pending}>
+      <button type="submit" className="pill-btn pill-btn--primary" disabled={pending || selectedFiles.size < 3}>
         {pending ? "検証しています…" : "検証して取り込む"}
       </button>
 
       {state.errors && state.errors.length > 0 && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16 }} role="alert">
           <div className="section-label" style={{ color: "var(--brick)" }}>
             取り込めませんでした({state.errors.length}件)
           </div>
@@ -103,7 +121,7 @@ export function ImportForm() {
       )}
 
       {state.importedSiteCount !== undefined && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16 }} role="status">
           <div className="section-label" style={{ color: "var(--accent-ink)" }}>
             拠点{state.importedSiteCount}件を取り込みました
           </div>

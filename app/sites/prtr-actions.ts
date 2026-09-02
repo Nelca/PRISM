@@ -9,7 +9,6 @@ import { loadPrtrDataset, type PrtrSourceFile } from "@/lib/intake/prtr";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 import { sql } from "drizzle-orm";
 
-const REVALIDATE_PATHS = ["/sites", "/assessment", "/valuation", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
 const ACTOR = "宮里";
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 45 * 1024 * 1024;
@@ -93,7 +92,7 @@ export async function importPrtrDatasetAction(
     return { errors: ["PRTRデータを保存できませんでした。データは一件も保存していません。時間を置いて再度お試しください。"] };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {
     batchId: result.batch.id,
     importedRecordCount: result.batch.records.length,

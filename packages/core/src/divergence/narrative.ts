@@ -41,7 +41,16 @@ function formatPercent(ratio: number): string {
 }
 
 function formatMultiplier(multiplier: number): string {
-  return `×${multiplier.toFixed(2)}`;
+  return `×${Math.abs(multiplier) < 0.01 ? multiplier.toPrecision(2) : multiplier.toFixed(2)}`;
+}
+
+/** 比較の向きに関係なく、利用者が「何が何倍か」をそのまま読める形にする。 */
+function formatComparison(methodIdA: string, methodIdB: string, ratio: number | null): string {
+  if (ratio === null || !Number.isFinite(ratio) || ratio <= 0) {
+    return `${methodIdA} と ${methodIdB} の比率は算出できません。`;
+  }
+  if (ratio >= 1) return `${methodIdA} は ${methodIdB} の ${ratio.toFixed(2)}倍です。`;
+  return `${methodIdB} は ${methodIdA} の ${(1 / ratio).toFixed(2)}倍です。`;
 }
 
 export interface NarrativeInput {
@@ -72,9 +81,7 @@ export function buildNarrative(input: NarrativeInput): string {
   // mode === "multiplicative"
   const decomposed = contributions.filter((c) => c.status === "decomposed");
   const notRecalculable = contributions.filter((c) => c.status === "not_recalculable");
-  const ratioText = ratio !== null ? `${ratio.toFixed(2)}倍` : "(比率算出不能)";
-
-  const parts: string[] = [`${methodIdA} と ${methodIdB} の差は ${ratioText} です。`];
+  const parts: string[] = [formatComparison(methodIdA, methodIdB, ratio)];
 
   const hasAnyExplainedContribution = decomposed.some((c) => c.logContribution !== 0);
 

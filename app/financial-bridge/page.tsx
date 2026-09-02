@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { deriveMoneySummary, deriveOpenTasks, joinSiteNames, sitesWithDegenerateRepresentative } from "@/lib/pipeline/open-tasks";
 import { loadInteractivePipelineView } from "@/lib/views/pipeline";
 import { CompanyFinancialsForm } from "./financials-form";
@@ -11,6 +12,10 @@ import { TaskBanner } from "../components/task-banner";
 import { Waterfall } from "../components/charts/Waterfall";
 import { PipelineWarnings } from "../components/pipeline-warnings";
 
+export const metadata: Metadata = {
+  title: "財務への影響 | PRISM",
+};
+
 /** D-12:辞書に必ずある用語。辞書から引けなければ用語名をそのままtitleにする(文章を発明しない)。 */
 function term(label: string) {
   return <Term note={financialTermNote(label) ?? label}>{label}</Term>;
@@ -18,8 +23,10 @@ function term(label: string) {
 
 export default async function FinancialBridgePage({
   searchParams,
+  detailOnly = false,
 }: {
   searchParams: Promise<{ site?: string }>;
+  detailOnly?: boolean;
 }) {
   const { site: siteParam } = await searchParams;
   const { result, interactions } = await loadInteractivePipelineView();
@@ -67,7 +74,9 @@ export default async function FinancialBridgePage({
    * 導出そのものは lib/pipeline/open-tasks.ts に移した(指示13)。この画面と
    * ホームの「次にやること」が同じ関数を参照する。
    */
-  const redFlags = deriveOpenTasks(result);
+  const redFlags = deriveOpenTasks(result).filter(
+    (task) => task.section === "/valuation" || task.section === "/financial-bridge"
+  );
 
   /**
    * 第4版 D-11:拠点サマリーに出す1行分の値。金額の計算は deriveMoneySummary に集約し、
@@ -106,22 +115,18 @@ export default async function FinancialBridgePage({
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">財務への影響</h1>
-          <GuideButton />
+          <h1 className="screen__title">{detailOnly ? "拠点の財務影響" : "財務への影響"}</h1>
+          {!detailOnly && <GuideButton />}
         </div>
         <ScreenLead>選んだ代表値が利益・リスクにどう効くかを確認します</ScreenLead>
+        {detailOnly && <p className="page-back"><Link href="/financial-bridge">← 拠点一覧へ戻る</Link></p>}
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
-        <GuideBox>
-          この画面では、選んだ代表値が財務にどう効くかを読み取ります。<b>1.</b>{" "}
-          上部の「企業全体の財務データ」から、自社の財務データ(売上・営業利益など)を登録します(全拠点の計算に共通で使われます)
-          → <b>2.</b> 拠点サマリーで、利益への影響・自然債務・減損リスクを拠点ごとに見比べます → <b>3.</b>{" "}
-          気になる拠点の行から詳細を開き、決算値の利益からの調整と「期待損失」、比較先(営業利益比・減損リスク)を確認します →{" "}
-          <b>4.</b> 「重要な論点」に挙がった項目を処理してから「対策と判定」へ進みます。
-          社会全体への影響(開示専用の参考値)は別枠で表示し、利益の試算には加算しません。
-          この画面の数値は決算書の数値ではなく、社内試算値(参考値)です。
-          格付・資本コストへの影響を予測・断定することはしません。
-        </GuideBox>
+        {!detailOnly && <GuideBox>
+          企業の財務データを登録し、拠点ごとの利益影響、期待損失、減損リスクを確認します。
+        </GuideBox>}
       </div>
+
+      {!detailOnly && <>
 
       {/* D-01-3:保存済みの操作のうち、今回の計算に反映できなかったものを黙って捨てない。 */}
       <PipelineWarnings warnings={result.warnings} screen="/financial-bridge" />
@@ -141,7 +146,7 @@ export default async function FinancialBridgePage({
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {welfareOnlyIssues.map((issue) => (
               <li key={issue.id}>
-                <Link href={`/valuation?issue=${encodeURIComponent(issue.id)}`}>
+                <Link href={`/valuation/${encodeURIComponent(issue.id)}`}>
                   {materialIssueLabel(siteNameById.get(issue.siteId), issue.impactCategory, issue.id)}
                 </Link>
                 <span className="cell-note">{categoryLabel(issue.impactCategory)}の社会的影響</span>
@@ -225,7 +230,7 @@ export default async function FinancialBridgePage({
                 <td>{row.impairmentAffected ? <Tag variant="warn">あり</Tag> : "—"}</td>
                 <td>
                   <Link
-                    href={`/financial-bridge?site=${encodeURIComponent(row.siteId)}#site-${row.siteId}`}
+                    href={`/financial-bridge/${encodeURIComponent(row.siteId)}`}
                     className="pill-btn pill-btn--sm"
                   >
                     詳細 →
@@ -242,7 +247,7 @@ export default async function FinancialBridgePage({
         レッドフラグの信頼性を損なうため、すべて実際の計算結果から導出する。
         該当がなければ行を出さない。D-11:最下部からサマリー直後(上部)へ移動。
       */}
-      <Card title="重要な論点" padBody={false} foot="実際の算定・判定結果から導出しています">
+      <Card title="財務試算の前提で確認すること" padBody={false} foot="代表値と財務試算に関係する論点だけを表示しています">
         <table className="data-table">
           <tbody>
             {redFlags.length === 0 ? (
@@ -269,6 +274,7 @@ export default async function FinancialBridgePage({
           </tbody>
         </table>
       </Card>
+      </>}
 
       {/*
         拠点別詳細(D-11 → 第6版D-23で改稿)。**選択中の1拠点だけを描画する。**

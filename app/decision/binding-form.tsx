@@ -53,7 +53,7 @@ export function BindingForm({ siteId, currentKind }: { siteId: string; currentKi
         </div>
       )}
 
-      {state?.error && <p className="form-error">{state.error}</p>}
+      {state?.error && <p className="form-error" role="alert">{state.error}</p>}
 
       <div style={{ marginTop: 12 }}>
         <button type="submit" className="pill-btn pill-btn--primary" disabled={pending}>

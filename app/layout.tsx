@@ -1,17 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Shippori_Mincho, Noto_Sans_JP, JetBrains_Mono } from "next/font/google";
+import { Noto_Sans_JP, JetBrains_Mono } from "next/font/google";
 import { COMPANY_NAME } from "@/lib/demo/company";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { deriveOpenTasks } from "@/lib/pipeline/open-tasks";
-import { Nav } from "./components/nav";
+import { AppShell } from "./components/app-shell";
 import "./globals.css";
-
-const shipporiMincho = Shippori_Mincho({
-  variable: "--font-shippori-mincho",
-  weight: ["500", "600", "800"],
-  subsets: ["latin"],
-});
 
 const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
@@ -51,9 +44,7 @@ export const dynamic = "force-dynamic";
  */
 async function getNeedsAttentionHrefs(): Promise<string[]> {
   const result = await loadPipelineView();
-  const hrefs = new Set(deriveOpenTasks(result).map((task) => task.href));
-  hrefs.delete("/");
-  hrefs.delete("/ledger");
+  const hrefs = new Set(deriveOpenTasks(result).map((task) => task.section));
   return Array.from(hrefs);
 }
 
@@ -61,52 +52,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const needsAttentionHrefs = await getNeedsAttentionHrefs();
 
   return (
-    <html lang="ja" className={`${shipporiMincho.variable} ${notoSansJP.variable} ${jetbrainsMono.variable}`}>
+    <html lang="ja" className={`${notoSansJP.variable} ${jetbrainsMono.variable}`}>
       <body>
-        <div className="app">
-          {/*
-            指示12:デモ注記はページ末尾のfooter-noteで毎画面繰り返すと景色化して読まれなくなるため、
-            レイアウト共通の細いバナー1本に集約する(各page.tsxのfooter-noteは削除済み)。
-          */}
-          <div className="demo-banner">デモデータ(架空企業)を表示中 — 実在の企業・実データではありません</div>
-
-          {/* 2026-08-23レビュー:ロゴのクリックでホームに戻れるようにする(一般的な期待動作)。 */}
-          <Link href="/" className="brand" aria-label="ホームへ戻る">
-            <div className="brand__mark">
-              <svg viewBox="0 0 24 24" fill="none">
-                <path d="M12 1.5L22.5 12L12 22.5L1.5 12L12 1.5Z" stroke="#7FA694" strokeWidth="1.4" />
-                <path
-                  d="M12 1.5V22.5M1.5 12H22.5M4.9 4.9L19.1 19.1M19.1 4.9L4.9 19.1"
-                  stroke="#3E5A50"
-                  strokeWidth="0.7"
-                />
-              </svg>
-            </div>
-            <div>
-              <div className="brand__name">PRISM</div>
-              <div className="brand__tag">自然資本の意思決定レイヤー</div>
-            </div>
-          </Link>
-
-          <div className="topbar">
-            <div className="topbar__left">
-              <div className="crumbs">
-                <b>{COMPANY_NAME}</b>
-              </div>
-            </div>
-            <div className="topbar__right">
-              <span className="env-badge">パイロット環境・FY2027</span>
-              <div className="user-chip">
-                <div className="user-chip__avatar">宮</div>
-                <span>宮里 様(サステナビリティ推進室)</span>
-              </div>
-            </div>
-          </div>
-
-          <Nav needsAttentionHrefs={needsAttentionHrefs} />
-
-          <div className="main">{children}</div>
-        </div>
+        <AppShell companyName={COMPANY_NAME} needsAttentionHrefs={needsAttentionHrefs}>
+          {children}
+        </AppShell>
       </body>
     </html>
   );

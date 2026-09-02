@@ -19,44 +19,78 @@ function SiteFormModal({ entry }: { entry?: UserSiteEntry }) {
     entry && entry.row.lat === undefined ? "address" : "coordinates"
   );
   const wasPending = useRef(false);
+  const pendingRef = useRef(pending);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   // 一覧の行ごとに同じフォームが並ぶため、label/inputの紐付けにはインスタンス固有のidを使う。
   const uid = useId();
   const fieldId = (name: string) => `${uid}-${name}`;
 
   useEffect(() => {
+    pendingRef.current = pending;
     if (wasPending.current && !pending && !state.error) {
       setOpen(false);
     }
     wasPending.current = pending;
   }, [pending, state]);
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const trigger = triggerRef.current;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.querySelector<HTMLElement>("button, input, select, textarea")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (pendingRef.current) return;
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [href], [tabindex]:not([tabindex="-1"])'
+      ));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      trigger?.focus();
+    };
+  }, [open]);
+
   const deepDive = entry?.deepDive;
 
   return (
     <>
       {editing ? (
-        <button type="button" className="pill-btn pill-btn--sm" onClick={() => setOpen(true)}>
+        <button ref={triggerRef} type="button" className="pill-btn pill-btn--sm" onClick={() => setOpen(true)}>
           編集
         </button>
       ) : (
-        <button type="button" className="pill-btn pill-btn--accent" onClick={() => setOpen(true)}>
+        <button ref={triggerRef} type="button" className="pill-btn pill-btn--accent" onClick={() => setOpen(true)}>
           拠点を追加
         </button>
       )}
 
       {open && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
-          <div className="modal-card">
+        <div className="modal-overlay" onClick={(e) => !pending && e.target === e.currentTarget && setOpen(false)}>
+          <div ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby={fieldId("dialog-title")} aria-describedby={fieldId("dialog-description")}>
             <div className="modal-head">
               <div>
-                <h3>{editing ? "拠点を編集" : "拠点を追加"}</h3>
-                <p>
+                <h3 id={fieldId("dialog-title")}>{editing ? "拠点を編集" : "拠点を追加"}</h3>
+                <p id={fieldId("dialog-description")}>
                   {editing
                     ? "保存すると再計算され、変更の内容は記録に残ります"
                     : "登録すると、周辺環境との関係を確認し「自然との関わり」を算定します"}
                 </p>
               </div>
-              <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setOpen(false)}>
+              <button type="button" className="modal-close" aria-label="閉じる" disabled={pending} onClick={() => setOpen(false)}>
                 ✕
               </button>
             </div>
@@ -241,10 +275,10 @@ function SiteFormModal({ entry }: { entry?: UserSiteEntry }) {
                   </div>
                 </details>
 
-                {state?.error && <p className="form-error">{state.error}</p>}
+                {state?.error && <p className="form-error" role="alert">{state.error}</p>}
               </div>
               <div className="modal-foot">
-                <button type="button" className="pill-btn" onClick={() => setOpen(false)}>
+                <button type="button" className="pill-btn" disabled={pending} onClick={() => setOpen(false)}>
                   キャンセル
                 </button>
                 <button type="submit" className="pill-btn pill-btn--accent" disabled={pending}>

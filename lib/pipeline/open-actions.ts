@@ -2,6 +2,7 @@ import type { DemoPipelineResult } from "@/lib/demo/run-demo-pipeline";
 import { bindingLabel } from "@/app/components/labels";
 import { formatYen } from "@/app/components/numeric";
 import {
+  decompositionForMaterialIssue,
   materialIssueIdsWithoutRepresentativeSelection,
   maxDivergenceRatio,
   sitesWithDegenerateRepresentative,
@@ -11,6 +12,8 @@ export interface OpenTask {
   /** Reactのkeyと重複排除に使う内部キー。画面には出さない。 */
   id: string;
   text: string;
+  /** タスクを所有する業務工程。子URLへ遷移してもナビと残件数を親工程へ集約する。 */
+  section: "/sites" | "/assessment" | "/valuation" | "/financial-bridge" | "/decision" | "/disclosure";
   href: string;
   linkLabel: string;
   /**
@@ -40,28 +43,37 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
   const { decisions, disclosure, valuation } = result;
 
   // ③ 手法間の乖離:実際の分解結果から最大倍率を取る
-  const ratios = valuation.divergenceDecompositions
-    .map(maxDivergenceRatio)
-    .filter((ratio): ratio is number => ratio !== null);
-  const maxRatio = ratios.length > 0 ? Math.max(...ratios) : null;
+  const valuationIssueIds = Object.keys(valuation.valuationRecordsByMaterialIssue);
+  const divergenceTargets = valuation.divergenceDecompositions
+    .map((decomposition) => ({
+      ratio: maxDivergenceRatio(decomposition),
+      issueId: valuationIssueIds.find((issueId) => decompositionForMaterialIssue(result, issueId) === decomposition),
+    }))
+    .filter((entry): entry is { ratio: number; issueId: string | undefined } => entry.ratio !== null)
+    .sort((a, b) => b.ratio - a.ratio);
+  const maxDivergence = divergenceTargets[0];
+  const maxRatio = maxDivergence?.ratio ?? null;
   if (maxRatio !== null && maxRatio > DIVERGENCE_ALERT_RATIO) {
     tasks.push({
       id: "divergence",
       anchor: "pair-comparison",
-      text: `算定方法によって試算結果に最大${maxRatio.toFixed(1)}倍の差がある。代表値の選択理由を確認してください。`,
-      href: "/valuation",
+      text: `算定結果の差:最大${maxRatio.toFixed(1)}倍`,
+      section: "/valuation",
+      href: maxDivergence?.issueId ? `/analysis?issue=${encodeURIComponent(maxDivergence.issueId)}` : "/analysis",
       linkLabel: "確認する",
     });
   }
 
   // ③ 代表値が未選択(既定値のまま)の課題があるか。判定は③の画面と同じ関数を使う(D-02)。
-  const unselected = materialIssueIdsWithoutRepresentativeSelection(result).length;
+  const unselectedIssueIds = materialIssueIdsWithoutRepresentativeSelection(result);
+  const unselected = unselectedIssueIds.length;
   if (unselected > 0) {
     tasks.push({
       id: "representative-value",
       anchor: "representative-selection",
-      text: `${unselected}件の課題で、投資判断に使う代表値がまだ選択されていない(既定値を使用中)。`,
-      href: "/valuation",
+      text: `代表値が未選択:${unselected}件`,
+      section: "/valuation",
+      href: `/valuation/${encodeURIComponent(unselectedIssueIds[0])}`,
       linkLabel: "代表値を選ぶ",
     });
   }
@@ -73,32 +85,20 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
    */
   const degenerate = sitesWithDegenerateRepresentative(result);
   if (degenerate.length > 0) {
-    /**
-     * 原因は2種類あり、文言で区別する(2026-08-23レビュー指摘2):
-     * ①中心値0円の代表値が選択されている拠点、②中心値は非ゼロだが既内部化コストが
-     * 試算値を上回る拠点。①だけの文で②の拠点まで括ると不正確になる。
-     */
-    const zeroSites = degenerate.filter((d) => d.zeroRepresentative);
-    const belowPaidSites = degenerate.filter((d) => !d.zeroRepresentative);
-    const causeParts: string[] = [];
-    if (zeroSites.length > 0) {
-      causeParts.push(`「${joinSiteNames(zeroSites.map((d) => d.siteName))}」で選択中の代表値の中心値が0円`);
-    }
-    if (belowPaidSites.length > 0) {
-      causeParts.push(`「${joinSiteNames(belowPaidSites.map((d) => d.siteName))}」で試算値(代表値)が内部化済みコストを下回っている`);
-    }
-    const cause = causeParts.join("、また");
+    const affectedSites = joinSiteNames(degenerate.map((entry) => entry.siteName));
     const totalNegativeCost = degenerate.reduce((sum, d) => sum + Math.min(0, d.uninternalizedCost), 0);
+    const degenerateIssueId = result.assessment.materialIssues.find(
+      (issue) => issue.siteId === degenerate[0]?.siteId && valuation.valuationRecordsByMaterialIssue[issue.id]?.length > 0
+    )?.id;
     tasks.push({
       id: "degenerate-representative",
       anchor: "representative-selection",
       text:
         totalNegativeCost < 0
-          ? `${cause}ため、未内部化コストが負(${formatCompactYen(
-              totalNegativeCost
-            )})になり、利益への影響がプラス方向に算出されています。代表値の選択が妥当か確認してください。`
-          : `${cause}ため、利益への影響の算出が実態と逆方向になっている可能性があります。代表値の選択が妥当か確認してください。`,
-      href: "/valuation",
+          ? `${affectedSites}:未内部化コストが負(${formatCompactYen(totalNegativeCost)})`
+          : `${affectedSites}:代表値と利益影響を確認`,
+      section: "/valuation",
+      href: degenerateIssueId ? `/valuation/${encodeURIComponent(degenerateIssueId)}` : "/valuation",
       linkLabel: "確認する",
     });
   }
@@ -108,52 +108,58 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
    * 「仮の値を置かず保留にする」現仕様(M6 D-10)は正しいので、**誰に聞けば
    * 保留を解けるのか**まで書く。
    */
-  const pendingSites = decisions
-    .filter((d) => d.decision.decisionRecord.verdict === "pending")
-    .map((d) => d.siteName);
+  const pendingEntries = decisions.filter((d) => d.decision.decisionRecord.verdict === "pending");
+  const pendingSites = pendingEntries.map((d) => d.siteName);
   if (pendingSites.length > 0) {
     const scope = pendingSites.length === 1 ? `${pendingSites[0]}で` : `${pendingSites.length}拠点で`;
     tasks.push({
       id: "approval-threshold",
       anchor: "site-summary",
-      text: `${scope}投資の承認ラインが未入力のため判定が保留中です(財務・経営企画部門への確認が必要)。`,
-      href: "/decision",
+      text: `${scope}承認ラインが未入力(財務・経営企画部門へ確認)`,
+      section: "/decision",
+      href: `/decision/${encodeURIComponent(pendingEntries[0].siteId)}`,
       linkLabel: "承認ラインを入力",
     });
   }
 
   // ⑤ 反映先が「弱」(参考記載)のままの拠点。R-3(単一値方式と同じ運命)への対応。
-  const weakBinding = decisions.filter((d) => d.decision.decisionRecord.bindingMechanism.kind === "weak_reference").length;
+  const weakBindingEntries = decisions.filter((d) => d.decision.decisionRecord.bindingMechanism.kind === "weak_reference");
+  const weakBinding = weakBindingEntries.length;
   if (weakBinding > 0) {
     tasks.push({
       id: "binding-mechanism",
       anchor: "site-summary",
-      text: `${weakBinding}件の判定が「${bindingLabel("weak_reference")}」のままで、社内制度に拘束されていない。`,
-      href: "/decision",
+      text: `反映先が「${bindingLabel("weak_reference")}」:${weakBinding}件`,
+      section: "/decision",
+      href: `/decision/${encodeURIComponent(weakBindingEntries[0].siteId)}`,
       linkLabel: "反映先を決める",
     });
   }
 
   // ⑤ 減損テストの前提を変える拠点があるか(実際の比較先の判定を使う)
-  const impairmentAffected = decisions.filter((d) => d.comparisonTargets.impairmentTestImpact.changesAssumption).length;
+  const impairmentAffectedEntries = decisions.filter((d) => d.comparisonTargets.impairmentTestImpact.changesAssumption);
+  const impairmentAffected = impairmentAffectedEntries.length;
   if (impairmentAffected > 0) {
     tasks.push({
       id: "impairment",
       anchor: "site-summary",
-      text: `${impairmentAffected}拠点で、自然債務が既存の減損テスト前提の閾値を上回っている。`,
-      href: "/decision",
+      text: `自然債務が減損テストの目安額を超過:${impairmentAffected}拠点`,
+      section: "/decision",
+      href: `/decision/${encodeURIComponent(impairmentAffectedEntries[0].siteId)}`,
       linkLabel: "対策を検討",
     });
   }
 
   // ⑥ 開示の根拠が不足している記載
-  const gapsFound = disclosure.gapFindings.filter((f) => f.gapType !== null).length;
+  const openGapFindings = disclosure.gapFindings.filter((f) => f.gapType !== null);
+  const gapsFound = openGapFindings.length;
   if (gapsFound > 0) {
     tasks.push({
       id: "disclosure-gap",
       anchor: "gap-findings",
-      text: `開示文言${gapsFound}件で、記載内容に対する根拠が不足している。`,
-      href: "/disclosure",
+      text: `根拠不足の開示文言:${gapsFound}件`,
+      section: "/disclosure",
+      href: `/disclosure/${encodeURIComponent(openGapFindings[0].id)}`,
       linkLabel: "確認する",
     });
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { removeSiteAction, type AddSiteFormState } from "./actions";
 
 const initialState: AddSiteFormState = {};
@@ -16,29 +16,62 @@ export function RemoveSiteButton({ siteId, siteName }: { siteId: string; siteNam
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(removeSiteAction, initialState);
   const wasPending = useRef(false);
+  const pendingRef = useRef(pending);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const uid = useId();
 
   useEffect(() => {
+    pendingRef.current = pending;
     if (wasPending.current && !pending && !state.error) {
       setOpen(false);
     }
     wasPending.current = pending;
   }, [pending, state]);
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const trigger = triggerRef.current;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.querySelector<HTMLElement>("button")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (pendingRef.current) return;
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      trigger?.focus();
+    };
+  }, [open]);
+
   return (
     <>
-      <button type="button" className="pill-btn pill-btn--sm" onClick={() => setOpen(true)}>
+      <button ref={triggerRef} type="button" className="pill-btn pill-btn--sm" onClick={() => setOpen(true)}>
         削除
       </button>
 
       {open && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
-          <div className="modal-card">
+        <div className="modal-overlay" onClick={(e) => !pending && e.target === e.currentTarget && setOpen(false)}>
+          <div ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby={`${uid}-title`} aria-describedby={`${uid}-description`}>
             <div className="modal-head">
               <div>
-                <h3>拠点を削除しますか</h3>
-                <p>評価の対象から外れます</p>
+                <h3 id={`${uid}-title`}>拠点を削除しますか</h3>
+                <p id={`${uid}-description`}>評価の対象から外れます</p>
               </div>
-              <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setOpen(false)}>
+              <button type="button" className="modal-close" aria-label="閉じる" disabled={pending} onClick={() => setOpen(false)}>
                 ✕
               </button>
             </div>
@@ -55,10 +88,10 @@ export function RemoveSiteButton({ siteId, siteName }: { siteId: string; siteNam
                   <b>過去の計算結果・監査証跡は消えません。</b>
                   いつ誰が何を根拠に判定したかの記録は残り、削除したこと自体も記録に残ります。
                 </p>
-                {state?.error && <p className="form-error">{state.error}</p>}
+                {state?.error && <p className="form-error" role="alert">{state.error}</p>}
               </div>
               <div className="modal-foot">
-                <button type="button" className="pill-btn" onClick={() => setOpen(false)}>
+                <button type="button" className="pill-btn" disabled={pending} onClick={() => setOpen(false)}>
                   キャンセル
                 </button>
                 <button type="submit" className="pill-btn pill-btn--primary" disabled={pending}>

@@ -12,28 +12,28 @@ import { usePathname } from "next/navigation";
  */
 const NAV = [
   {
-    group: "評価する",
+    group: "評価",
     items: [
-      { href: "/sites", label: "拠点データの登録", sub: "CSV一括または1件ずつ" },
-      { href: "/assessment", label: "評価対象の絞り込み", sub: "詳細評価に進む課題を決める" },
-      { href: "/valuation", label: "価値の算定", sub: "複数の方法を比べて代表値を選ぶ" },
+      { href: "/sites", label: "拠点とデータ" },
+      { href: "/assessment", label: "評価対象" },
+      { href: "/valuation", label: "価値算定" },
     ],
   },
   {
-    group: "判断する",
+    group: "判断",
     items: [
-      { href: "/financial-bridge", label: "財務への影響", sub: "利益・リスクへの反映" },
-      { href: "/decision", label: "対策と判定", sub: "投資の結論が変わるかを確認" },
+      { href: "/financial-bridge", label: "財務影響" },
+      { href: "/decision", label: "対策と判定" },
     ],
   },
   {
-    group: "開示する",
-    items: [{ href: "/disclosure", label: "開示への反映", sub: "記載内容と根拠の整合" }],
+    group: "開示",
+    items: [{ href: "/disclosure", label: "開示" }],
   },
 ];
 
 /** 業務フローの外にある参照画面(指示05)。ステップ列と混ぜず、ナビ下部に置く。 */
-const REFERENCE = { href: "/ledger", label: "記録(監査証跡)", sub: "誰がいつ何を選んだか" };
+const REFERENCE = { href: "/ledger", label: "記録" };
 
 interface NavProps {
   /**
@@ -47,47 +47,48 @@ interface NavProps {
 export function Nav({ needsAttentionHrefs }: NavProps) {
   const pathname = usePathname();
   const needsAttention = new Set(needsAttentionHrefs);
+  const isActive = (href: string) =>
+    pathname === href ||
+    (href !== "/" && pathname.startsWith(`${href}/`)) ||
+    (href === "/valuation" && (pathname === "/analysis" || pathname === "/evidence"));
 
-  const item = (entry: { href: string; label: string; sub: string }) => (
+  const item = (entry: { href: string; label: string }) => (
     <Link
       key={entry.href}
       href={entry.href}
-      className={`nav__item${pathname === entry.href ? " active" : ""}`}
+      className={`nav__item${isActive(entry.href) ? " active" : ""}`}
+      aria-current={isActive(entry.href) ? "page" : undefined}
     >
-      <div className="nav__label">
-        {entry.label}
-        <small>{entry.sub}</small>
-      </div>
+      <div className="nav__label">{entry.label}</div>
       {needsAttention.has(entry.href) && (
         <span className="nav__dot" role="img" aria-label="未完了の判断があります" title="未完了の判断があります" />
       )}
+      <span className="nav__chevron" aria-hidden="true">›</span>
     </Link>
   );
 
   return (
-    <div className="nav">
-      {NAV.map((section) => (
-        <div key={section.group}>
-          <div className="nav__section-label">{section.group}</div>
+    <nav className="nav" aria-label="主要ナビゲーション">
+      <div className="nav__primary">
+        {item({ href: "/", label: "ダッシュボード" })}
+      </div>
+
+      {NAV.map((section, index) => (
+        <div className="nav__group" role="group" aria-labelledby={`nav-group-${index}`} key={section.group}>
+          <div className="nav__section-label" id={`nav-group-${index}`}>{section.group}</div>
           {section.items.map(item)}
         </div>
       ))}
 
-      <div className="nav__divider" />
-      {item(REFERENCE)}
-
-      <div className="nav__divider" />
-      {/* IA-04:オリエンテーション層(/guide)への再訪導線。初見者の主導線はホーム冒頭の
-          リンクが担うため、ここは参照層としてホームと並べて置くだけに留める。 */}
-      <div className="nav__foot">
-        <Link href="/">ホーム</Link>
-        <span className="nav__foot-sep" aria-hidden="true">
-          ・
-        </span>
-        <Link href="/guide" className={pathname === "/guide" ? "nav__foot-active" : undefined}>
-          はじめに(使い方)
-        </Link>
+      <div className="nav__group" role="group" aria-labelledby="nav-group-management">
+        <div className="nav__section-label" id="nav-group-management">管理</div>
+        {item(REFERENCE)}
       </div>
-    </div>
+
+      <div className="nav__group nav__group--support" role="group" aria-labelledby="nav-group-support">
+        <div className="nav__section-label" id="nav-group-support">サポート</div>
+        {item({ href: "/guide", label: "PRISMとは・使い方" })}
+      </div>
+    </nav>
   );
 }

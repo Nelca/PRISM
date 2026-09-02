@@ -8,8 +8,6 @@ import { hasValuationSelection } from "@/lib/pipeline/action-targets";
 
 const ACTOR = "宮里";
 
-const REVALIDATE_PATHS = ["/", "/valuation", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
-
 export interface ChangeRepresentativeFormState {
   error?: string;
 }
@@ -67,6 +65,6 @@ export async function changeRepresentativeRecordAction(
     return { error: outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {};
 }

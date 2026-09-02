@@ -42,15 +42,19 @@ function formatExactYen(value: number): string {
 
 /** 分解の対象(拠点 × カテゴリ)の表示名を引く。IDは画面に出さない(指示06)。 */
 function issueLabelForDecomposition(result: DemoPipelineResult, decomposition: DivergenceDecomposition): string {
-  const materialIssueId = Object.keys(result.valuation.valuationRecordsByMaterialIssue).find((id) =>
-    result.valuation.valuationRecordsByMaterialIssue[id].some(
-      (record) => record.physicalQuantityId === decomposition.targetPhysicalQuantityId
-    )
-  );
+  const materialIssueId = materialIssueIdForDecomposition(result, decomposition);
   const issue = result.assessment.materialIssues.find((i) => i.id === materialIssueId);
   const siteName = result.assessment.sites.find((s) => s.id === decomposition.siteId)?.name;
   if (!issue) return siteName ?? decomposition.siteId;
   return materialIssueLabel(siteName, issue.impactCategory, decomposition.siteId);
+}
+
+function materialIssueIdForDecomposition(result: DemoPipelineResult, decomposition: DivergenceDecomposition): string | undefined {
+  return Object.keys(result.valuation.valuationRecordsByMaterialIssue).find((id) =>
+    result.valuation.valuationRecordsByMaterialIssue[id].some(
+      (record) => record.physicalQuantityId === decomposition.targetPhysicalQuantityId
+    )
+  );
 }
 
 /** 差の主因。寄与が分解できていない(残差が支配的な)場合はそれを正直に書く。 */
@@ -110,31 +114,35 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
       )}(最大${widest.ratio.toFixed(1)}倍)の幅がある`,
       detail: `差の主因は${dominantFactorLabel(widest.pair)}で、精度の問題ではありません。${conceptNote}`,
       exact: `${formatExactYen(low)} 〜 ${formatExactYen(high)}`,
-      href: "/valuation",
-      linkLabel: "価値の算定で詳細",
+      href: materialIssueIdForDecomposition(result, widest.decomposition)
+        ? `/analysis?issue=${encodeURIComponent(materialIssueIdForDecomposition(result, widest.decomposition)!)}`
+        : "/analysis",
+      linkLabel: "手法差を分析",
     });
   }
 
   // 2. ★判定。「またぐ」「またがない」はどちらも確定した結論として出す。
-  const crossing = decisions.filter((d) => d.decision.decisionRecord.verdict === "crosses").map((d) => d.siteName);
-  const notCrossing = decisions.filter((d) => d.decision.decisionRecord.verdict === "does_not_cross").map((d) => d.siteName);
-  if (crossing.length > 0) {
+  const crossingEntries = decisions.filter((d) => d.decision.decisionRecord.verdict === "crosses");
+  const notCrossingEntries = decisions.filter((d) => d.decision.decisionRecord.verdict === "does_not_cross");
+  const crossing = crossingEntries.map((d) => d.siteName);
+  const notCrossing = notCrossingEntries.map((d) => d.siteName);
+  if (crossingEntries.length > 0) {
     findings.push({
       id: "finding-verdict-crosses",
       headline: `${joinSiteNames(crossing)}では、自然コストを織り込むと投資判断の結論が変わる可能性がある`,
       detail:
         "試算の幅が投資の承認ラインと交差しています。対策案と反映先の見直しが必要かどうかを確認してください。",
-      href: "/decision",
+      href: `/decision/${encodeURIComponent(crossingEntries[0].siteId)}`,
       linkLabel: "対策と判定で詳細",
     });
   }
-  if (notCrossing.length > 0) {
+  if (notCrossingEntries.length > 0) {
     findings.push({
       id: "finding-verdict-does-not-cross",
       headline: `${joinSiteNames(notCrossing)}では、自然コストを織り込んでも投資判断の結論は変わらない`,
       detail:
         "この論点は今回の投資判断を変えない、と根拠をもって確定できました。追加の調査は不要です。",
-      href: "/decision",
+      href: `/decision/${encodeURIComponent(notCrossingEntries[0].siteId)}`,
       linkLabel: "対策と判定で詳細",
     });
   }
@@ -153,7 +161,7 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
           ? impairment[0].comparisonTargets.impairmentTestImpact.details
           : `${impairment.length}拠点で、自然債務が既存の減損テスト前提の閾値を上回っています。`,
       exact: formatExactYen(totalDebt),
-      href: "/financial-bridge",
+      href: `/financial-bridge/${encodeURIComponent(impairment[0].siteId)}`,
       linkLabel: "財務への影響で詳細",
     });
   }
@@ -164,15 +172,15 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
     .filter((gapType): gapType is GapType => gapType !== null);
   if (gapTypes.length > 0) {
     const severest = GAP_TYPE_SEVERITY.find((type) => gapTypes.includes(type)) ?? gapTypes[0];
+    const targetFinding = disclosure.gapFindings.find((finding) => finding.gapType === severest);
     findings.push({
       id: "finding-disclosure-gap",
       headline: `開示文言${gapTypes.length}件で、記載内容に対する根拠が不足している`,
       detail: `最も重い指摘は「${gapTypeLabel(severest)}」です。記載を弱める・根拠を追加取得する・判断の理由を記録する、のいずれかで対応します。`,
-      href: "/disclosure",
+      href: targetFinding ? `/disclosure/${encodeURIComponent(targetFinding.id)}` : "/disclosure",
       linkLabel: "開示への反映で詳細",
     });
   }
 
   return findings;
 }
-

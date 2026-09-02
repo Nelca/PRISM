@@ -9,7 +9,7 @@ import {
 
 const INITIAL_STATE: CategoryInputImportState = {};
 
-function CategoryCsvForm({ category }: { category: "waste" | "land-use" }) {
+export function CategoryCsvForm({ category }: { category: "waste" | "land-use" }) {
   const action = category === "waste" ? importWasteCsvAction : importLandUseCsvAction;
   const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -38,11 +38,11 @@ function CategoryCsvForm({ category }: { category: "waste" | "land-use" }) {
         <label htmlFor={inputId} className="pill-btn pill-btn--sm file-input__label">ファイルを選ぶ</label>
         <span className={`file-input__name${fileName ? " file-input__name--set" : ""}`}>{fileName ?? "未選択"}</span>
       </div>
-      <button type="submit" className="pill-btn pill-btn--primary" disabled={pending}>
+      <button type="submit" className="pill-btn pill-btn--primary" disabled={pending || !fileName}>
         {pending ? "検証・算定しています…" : `${title}CSVを取り込む`}
       </button>
       {state.errors && (
-        <div aria-live="polite" style={{ marginTop: 12 }}>
+        <div role="alert" style={{ marginTop: 12 }}>
           <div className="section-label" style={{ color: "var(--brick)" }}>取り込めませんでした（{state.errors.length}件）</div>
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
             {state.errors.map((error, index) => <li key={`${index}-${error}`} style={{ fontSize: 12.5, color: "var(--brick)" }}>{error}</li>)}
@@ -50,7 +50,7 @@ function CategoryCsvForm({ category }: { category: "waste" | "land-use" }) {
         </div>
       )}
       {state.importedRecordCount !== undefined && (
-        <p aria-live="polite" className="tooltip-note" style={{ color: "var(--accent-ink)" }}>
+        <p role="status" className="tooltip-note" style={{ color: "var(--accent-ink)" }}>
           {state.importedRecordCount}行を取り込み、LIME3単独パイロットを再計算しました。
         </p>
       )}

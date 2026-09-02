@@ -18,8 +18,6 @@ import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
 
 const ACTOR = "宮里";
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
-const REVALIDATE_PATHS = ["/sites", "/assessment", "/valuation", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
-
 export interface CategoryInputImportState {
   errors?: string[];
   batchId?: string;
@@ -138,7 +136,7 @@ async function importCategoryCsv(
     return { errors: ["CSVを保存・算定できませんでした。データは一件も保存していません。時間を置いて再度お試しください。"] };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return { batchId, importedRecordCount: inputs.length };
 }
 

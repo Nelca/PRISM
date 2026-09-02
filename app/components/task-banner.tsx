@@ -13,15 +13,15 @@ import type { DemoPipelineResult } from "@/lib/demo/run-demo-pipeline";
 import { deriveOpenTasks } from "@/lib/pipeline/open-tasks";
 
 export function TaskBanner({ current, result }: { current: string; result: DemoPipelineResult }) {
-  const tasks = deriveOpenTasks(result).filter((task) => task.href === current);
+  const tasks = deriveOpenTasks(result).filter((task) => task.section === current);
   if (tasks.length === 0) return null;
 
   return (
     <div className="task-banner" role="status">
-      <span className="task-banner__title">この画面でやること({tasks.length}件)</span>
+      <span className="task-banner__title">要対応 {tasks.length}件</span>
       <ul className="task-banner__list">
         {tasks.map((task) => (
-          <li key={task.id}>{task.anchor ? <a href={`#${task.anchor}`}>{task.text} ↓</a> : task.text}</li>
+          <li key={task.id}><a href={task.href}>{task.text}</a></li>
         ))}
       </ul>
     </div>

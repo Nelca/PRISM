@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Card, ScreenLead, Tag } from "../components/ui";
 
 /**
@@ -12,6 +13,10 @@ import { Card, ScreenLead, Tag } from "../components/ui";
  * 文言の規律は業務画面と同じ:投資可否・記載の真偽を断定しない、推奨値を
  * 出さないことを明示する、「結論が変わるか」の言い回しに徹する。
  */
+
+export const metadata: Metadata = {
+  title: "PRISMとは・使い方 | PRISM",
+};
 
 /** 6ステップの入出力対応(IA §3.4)。ナビ(nav.tsx)・StepNavと同じ順序を保つこと。 */
 const FLOW_IO = [
@@ -93,24 +98,15 @@ export default function GuidePage() {
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">はじめに</h1>
+          <h1 className="screen__title">PRISMとは・使い方</h1>
         </div>
-        <ScreenLead>PRISMが何をするプロダクトで、使うと何が得られるかを説明します</ScreenLead>
+        <ScreenLead>何を入れると、どの業務で使える情報になるかを2分で確認できます</ScreenLead>
       </div>
 
       {/* 1. 何をするプロダクトか(IAの1文+差別化) */}
       <Card title="何をするプロダクトか">
         <p style={{ margin: 0 }}>
-          企業が既に持っている環境データ(取水量・GHG排出量など)は、そのままでは「金額にするといくらか」
-          「この投資判断はこのままでよいか」「開示に何と書けるか」に答えられません。PRISMは、その環境データを
-          金額の幅に換算し、さらに<b>「この数字は、この決定の結論を変えるか」という判定</b>と
-          <b>「開示の記載とその根拠」</b>にまで変換します。計測は行わないため、手元にあるデータから始められます。
-        </p>
-        <p style={{ margin: "10px 0 0" }}>
-          自然の価値を金額にする方法は世の中に複数あり、方法によって結果が何倍も違うことがあります。
-          PRISMは1つの方法を正解として推すのではなく、<b>複数の方法を並べて適用し、差がどこから来ているのか
-          (問いの違いか、精度の差か)を分解して示します。</b>どの方法の値を使うかは利用者が理由とともに選び、
-          その選択は監査証跡として残ります。
+          PRISMは、取水量・GHG排出量などの環境データを金額の幅に換算し、投資判断の結論への影響、開示文の下書き、選択理由の記録につなげるプロダクトです。手元のデータから始められます。複数の算定方法を並べ、結果の差と理由を確認したうえで、使う値を理由とともに選べます。
         </p>
       </Card>
 

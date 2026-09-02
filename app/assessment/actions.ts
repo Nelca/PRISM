@@ -8,8 +8,6 @@ import { hasMaterialIssue } from "@/lib/pipeline/action-targets";
 
 const ACTOR = "宮里";
 
-const REVALIDATE_PATHS = ["/", "/sites", "/assessment", "/valuation", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
-
 export interface DepthOverrideFormState {
   error?: string;
   /**
@@ -66,6 +64,6 @@ export async function setDepthOverrideAction(
    * 参照: node_modules/next/dist/docs/01-app/02-guides/server-actions.md
    *      「A single response carries data and UI」
    */
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return { applied: { mode, materialIssueId } };
 }

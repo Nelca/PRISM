@@ -43,11 +43,13 @@ export function Waterfall({ steps }: { steps: WaterfallStepInput[] }) {
   const y = (v: number) => top + (1 - v / max) * (H - top - bottom);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img">
+      <title>手法間の差の要因分解</title>
+      <desc>{steps.map((step) => `${step.label}: ${fmt(step.value)}円${step.isTotal ? "" : "の変化"}`).join("。")}</desc>
       <line x1={30} x2={W - 10} y1={y(0)} y2={y(0)} stroke="#D9DCD2" strokeWidth={1} />
       {vals.map((v, i) => {
         const bx = 40 + i * (barW + gap);
-        const color = v.total ? "#16233A" : (v.delta ?? 0) < 0 ? "#953F35" : "#33564A";
+        const color = v.total ? "#2458C7" : (v.delta ?? 0) < 0 ? "#953F35" : "#2F68F6";
         const y1 = y(v.start);
         const y2 = y(v.end);
         const yTop = Math.min(y1, y2);

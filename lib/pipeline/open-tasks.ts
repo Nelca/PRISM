@@ -8,11 +8,13 @@ export {
   decompositionForMaterialIssue,
   hasDegenerateRepresentative,
   hasRepresentativeSelection,
+  materialIssueIdsRequiringRepresentativeSelection,
+  materialIssueIdsWithWelfareOnlyValuation,
   materialIssueIdsWithoutRepresentativeSelection,
   maxDivergenceRatio,
   pairDivergenceRatio,
   representativeCentralValueForMaterialIssue,
   sitesWithDegenerateRepresentative,
 } from "./valuation-insights";
-export { deriveOutcomeSummary, deriveStepContext, deriveStepProgress } from "./pipeline-progress";
-export type { OutcomeSummary, StepProgress } from "./pipeline-progress";
+export { countProgress, deriveOutcomeSummary, deriveStepContext, deriveStepProgress } from "./pipeline-progress";
+export type { OutcomeSummary, ProgressCounts, StepProgress } from "./pipeline-progress";

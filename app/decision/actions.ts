@@ -10,8 +10,6 @@ import { parseOptionalNumber, parseRequiredNumber } from "@/lib/forms/number";
 import { getOrCreateLatestResult } from "@/lib/pipeline/execute-run";
 import { hasDecisionSite } from "@/lib/pipeline/action-targets";
 
-const REVALIDATE_PATHS = ["/", "/financial-bridge", "/decision", "/disclosure", "/ledger"];
-
 const ACTOR = "宮里";
 
 const BINDING_LABELS: Record<BindingMechanism["kind"], string> = {
@@ -96,7 +94,7 @@ export async function saveDecisionParametersAction(
     return { error: outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return { saved: true };
 }
 
@@ -123,7 +121,7 @@ export async function selectCountermeasureAction(
     return { error: outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {};
 }
 
@@ -191,6 +189,6 @@ export async function recordDecisionAction(
     }
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {};
 }

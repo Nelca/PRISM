@@ -1,35 +1,36 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { extractDisclosurePdfAction, type PdfIntakeFormState } from "./actions";
 
 const initialState: PdfIntakeFormState = {};
 
 export function PdfIntakeForm() {
   const [state, formAction, pending] = useActionState(extractDisclosurePdfAction, initialState);
+  const [hasFile, setHasFile] = useState(false);
 
   return (
     <form action={formAction}>
       <div className="field">
         <label htmlFor="disclosurePdf">過去の統合報告書・開示PDF</label>
-        <input id="disclosurePdf" name="disclosurePdf" type="file" accept=".pdf,application/pdf" />
+        <input id="disclosurePdf" name="disclosurePdf" type="file" accept=".pdf,application/pdf" required aria-invalid={state.error ? "true" : undefined} onChange={(event) => setHasFile(Boolean(event.target.files?.[0]))} />
         <div className="field-hint">
           AIはPDFから主張(claim)を抽出するだけで、根拠の十分性は判定しません。判定は既存のルールベース処理が行います。
         </div>
       </div>
 
-      <button type="submit" className="pill-btn pill-btn--primary" disabled={pending}>
+      <button type="submit" className="pill-btn pill-btn--primary" disabled={pending || !hasFile}>
         {pending ? "抽出しています…" : "PDFから抽出する"}
       </button>
 
       {state.error && (
-        <p className="tooltip-note" style={{ color: "var(--brick)", marginTop: 10 }}>
+        <p className="tooltip-note" style={{ color: "var(--brick)", marginTop: 10 }} role="alert">
           {state.error}
         </p>
       )}
 
       {state.extractedCount !== undefined && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16 }} role="status">
           <div className="section-label" style={{ color: "var(--accent-ink)" }}>
             {state.extractedCount}件の主張を抽出しました
           </div>

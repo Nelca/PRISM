@@ -50,7 +50,9 @@ export function Scatter({ points, xLabel, yLabel }: { points: ScatterPointInput[
   };
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img">
+      <title>{xLabel}と{yLabel}の比較</title>
+      <desc>{points.map((point) => `${point.label}: ${xLabel}${point.x}、${yLabel}${point.y}`).join("。")}</desc>
       {/* 0の基準線(レンジ内にある場合のみ)。プロット領域の枠は薄く別に描く。 */}
       <rect
         x={sx(xMin)}
@@ -79,8 +81,8 @@ export function Scatter({ points, xLabel, yLabel }: { points: ScatterPointInput[
         const { lx, ly, anchor } = labelPlacement(cx, cy);
         return (
           <g key={i}>
-            <circle cx={cx} cy={cy} r={9} fill={p.color || "#33564A"} opacity={0.16} />
-            <circle cx={cx} cy={cy} r={5} fill={p.color || "#33564A"} />
+            <circle cx={cx} cy={cy} r={9} fill={p.color || "#2F68F6"} opacity={0.16} />
+            <circle cx={cx} cy={cy} r={5} fill={p.color || "#2F68F6"} />
             <text x={lx} y={ly} fontSize={11.5} fontFamily="var(--font-body)" textAnchor={anchor} fill="#16233A" fontWeight={600}>
               {p.label}
             </text>

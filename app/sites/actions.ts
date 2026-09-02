@@ -15,18 +15,6 @@ import { toSiteEntries } from "@/lib/intake/to-site-entries";
 import { DEFAULT_DEEP_DIVE_PARAMS } from "@/lib/demo/user-site-defaults";
 import { describeSiteChanges, parseSiteForm } from "./site-form";
 
-/** 拠点の登録は全画面の入力なので、取込・手入力のどちらでも同じ範囲を無効化する。 */
-const REVALIDATE_PATHS = [
-  "/",
-  "/sites",
-  "/assessment",
-  "/valuation",
-  "/financial-bridge",
-  "/decision",
-  "/disclosure",
-  "/ledger",
-];
-
 const ACTOR = "宮里";
 
 export interface AddSiteFormState {
@@ -62,7 +50,7 @@ export async function addSiteAction(_prevState: AddSiteFormState, formData: Form
     return { error: outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {};
 }
 
@@ -126,7 +114,7 @@ export async function updateSiteAction(_prevState: AddSiteFormState, formData: F
     return { error: updateError ?? outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {};
 }
 
@@ -181,7 +169,7 @@ export async function removeSiteAction(_prevState: AddSiteFormState, formData: F
     return { error: removeError ?? outcome.message };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return {};
 }
 
@@ -257,6 +245,6 @@ export async function importCompanyDatasetAction(
     return { errors: [outcome.message] };
   }
 
-  for (const path of REVALIDATE_PATHS) revalidatePath(path);
+  revalidatePath("/", "layout");
   return { importedSiteCount: entries.length, unmapped: unmappedFields };
 }

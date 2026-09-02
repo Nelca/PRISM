@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { computePercentileRanks } from "@core/assessment/percentile-rank";
 import type { DepthDecision } from "@core/types/assessment";
@@ -15,6 +17,10 @@ import { TaskBanner } from "../components/task-banner";
  * 読み取る。固定値をUIに書き込まない(捏造しない)ための工夫。
  */
 const PROMOTION_PERCENT_PATTERN = /上位(\d+)%/;
+
+export const metadata: Metadata = {
+  title: "評価対象 | PRISM",
+};
 function findPromotionPercent(decisions: DepthDecision[]): number | null {
   for (const decision of decisions) {
     const match = decision.exclusionReason?.match(PROMOTION_PERCENT_PATTERN);
@@ -104,13 +110,7 @@ export default async function AssessmentPage() {
         <ScreenLead>詳細評価する課題を絞り込みます</ScreenLead>
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         <GuideBox>
-          この画面では、詳細評価に進める課題を決めます。<b>1.</b> 優先度(自然との関わり・影響しうる財務規模・不確実性・
-          開示必須性の4項目を合成した順位)を確認します → <b>2.</b> 表の「評価の深さ」で、詳細評価する課題を切り替えで
-          指定します → <b>3.</b> 指定できたら「価値の算定」へ進みます。
-          <b>概算評価</b>は、全課題に自動で行う簡易な優先度づけまでで止まります。<b>詳細評価</b>にすると、
-          次の「価値の算定」で貨幣価値の算定から投資判断への反映までを行う対象になります。
-          優先度が上位の課題は自動で詳細評価になっていますが、手動で変更できます(変更は理由とともに記録に残ります)。
-          対象外とした課題も表の末尾に理由付きで残ります。
+          優先度を確認し、価値算定へ進める課題を「詳細評価」にします。変更理由は記録されます。
         </GuideBox>
       </div>
 
@@ -158,9 +158,13 @@ export default async function AssessmentPage() {
                   <td>
                     {/* 課題IDそのものではなく「拠点名 × カテゴリ名」で示す(指示06)。IDは小書きに退避。 */}
                     <b>
-                      {issue
-                        ? materialIssueLabel(siteNameById.get(issue.siteId), issue.impactCategory, issue.siteId)
-                        : score.materialIssueId}
+                      {issue ? (
+                        <Link href={`/assessment/${encodeURIComponent(issue.id)}`}>
+                          {materialIssueLabel(siteNameById.get(issue.siteId), issue.impactCategory, issue.siteId)}
+                        </Link>
+                      ) : (
+                        score.materialIssueId
+                      )}
                     </b>
                     <span className="id-note">{score.materialIssueId}</span>
                   </td>
@@ -224,7 +228,11 @@ export default async function AssessmentPage() {
               <tr key={issue.id} style={{ color: "var(--ink-soft)" }}>
                 <td>
                   {/* 座標が解決できていないため、カテゴリまでは確定していない。拠点名だけを出す。 */}
-                  <b>{siteNameById.get(issue.siteId) ?? issue.siteId}</b>
+                  <b>
+                    <Link href={`/assessment/${encodeURIComponent(issue.id)}`}>
+                      {siteNameById.get(issue.siteId) ?? issue.siteId}
+                    </Link>
+                  </b>
                   <span className="id-note">{issue.id}</span>
                 </td>
                 <td className="num">—</td>

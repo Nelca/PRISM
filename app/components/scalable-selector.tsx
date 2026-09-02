@@ -77,7 +77,6 @@ export function ScalableSelector({
         type="button"
         className="combo__trigger"
         onClick={() => setOpen(!open)}
-        aria-haspopup="listbox"
         aria-expanded={open}
       >
         <span className="combo__value">
@@ -111,13 +110,13 @@ export function ScalableSelector({
           <div className="combo__count">
             {filtered.length}/{items.length}件
           </div>
-          <ul className="combo__list" role="listbox">
+          <ul className="combo__list">
             {filtered.map((item) => (
-              <li key={item.id} role="option" aria-selected={item.active}>
+              <li key={item.id}>
                 <Link
                   href={item.href}
                   className={`combo__item${item.active ? " combo__item--active" : ""}`}
-                  aria-current={item.active ? "true" : undefined}
+                  aria-current={item.active ? "page" : undefined}
                   title={item.id}
                   onClick={() => setOpen(false)}
                 >

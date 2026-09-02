@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { computeTornadoChart } from "@core/monetization/tornado";
 import type { PairwiseDecomposition } from "@core/types/divergence";
 import { decomposeQuantileRange } from "@core/divergence/quantile-decomposition";
@@ -24,7 +25,7 @@ import { DataSourceAttribution } from "../components/attribution";
 import { PipelineWarnings } from "../components/pipeline-warnings";
 import { ScalableSelector } from "../components/scalable-selector";
 import { TaskBanner } from "../components/task-banner";
-import { additivePairSteps, pairwiseToWaterfallSteps, UNCERTAINTY_FACTOR_LABEL, zeroValueNote } from "./view-model";
+import { additivePairSteps, pairwiseToWaterfallSteps, readablePairNarrative, UNCERTAINTY_FACTOR_LABEL, zeroValueNote } from "./view-model";
 import {
   availabilityLabel,
   coverageRows,
@@ -34,6 +35,10 @@ import {
   isLime3SingleMethodPilot,
   physicalQuantityLabel,
 } from "./category-expansion";
+
+export const metadata: Metadata = {
+  title: "価値の算定 | PRISM",
+};
 
 /**
  * 価値の算定と代表値の選択(指示03。旧 /valuation + /decomposition)。
@@ -216,6 +221,104 @@ export default async function ValuationPage({
     dominant: i === 0,
   }));
 
+  const representativeActionCard = usesCorporateContributionModel ? (
+    <Card
+      id="representative-selection"
+      title="財務ブリッジへ渡す企業交換価値"
+      subtitle="同じカテゴリ内の費用項目は代替案ではないため、すべて拠点別内訳へ合算します"
+      padBody={false}
+      headExtra={<Tag variant="exchange">財務反映済み</Tag>}
+    >
+      <table className="data-table">
+        <thead><tr><th>入力</th><th>企業負担総額</th><th>既に利益へ反映済み</th><th>確認済み増分便益</th><th>金額の基準</th></tr></thead>
+        <tbody>
+          {corporateExchangeRecords.map((record) => {
+            const effect = record.financialEffectSnapshot!;
+            return (
+              <tr key={record.id}>
+                <td><b>{inputDetail(record.inputSnapshot) ?? methodLabel(record.methodId)}</b></td>
+                <td className="num"><Num value={effect.grossCost} unit="円" scale={recordScale} /></td>
+                <td className="num"><Num value={effect.alreadyInternalizedCost} unit="円" scale={recordScale} /></td>
+                <td className="num"><Num value={effect.verifiedIncrementalBenefit} unit="円" scale={recordScale} /></td>
+                <td>{effect.amountBasis === "annual" ? "年額" : "一時費用"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p style={{ padding: "12px 18px", margin: 0, color: "var(--ink-soft)" }}>
+        LIME3の厚生価値はこの合計へ含めません。既に利益へ反映済みの額は再控除せず、増分便益は自然債務・減損リスクと相殺しません。
+      </p>
+    </Card>
+  ) : exchangeRecords.length > 0 ? (
+    <Card
+      id="representative-selection"
+      title="投資判断に使う代表値の選択"
+      subtitle="最初に完了する判断です。推奨値は表示しません"
+      padBody={false}
+    >
+      <table className="data-table">
+        <thead><tr><th>状態・操作</th><th>方法</th><th>確からしさ</th><th>中心値</th></tr></thead>
+        <tbody>
+          {exchangeRecords.map((record) => {
+            const selected = record.id === currentRepresentativeId;
+            return (
+              <tr key={record.id} style={selected ? { background: "var(--accent-soft)" } : undefined}>
+                <td>
+                  {selected ? (
+                    <>
+                      <Tag variant="ok">選択中</Tag>
+                      {Number(record.centralValue) === 0 && (
+                        <p className="tooltip-note" style={{ marginTop: 4 }}>
+                          中心値は0円です。投資判断の代表値として妥当か確認してください。
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <RepresentativeSelector
+                      materialIssueId={selectedIssueId}
+                      recordId={record.id}
+                      methodId={record.methodId}
+                      valueConcept={record.valueConcept}
+                      fromLabel={methodLabel(records.find((candidate) => candidate.id === currentRepresentativeId)?.methodId)}
+                      toLabel={methodLabel(record.methodId)}
+                    />
+                  )}
+                </td>
+                <td><b>{methodLabel(record.methodId)}</b></td>
+                <td>{tierLabel(record.transferFitness.tier)}</td>
+                <td className="num"><Num value={record.centralValue} unit="円" scale={recordScale} /></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div style={{ padding: "12px 18px" }}>
+        {changeLog ? (
+          <>
+            <div className="section-label">変更履歴</div>
+            <KV k="変更前" v={withMethodLabelsInText(changeLog.from)} />
+            <KV k="変更後" v={withMethodLabelsInText(changeLog.to)} />
+            <KV k="変更理由" v={changeLog.reason} />
+          </>
+        ) : (
+          <p style={{ color: "var(--ink-faint)", fontSize: 12 }}>代表値の変更履歴はまだありません。</p>
+        )}
+      </div>
+    </Card>
+  ) : (
+    <Card
+      id="representative-selection"
+      title="企業財務への接続"
+      subtitle="このカテゴリは厚生価値の参照値です"
+      headExtra={<Tag variant="welfare">NPV・ROIには算入しません</Tag>}
+    >
+      <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+        現在の{categoryLabel(issue?.impactCategory ?? physicalQuantity?.category ?? "pollution")}の結果は社会的な厚生価値です。企業が保有する回避費用などの交換価値入力が登録されるまで、財務への影響・対策ROI・投資判定には加算しません。
+      </p>
+    </Card>
+  );
+
   return (
     <div className="screen">
       <div className="screen__head">
@@ -223,15 +326,10 @@ export default async function ValuationPage({
           <h1 className="screen__title">価値の算定</h1>
           <GuideButton />
         </div>
-        <ScreenLead>差の理由を確認し、投資判断に使う代表値を1つ選びます</ScreenLead>
+        <ScreenLead>投資判断に使う代表値を選び、必要なときだけ手法差を詳しく確認します</ScreenLead>
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         <GuideBox>
-          この画面では、投資判断に使う代表値を決めます。<b>1.</b> 「試算の幅(手法別)」で方法ごとの結果を見ます →{" "}
-          <b>2.</b> 「差が生じる理由」「幅が違う理由」で、その差が何から来ているのかを確認します → <b>3.</b>{" "}
-          「投資判断に使う代表値の選択」で1つ選び、変更する場合は理由を入力します → <b>4.</b>{" "}
-          課題が複数ある場合は上の切替で他の課題も同じ手順で選びます → <b>5.</b> 選び終えたら「財務への影響」へ進みます。
-          方法によって結果に大きな差が出ることがありますが、これは誤差ではなく、各方法が異なる問いに答えているためです。
-          推奨値は表示されません。方法を変更する場合は理由の入力が必須です。
+          投資判断に使う代表値を1つ選びます。迷う場合は「手法差を分析」で算定方法を比較します。
         </GuideBox>
       </div>
 
@@ -249,7 +347,7 @@ export default async function ValuationPage({
         items={materialIssueIds.map((id) => ({
           id,
           label: labelForIssueId(id),
-          href: `/valuation?issue=${encodeURIComponent(id)}`,
+          href: `/valuation/${encodeURIComponent(id)}`,
           active: id === selectedIssueId,
           attention: unselectedIssueIds.includes(id),
           attentionLabel: "代表値が未選択です",
@@ -282,6 +380,37 @@ export default async function ValuationPage({
         {/* 物理量入力IDは照合用の内部ID。本文からは外し、小書きに退避する(指示06)。 */}
         {physicalQuantityId && <span className="id-note">算定に使った物理量:{physicalQuantityId}</span>}
       </Card>
+
+      <section className="primary-action" aria-labelledby="valuation-primary-action">
+        <div>
+          <p className="primary-action__eyebrow">次の判断</p>
+          <h2 id="valuation-primary-action">
+            {usesCorporateContributionModel
+              ? "企業交換価値の財務反映を確認する"
+              : exchangeRecords.length > 0
+                ? unselectedIssueIds.includes(selectedIssueId)
+                  ? "投資判断に使う代表値を選ぶ"
+                  : "選択した代表値を確認する"
+                : "厚生価値の入力根拠を確認する"}
+          </h2>
+          <p>
+            {exchangeRecords.length > 0
+              ? "詳細分析は必要なときだけ開き、まずこの評価対象で必要な判断を完了します。"
+              : "この結果は企業NPV・ROIへ加算せず、開示の参考値として扱います。"}
+          </p>
+        </div>
+        <div className="primary-action__links">
+          {exchangeRecords.length > 0 ? (
+            <a href="#representative-selection" className="pill-btn pill-btn--primary">代表値の欄へ</a>
+          ) : (
+            <Link href={`/evidence?issue=${encodeURIComponent(selectedIssueId)}`} className="pill-btn pill-btn--primary">入力根拠を見る</Link>
+          )}
+          {decomposition && <Link href={`/analysis?issue=${encodeURIComponent(selectedIssueId)}`}>手法差を分析</Link>}
+          <Link href={`/evidence?issue=${encodeURIComponent(selectedIssueId)}`}>証拠・入力根拠</Link>
+        </div>
+      </section>
+
+      {representativeActionCard}
 
       {isLime3Pilot && (
         <div className="pipeline-warning" role="status">
@@ -383,7 +512,7 @@ export default async function ValuationPage({
                 <td>
                   <Tag variant={tierTagVariant(r.transferFitness.tier)}>{tierLabel(r.transferFitness.tier)}</Tag>
                 </td>
-                <td className="num" style={{ fontWeight: 700 }}>
+                <td className="num" style={{ fontWeight: 600 }}>
                   <Num value={r.centralValue} unit="円" scale={recordScale} />
                   {/* D-08:0円の行は非表示にせず、なぜ0かの短い注記を値の隣に付ける。 */}
                   {zeroValueNote(r) && (
@@ -448,6 +577,12 @@ export default async function ValuationPage({
         </Card>
       )}
 
+      <details className="foldout">
+        <summary>
+          この画面内で詳細分析を確認する
+          <small>通常は「手法差を分析」から専用画面を使います</small>
+        </summary>
+        <div className="foldout__body">
       {/* (2) 試算の幅(フットボールチャートは画面に1回だけ) */}
       <Card
         title="試算の幅(手法別)"
@@ -492,7 +627,7 @@ export default async function ValuationPage({
                         return (
                           <Link
                             key={key}
-                            href={`/valuation?issue=${encodeURIComponent(selectedIssueId)}&pair=${encodeURIComponent(key)}#pair-comparison`}
+                            href={`/analysis?issue=${encodeURIComponent(selectedIssueId)}&pair=${encodeURIComponent(key)}#pair-comparison`}
                             className={`pill-btn pill-btn--sm${active ? " pill-btn--accent" : ""}`}
                             title={`${methodLabel(pair.methodIdA)} と ${methodLabel(pair.methodIdB)} の比較`}
                           >
@@ -517,7 +652,7 @@ export default async function ValuationPage({
                 )}
               />
               {/* 読み下し文は図の直下に常設する(以前はtooltip-note扱いで読み飛ばされた)。 */}
-              <p className="chart-narrative">{withMethodLabelsInText(selectedPair.narrative)}</p>
+              <p className="chart-narrative">{withMethodLabelsInText(readablePairNarrative(selectedPair))}</p>
             </>
           ) : selectedPair.mode === "additive" ? (
             <>
@@ -532,11 +667,11 @@ export default async function ValuationPage({
               <p className="chart-narrative">
                 {zeroSideRecord
                   ? `${methodLabel(zeroSideRecord.methodId)}の中心値が0円のため、倍率での分解ができず金額差での表示になっています。0円になるのは、${zeroValueNote(zeroSideRecord)!.detail}`
-                  : withMethodLabelsInText(selectedPair.narrative)}
+                  : withMethodLabelsInText(readablePairNarrative(selectedPair))}
               </p>
             </>
           ) : (
-            <p className="chart-narrative">{withMethodLabelsInText(selectedPair.narrative)}</p>
+            <p className="chart-narrative">{withMethodLabelsInText(readablePairNarrative(selectedPair))}</p>
           )}
         </Card>
       )}
@@ -593,6 +728,8 @@ export default async function ValuationPage({
           )}
         </Card>
       )}
+        </div>
+      </details>
 
       {/*
         価値概念の分離(concept-v2 §8.2の合算禁止・X7ガードのUI表現)。
@@ -633,131 +770,6 @@ export default async function ValuationPage({
         )}
       </div>
 
-      {/* (5) 代表値の選択 = この画面の出口(必須アクション) */}
-      {usesCorporateContributionModel ? (
-        <Card
-          id="representative-selection"
-          title="財務ブリッジへ渡す企業交換価値"
-          subtitle="同じカテゴリ内の費用項目は代替案ではないため、すべて拠点別内訳へ合算します"
-          padBody={false}
-          headExtra={<Tag variant="exchange">財務反映済み</Tag>}
-        >
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>入力</th>
-                <th>企業負担総額</th>
-                <th>既に利益へ反映済み</th>
-                <th>確認済み増分便益</th>
-                <th>金額の基準</th>
-              </tr>
-            </thead>
-            <tbody>
-              {corporateExchangeRecords.map((record) => {
-                const effect = record.financialEffectSnapshot!;
-                return (
-                  <tr key={record.id}>
-                    <td><b>{inputDetail(record.inputSnapshot) ?? methodLabel(record.methodId)}</b></td>
-                    <td className="num"><Num value={effect.grossCost} unit="円" scale={recordScale} /></td>
-                    <td className="num"><Num value={effect.alreadyInternalizedCost} unit="円" scale={recordScale} /></td>
-                    <td className="num"><Num value={effect.verifiedIncrementalBenefit} unit="円" scale={recordScale} /></td>
-                    <td>{effect.amountBasis === "annual" ? "年額" : "一時費用"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p style={{ padding: "12px 18px", margin: 0, color: "var(--ink-soft)" }}>
-            LIME3の厚生価値はこの合計へ含めません。既に利益へ反映済みの額は再控除せず、増分便益は自然債務・減損リスクと相殺しません。
-          </p>
-        </Card>
-      ) : exchangeRecords.length > 0 ? <Card
-        id="representative-selection"
-        title="投資判断に使う代表値の選択"
-        subtitle="この画面ですべきこと。推奨値は表示しません"
-        padBody={false}
-      >
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>方法</th>
-              <th>確からしさ</th>
-              <th>中心値</th>
-            </tr>
-          </thead>
-          <tbody>
-            {exchangeRecords
-              .map((r) => {
-                const selected = r.id === currentRepresentativeId;
-                return (
-                  <tr key={r.id} style={selected ? { background: "var(--accent-soft)" } : undefined}>
-                    <td>
-                      {selected ? (
-                        <>
-                          <Tag variant="ok">選択中</Tag>
-                          {/*
-                            2026-08-23レビュー第3回:中心値0円の手法が代表値に選ばれていると、
-                            未内部化コストが負になり④の利益への影響がプラスに反転する
-                            (自然コストの織り込みによる改善ではない)。選択中表示の直下で
-                            気づけるようにする。
-                          */}
-                          {(r.centralValue as unknown as number) === 0 && (
-                            <p className="tooltip-note" style={{ marginTop: 4 }}>
-                              この手法の中心値は0円です(係数が0のため物理量に関わらず0円になります)。投資判断の代表値として妥当か確認してください。
-                            </p>
-                          )}
-                        </>
-                      ) : (
-                        <RepresentativeSelector
-                          materialIssueId={selectedIssueId}
-                          recordId={r.id}
-                          methodId={r.methodId}
-                          valueConcept={r.valueConcept}
-                          fromLabel={methodLabel(records.find((rr) => rr.id === currentRepresentativeId)?.methodId)}
-                          toLabel={methodLabel(r.methodId)}
-                        />
-                      )}
-                    </td>
-                    <td>
-                      <b>{methodLabel(r.methodId)}</b>
-                    </td>
-                    <td>{tierLabel(r.transferFitness.tier)}</td>
-                    <td className="num">
-                      <Num value={r.centralValue} unit="円" scale={recordScale} />
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
-        <div style={{ padding: "12px 18px" }}>
-          {changeLog ? (
-            <>
-              <div className="section-label">変更履歴</div>
-              {/* 第4版 D-03:辞書が内訳値に対応していなかった時期に記録された変更履歴には、
-                  手法IDがそのまま入っている。記録は書き換えず、表示時だけ読める名前にする。 */}
-              <KV k="変更前" v={withMethodLabelsInText(changeLog.from)} />
-              <KV k="変更後" v={withMethodLabelsInText(changeLog.to)} />
-              <KV k="変更理由" v={changeLog.reason} />
-            </>
-          ) : (
-            <p style={{ color: "var(--ink-faint)", fontSize: 12 }}>代表値の変更履歴はまだありません。</p>
-          )}
-        </div>
-      </Card> : (
-        <Card
-          id="representative-selection"
-          title="企業財務への接続"
-          subtitle="このカテゴリは厚生価値の参照値です"
-          headExtra={<Tag variant="welfare">NPV・ROIには算入しません</Tag>}
-        >
-          <p style={{ margin: 0, color: "var(--ink-soft)" }}>
-            現在の{categoryLabel(issue?.impactCategory ?? physicalQuantity?.category ?? "pollution")}の結果は社会的な厚生価値です。企業が保有する回避費用などの交換価値入力が登録されるまで、財務への影響・対策ROI・投資判定には加算しません。
-          </p>
-        </Card>
-      )}
-
       {/*
         C-05:この画面の出口(代表値の選択)の直下で、他の課題がまだ未選択であることを知らせる。
         課題セレクタのドットと同じ状態(unselectedIssueIds)から出す。
@@ -773,7 +785,7 @@ export default async function ValuationPage({
           <div className="cross-issue-note">
             <div className="section-label">まだ代表値を選んでいない課題</div>
             {shownLinks.map((id) => (
-              <Link key={id} href={`/valuation?issue=${encodeURIComponent(id)}`} className="cross-issue-note__link">
+              <Link key={id} href={`/valuation/${encodeURIComponent(id)}`} className="cross-issue-note__link">
                 {labelForIssueId(id)}の代表値がまだ選ばれていません →
               </Link>
             ))}

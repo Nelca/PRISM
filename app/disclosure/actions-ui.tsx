@@ -1,5 +1,6 @@
 "use client";
 
+import { useActionState } from "react";
 import { ModalForm } from "../components/ui";
 import { acquireEvidenceAction, recordIntentionalDecisionAction, weakenClaimAction, type DisclosureActionFormState } from "./actions";
 
@@ -30,16 +31,15 @@ export function WeakenClaimAction({ claimId, currentText }: { claimId: string; c
   );
 }
 
-export function AcquireEvidenceAction({ siteId }: { siteId: string }) {
-  async function submit(formData: FormData) {
-    await acquireEvidenceAction(initialState, formData);
-  }
+export function AcquireEvidenceAction({ materialIssueId }: { materialIssueId: string }) {
+  const [state, formAction, pending] = useActionState(acquireEvidenceAction, initialState);
   return (
-    <form action={submit}>
-      <input type="hidden" name="siteId" value={siteId} />
-      <button type="submit" className="pill-btn pill-btn--accent">
-        ② 根拠を追加で取得する
+    <form action={formAction}>
+      <input type="hidden" name="materialIssueId" value={materialIssueId} />
+      <button type="submit" className="pill-btn pill-btn--accent" disabled={pending}>
+        {pending ? "追加しています…" : "② 根拠を追加で取得する"}
       </button>
+      {state.error && <p className="form-error" role="alert">{state.error}</p>}
     </form>
   );
 }

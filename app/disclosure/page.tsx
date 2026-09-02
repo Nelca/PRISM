@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { buildDisclosureView } from "@core/disclosure/build-disclosure-view";
 import { INTERNAL_REVIEW_TEMPLATE } from "@core/disclosure/templates/internal-review-template";
@@ -7,9 +8,12 @@ import { categoryLabel, formatDepthReason, gapTypeLabel, materialIssueLabel } fr
 import { Num } from "../components/numeric";
 import { StepNav } from "../components/step-nav";
 import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
-import { PdfIntakeForm } from "./pdf-intake-form";
 import { TaskBanner } from "../components/task-banner";
 import { inputSourceLabel } from "../valuation/category-expansion";
+
+export const metadata: Metadata = {
+  title: "開示への反映 | PRISM",
+};
 
 const EXCLUSION_KIND_LABEL: Record<string, string> = {
   not_assessed: "評価対象に入っていない",
@@ -25,8 +29,10 @@ function truncateClaim(text: string | undefined, max = 34): string {
 
 export default async function DisclosurePage({
   searchParams,
+  detailOnly = false,
 }: {
   searchParams: Promise<{ finding?: string }>;
+  detailOnly?: boolean;
 }) {
   const { finding: findingParam } = await searchParams;
   const result = await loadPipelineView();
@@ -65,24 +71,38 @@ export default async function DisclosurePage({
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">開示への反映</h1>
-          <GuideButton />
+          <h1 className="screen__title">{detailOnly ? "開示の指摘に対応する" : "開示への反映"}</h1>
+          {!detailOnly && <GuideButton />}
         </div>
-        <ScreenLead>開示文言と根拠の整合を確認します</ScreenLead>
+        <ScreenLead>{detailOnly ? "選択した記載の根拠を確認し、対応を記録します" : "開示文言と根拠の整合を確認します"}</ScreenLead>
+        {detailOnly && <p className="page-back"><Link href="/disclosure">← 指摘の一覧へ戻る</Link></p>}
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
-        <GuideBox>
-          この画面では、開示文言と根拠の整合を確認します。<b>1.</b>{" "}
-          「PDFから主張を抽出する」で開示物を読み込みます(抽出だけをAIが行い、根拠の十分性判定はAIを使いません) →{" "}
-          <b>2.</b> 「指摘の一覧」で、根拠が充足しているか・どの種別の不足か・対応が済んでいるかを全記載分見渡します →{" "}
-          <b>3.</b> 不足がある記載は行の「詳細」を開き、①記載を弱める・②根拠を追加取得する(詳細評価キューへ追加)・
-          ③判断の理由を記録する、の3つから対応を選びます → <b>4.</b>{" "}
-          末尾の「開示文の下書き」で、登録済みのレコードから組み立てた文案を確認します。
-          記載の真偽は断定せず、根拠の充足状況だけを示します。材料が足りない項目を文章で埋めることはしません。
-        </GuideBox>
+        {!detailOnly && <GuideBox>
+          PDFを取り込み、根拠不足の記載を確認します。不足があれば記載修正、根拠取得、理由記録のいずれかで対応します。
+        </GuideBox>}
       </div>
+
+      {!detailOnly && <>
 
       {/* D-11-1:残タスクの頭出しバナー(全6画面共通。残タスクがある時だけ出る)。 */}
       <TaskBanner current="/disclosure" result={result} />
+
+      <Card title="開示作業" subtitle="未対応の指摘を確認し、必要なときだけ取込・下書きへ進みます">
+        <div className="action-list">
+          <Link href="#gap-findings" className="action-link">
+            <b>未対応の指摘を確認する</b>
+            <span>根拠不足の記載と、対応操作を先に確認します</span>
+          </Link>
+          <Link href="/disclosure/intake" className="action-link">
+            <b>PDFから主張を抽出する</b>
+            <span>AIは抽出だけを行い、根拠の十分性判定は既存ルールで行います</span>
+          </Link>
+          <Link href="/disclosure/draft" className="action-link">
+            <b>開示文の下書きを確認する</b>
+            <span>登録済みレコードから機械的に組み立てた文案を確認します</span>
+          </Link>
+        </div>
+      </Card>
 
       {coverageSummaries.length > 0 && (
         <Card
@@ -126,13 +146,6 @@ export default async function DisclosurePage({
           </table>
         </Card>
       )}
-
-      <Card
-        title="PDFから主張を抽出する"
-        subtitle="M7段階1・2:AIによる抽出のみ。根拠の十分性判定はAIを使わない既存の処理が行う"
-      >
-        <PdfIntakeForm />
-      </Card>
 
       {/*
         第6版 D-22:サマリー(一覧)が先、詳細は要求時(第4版D-11と同じ型の適用漏れの解消)。
@@ -195,7 +208,7 @@ export default async function DisclosurePage({
                     </td>
                     <td>
                       <Link
-                        href={`/disclosure?finding=${encodeURIComponent(finding.id)}#finding-detail`}
+                        href={`/disclosure/${encodeURIComponent(finding.id)}`}
                         className="pill-btn pill-btn--sm"
                       >
                         詳細 →
@@ -208,11 +221,17 @@ export default async function DisclosurePage({
           </table>
         </Card>
       )}
+      </>}
 
       {/* 詳細は選択した1件だけを描画する(指摘が100件でもDOMは1件分)。 */}
       {[selectedFinding].filter((finding) => finding !== undefined).map((finding) => {
         const claim = claimsById.get(finding.claimId);
         const siteId = result.disclosureClaimSiteId[finding.claimId];
+        const materialIssueId = siteId
+          ? result.assessment.materialIssues.find(
+              (issue) => issue.siteId === siteId && issue.impactCategory === claim?.extractedMetadata.category
+            )?.id ?? result.decisions.find((decision) => decision.siteId === siteId)?.materialIssueId
+          : undefined;
         return (
           <Card
             key={finding.id}
@@ -275,7 +294,7 @@ export default async function DisclosurePage({
             {finding.recommendedActions.length > 0 && claim && (
               <div className="grid-3">
                 <WeakenClaimAction claimId={claim.id} currentText={claim.rawText} />
-                {siteId && <AcquireEvidenceAction siteId={siteId} />}
+                {materialIssueId && <AcquireEvidenceAction materialIssueId={materialIssueId} />}
                 <RecordIntentionalDecisionAction claimId={claim.id} />
               </div>
             )}
@@ -288,7 +307,7 @@ export default async function DisclosurePage({
         検証(上のギャップ検出)とは逆向きの機能で、PDFもAIも使わない。
         基準への項目マッピングは未確定のため、SSBJ準拠とは称さない(GAP-19)。
       */}
-      <Card
+      {!detailOnly && <Card
         title="開示文の下書き"
         subtitle="登録済みのレコードから組み立て"
         headExtra={<Tag variant="neutral">基準へのマッピング前</Tag>}
@@ -328,7 +347,7 @@ export default async function DisclosurePage({
         <p className="tooltip-note" style={{ marginTop: 10 }}>
           SSBJ等の基準のどの開示項目に何を載せるかは未確定です(基準本文の取得待ち)。この下書きは社内確認用です。
         </p>
-      </Card>
+      </Card>}
 
       <StepNav current="/disclosure" result={result} />
     </div>

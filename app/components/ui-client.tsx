@@ -1,6 +1,15 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  forwardRef,
+  useActionState,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { usePathname } from "next/navigation";
 
 /**
@@ -23,11 +32,9 @@ const guideStoreListeners = new Set<GuideStoreListener>();
 
 function readGuideOpen(storageKey: string): boolean {
   try {
-    // 値が "1"(=閉じたことがある)でなければ開く。未設定(初回訪問)は常に開く。
-    return window.localStorage.getItem(storageKey) !== "1";
+    return window.localStorage.getItem(storageKey) === "open";
   } catch {
-    // localStorageが使えない環境(プライベートモード等)では、開いた状態のままにする。
-    return true;
+    return false;
   }
 }
 
@@ -39,44 +46,36 @@ function subscribeGuideStore(listener: GuideStoreListener): () => void {
 function setGuideOpen(storageKey: string, open: boolean) {
   try {
     if (open) {
-      window.localStorage.removeItem(storageKey);
+      window.localStorage.setItem(storageKey, "open");
     } else {
-      window.localStorage.setItem(storageKey, "1");
+      window.localStorage.removeItem(storageKey);
     }
   } catch {
-    // 記憶できなくても動作は継続する(次回もまた開いた状態で表示されるだけ)。
+    // 記憶できなくても動作は継続する。
   }
   guideStoreListeners.forEach((listener) => listener());
 }
 
-export function PillButton({
-  variant,
-  size,
-  className,
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "accent"; size?: "sm" }) {
+export const PillButton = forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "accent"; size?: "sm" }
+>(function PillButton({ variant, size, className, ...props }, ref) {
   const classes = ["pill-btn"];
   if (variant) classes.push(`pill-btn--${variant}`);
   if (size) classes.push(`pill-btn--${size}`);
   if (className) classes.push(className);
-  return <button {...props} className={classes.join(" ")} />;
-}
+  return <button ref={ref} {...props} className={classes.join(" ")} />;
+});
 
 /**
  * 画面ガイド(指示10・B-01で構造を分離)。
  *
- * 初回訪問時は開いた状態で見せ、閉じたらlocalStorageに記憶する(キーは画面別=pathname)。
- * 2回目以降の訪問では、閉じた記憶があれば閉のまま・なければまた開いた状態で見せる。
- *
- * サーバーでは常に「開」を返し(初回訪問の既定値と一致)、クライアントの実際の値が
- * それと食い違う場合(=以前この画面で閉じたことがある)はhydration後にReactが
- * 安全に補正する。useSyncExternalStoreはこの種のReact外部状態の同期のために
- * React自身が用意している仕組みで、useEffect+setStateのように追加の再レンダーの
- * 原因になったり、lintの set-state-in-effect に触れたりしない。
+ * 説明量を抑えるため初期状態は閉じ、利用者が開いた画面だけlocalStorageに記憶する。
+ * サーバーでも「閉」を返し、初期描画を一致させる。
  *
  * B-01:以前は「iボタン」と「開いたガイドボックス」を1つのフラグメントで返し、
  * `.screen__title-row`(display:flex)の子として両方が並んでいた。ガイドが開くと
- * (初回訪問時は必ず開く)ボックスがタイトルと同じ行に入り、h1が圧縮されて縦折れする
+ * ボックスがタイトルと同じ行に入り、h1が圧縮されて縦折れする
  * 構造欠陥があった。GuideButton(トリガー)とGuideBox(ボックス)に分離し、
  * 呼び出し側で「title-rowの中にButtonだけ・ScreenLeadの下にBoxだけ」を全幅で
  * 描画できるようにする。両者は同じpathname由来のstorageKeyを見るため、
@@ -84,16 +83,16 @@ export function PillButton({
  */
 function useGuideOpenState(): [boolean, (open: boolean) => void] {
   const pathname = usePathname();
-  const storageKey = `prism:guide-closed:${pathname}`;
+  const storageKey = `prism:guide-open:${pathname}`;
   const open = useSyncExternalStore(
     subscribeGuideStore,
     () => readGuideOpen(storageKey),
-    () => true
+    () => false
   );
   return [open, (next: boolean) => setGuideOpen(storageKey, next)];
 }
 
-/** ガイドの開閉トリガー(iボタン)。`.screen__title-row` の中でh1と並べて置く。 */
+/** ガイドの開閉トリガー。`.screen__title-row` の中でh1と並べて置く。 */
 export function GuideButton() {
   const [open, setOpen] = useGuideOpenState();
   return (
@@ -101,10 +100,10 @@ export function GuideButton() {
       type="button"
       className={`info-btn${open ? " active" : ""}`}
       onClick={() => setOpen(!open)}
-      aria-label="この画面について"
+      aria-label="使い方を表示"
       aria-expanded={open}
     >
-      i
+      使い方
     </button>
   );
 }
@@ -117,7 +116,7 @@ export function GuideBox({ children }: { children: ReactNode }) {
     <div className="guide">
       <div className="guide__icon">i</div>
       <div className="guide__body">
-        <div className="guide__label">この画面について</div>
+        <div className="guide__label">使い方</div>
         {children}
       </div>
     </div>
@@ -155,29 +154,102 @@ export function ModalForm({
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(action, initialState);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const wasPending = useRef(false);
+  const pendingRef = useRef(pending);
+  const titleId = useId();
+  const subtitleId = useId();
+  const errorId = useId();
 
   useEffect(() => {
+    pendingRef.current = pending;
     if (wasPending.current && !pending && !state.error) {
       setOpen(false);
     }
     wasPending.current = pending;
   }, [pending, state]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const triggerButton = triggerRef.current;
+    document.body.style.overflow = "hidden";
+    const focusTarget = dialogRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    focusTarget?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (pendingRef.current) return;
+        setOpen(false);
+        triggerRef.current?.focus();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      triggerButton?.focus();
+    };
+  }, [open]);
+
   return (
     <>
-      <PillButton type="button" variant={triggerVariant} onClick={() => setOpen(true)}>
+      <PillButton ref={triggerRef} type="button" variant={triggerVariant} onClick={() => setOpen(true)}>
         {triggerLabel}
       </PillButton>
       {open && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
-          <div className="modal-card">
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (!pending && e.target === e.currentTarget) setOpen(false);
+          }}
+        >
+          <div
+            ref={dialogRef}
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={subtitle ? subtitleId : state?.error ? errorId : undefined}
+          >
             <div className="modal-head">
               <div>
-                <h3>{title}</h3>
-                {subtitle && <p>{subtitle}</p>}
+                <h3 id={titleId}>{title}</h3>
+                {subtitle && <p id={subtitleId}>{subtitle}</p>}
               </div>
-              <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setOpen(false)}>
+              <button
+                type="button"
+                className="modal-close"
+                aria-label="閉じる"
+                disabled={pending}
+                onClick={() => {
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                }}
+              >
                 ✕
               </button>
             </div>
@@ -186,10 +258,22 @@ export function ModalForm({
                 Object.entries(hiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
               <div className="modal-body">
                 {children}
-                {state?.error && <p className="form-error">{state.error}</p>}
+                {state?.error && (
+                  <p id={errorId} className="form-error" role="alert">
+                    {state.error}
+                  </p>
+                )}
               </div>
               <div className="modal-foot">
-                <button type="button" className="pill-btn" onClick={() => setOpen(false)}>
+                <button
+                  type="button"
+                  className="pill-btn"
+                  disabled={pending}
+                  onClick={() => {
+                    setOpen(false);
+                    triggerRef.current?.focus();
+                  }}
+                >
                   キャンセル
                 </button>
                 <PillButton type="submit" variant="accent" disabled={pending}>

@@ -15,11 +15,10 @@ export function RegisterTabs() {
 
   return (
     <>
-      <div className="tab-row" role="tablist">
+      <div className="tab-row" role="group" aria-label="登録方法">
         <button
           type="button"
-          role="tab"
-          aria-selected={tab === "csv"}
+          aria-pressed={tab === "csv"}
           className={`tab-btn${tab === "csv" ? " active" : ""}`}
           onClick={() => setTab("csv")}
         >
@@ -27,8 +26,7 @@ export function RegisterTabs() {
         </button>
         <button
           type="button"
-          role="tab"
-          aria-selected={tab === "single"}
+          aria-pressed={tab === "single"}
           className={`tab-btn${tab === "single" ? " active" : ""}`}
           onClick={() => setTab("single")}
         >

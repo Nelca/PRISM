@@ -38,7 +38,7 @@ export function StepNav({ current, result }: { current: string; result: DemoPipe
    * ここ(画面末尾)は前後リンク+完了/残件の一言だけに簡素化する。同じ一覧を
    * 上下2箇所に出すと、末尾の一覧のほうが古い習慣で「正」と誤解されるため。
    */
-  const openTaskCount = deriveOpenTasks(result).filter((task) => task.href === current).length;
+  const openTaskCount = deriveOpenTasks(result).filter((task) => task.section === current).length;
   const nextContext = next ? deriveStepContext(result, next.href) : null;
 
   return (

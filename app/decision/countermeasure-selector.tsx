@@ -15,7 +15,7 @@ export function CountermeasureSelector({ siteId, candidateKey, selected }: { sit
       <button type="submit" disabled={pending || selected} className="pill-btn pill-btn--sm">
         {selected ? "選択中" : "この案で判定"}
       </button>
-      {state?.error && <span className="form-error">{state.error}</span>}
+      {state?.error && <span className="form-error" role="alert">{state.error}</span>}
     </form>
   );
 }

@@ -13,11 +13,23 @@ export function hasRepresentativeSelection(result: DemoPipelineResult, materialI
 }
 
 export function materialIssueIdsWithoutRepresentativeSelection(result: DemoPipelineResult): string[] {
-  return Object.keys(result.valuation.valuationRecordsByMaterialIssue).filter(
-    (materialIssueId) =>
-      decompositionForMaterialIssue(result, materialIssueId) !== undefined &&
-      !hasRepresentativeSelection(result, materialIssueId)
+  return materialIssueIdsRequiringRepresentativeSelection(result).filter(
+    (materialIssueId) => !hasRepresentativeSelection(result, materialIssueId)
   );
+}
+
+export function materialIssueIdsRequiringRepresentativeSelection(result: DemoPipelineResult): string[] {
+  return Object.keys(result.valuation.valuationRecordsByMaterialIssue).filter((materialIssueId) => {
+    const records = result.valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [];
+    return records.some((record) => record.valueConcept === "exchange") && decompositionForMaterialIssue(result, materialIssueId) !== undefined;
+  });
+}
+
+export function materialIssueIdsWithWelfareOnlyValuation(result: DemoPipelineResult): string[] {
+  return Object.keys(result.valuation.valuationRecordsByMaterialIssue).filter((materialIssueId) => {
+    const records = result.valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [];
+    return records.length > 0 && records.every((record) => record.valueConcept === "welfare");
+  });
 }
 
 export function representativeCentralValueForMaterialIssue(
@@ -53,9 +65,10 @@ export function sitesWithDegenerateRepresentative(
 }
 
 export function pairDivergenceRatio(pair: PairwiseDecomposition): number | null {
-  const ratio = pair.ratio;
-  if (ratio === null || !Number.isFinite(ratio) || ratio <= 0) return null;
-  return ratio >= 1 ? ratio : 1 / ratio;
+  const a = Number(pair.valueA);
+  const b = Number(pair.valueB);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
+  return Math.max(a, b) / Math.min(a, b);
 }
 
 export function maxDivergenceRatio(decomposition: DivergenceDecomposition): number | null {

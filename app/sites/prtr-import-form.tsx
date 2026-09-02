@@ -5,7 +5,7 @@ import { importPrtrDatasetAction, type PrtrImportFormState } from "./prtr-action
 
 const INITIAL_STATE: PrtrImportFormState = {};
 
-function PrtrFileField({ id, name, label, accept }: { id: string; name: string; label: string; accept: string }) {
+function PrtrFileField({ id, name, label, accept, onSelectedChange }: { id: string; name: string; label: string; accept: string; onSelectedChange: (selected: boolean) => void }) {
   const [fileName, setFileName] = useState<string | null>(null);
   return (
     <div className="field">
@@ -18,7 +18,11 @@ function PrtrFileField({ id, name, label, accept }: { id: string; name: string; 
           accept={accept}
           className="file-input__control"
           required
-          onChange={(event) => setFileName(event.target.files?.[0]?.name ?? null)}
+          onChange={(event) => {
+            const nextName = event.target.files?.[0]?.name ?? null;
+            setFileName(nextName);
+            onSelectedChange(Boolean(nextName));
+          }}
         />
         <label htmlFor={id} className="pill-btn pill-btn--sm file-input__label">
           ファイルを選ぶ
@@ -32,6 +36,14 @@ function PrtrFileField({ id, name, label, accept }: { id: string; name: string; 
 /** `/sites`から呼ぶ独立パネル。既存の会社データ3ファイル取込とは状態を共有しない。 */
 export function PrtrImportForm() {
   const [state, formAction, pending] = useActionState(importPrtrDatasetAction, INITIAL_STATE);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set());
+  const trackFile = (name: string) => (selected: boolean) => {
+    setSelectedFiles((current) => {
+      const next = new Set(current);
+      if (selected) next.add(name); else next.delete(name);
+      return next;
+    });
+  };
 
   return (
     <form action={formAction}>
@@ -65,24 +77,25 @@ export function PrtrImportForm() {
           <input id="prtrListVersion" name="prtrListVersion" defaultValue="2023" required />
         </div>
       </div>
-      <PrtrFileField id="prtrHonshi" name="honshiFile" label="本紙.txt（CP932）" accept=".txt,text/plain" />
-      <PrtrFileField id="prtrBesshi" name="besshiFile" label="別紙.txt（CP932）" accept=".txt,text/plain" />
-      <PrtrFileField id="prtrOtherIndustries" name="otherIndustriesFile" label="他業種.txt（CP932）" accept=".txt,text/plain" />
+      <PrtrFileField id="prtrHonshi" name="honshiFile" label="本紙.txt（CP932）" accept=".txt,text/plain" onSelectedChange={trackFile("honshiFile")} />
+      <PrtrFileField id="prtrBesshi" name="besshiFile" label="別紙.txt（CP932）" accept=".txt,text/plain" onSelectedChange={trackFile("besshiFile")} />
+      <PrtrFileField id="prtrOtherIndustries" name="otherIndustriesFile" label="他業種.txt（CP932）" accept=".txt,text/plain" onSelectedChange={trackFile("otherIndustriesFile")} />
       <PrtrFileField
         id="prtrCrosswalk"
         name="facilityCrosswalkFile"
         label="facility-crosswalk.csv（UTF-8）"
         accept=".csv,text/csv"
+        onSelectedChange={trackFile("facilityCrosswalkFile")}
       />
       <p className="tooltip-note">
         crosswalkの列順: <code>reporting_year,facility_id,site_id</code>。指定されていない全国事業所は取り込みません。
       </p>
-      <button type="submit" className="pill-btn pill-btn--primary" disabled={pending}>
+      <button type="submit" className="pill-btn pill-btn--primary" disabled={pending || selectedFiles.size < 4}>
         {pending ? "全件を検証しています…" : "検証してPRTRを取り込む"}
       </button>
 
       {state.errors && state.errors.length > 0 && (
-        <div style={{ marginTop: 16 }} aria-live="polite">
+        <div style={{ marginTop: 16 }} role="alert">
           <div className="section-label" style={{ color: "var(--brick)" }}>
             取り込めませんでした（{state.errors.length}件）
           </div>
@@ -98,7 +111,7 @@ export function PrtrImportForm() {
       )}
 
       {state.importedRecordCount !== undefined && (
-        <div style={{ marginTop: 16 }} aria-live="polite">
+        <div style={{ marginTop: 16 }} role="status">
           <div className="section-label" style={{ color: "var(--accent-ink)" }}>
             PRTR長形式 {state.importedRecordCount}行を取り込みました
           </div>

@@ -23,7 +23,9 @@ export function Tornado({ center, factors }: { center: number; factors: TornadoF
   const sorted = [...factors].sort((a, b) => Math.abs(b.high - b.low) - Math.abs(a.high - a.low));
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img">
+      <title>試算幅に影響する要因</title>
+      <desc>{`中心値${fmt(center)}円。${sorted.map((factor) => `${factor.name}: ${fmt(factor.low)}円から${fmt(factor.high)}円`).join("。")}`}</desc>
       <line x1={midX} x2={midX} y1={top} y2={H - 20} stroke="#8B95A3" strokeWidth={1} strokeDasharray="2 3" />
       <text x={midX} y={H - 6} fontSize={10} fontFamily="var(--font-mono-ui)" textAnchor="middle" fill="#8B95A3">
         中心値 {fmt(center)}
@@ -39,7 +41,7 @@ export function Tornado({ center, factors }: { center: number; factors: TornadoF
             <text x={0} y={cy + 4} fontSize={12} fontFamily="var(--font-body)" fill="#16233A">
               {f.name}
             </text>
-            <rect x={xa} y={cy - 9} width={xb - xa} height={18} rx={2} fill={f.dominant ? "#9B7233" : "#33564A"} opacity={f.dominant ? 0.85 : 0.55} />
+            <rect x={xa} y={cy - 9} width={xb - xa} height={18} rx={2} fill={f.dominant ? "#9B7233" : "#2F68F6"} opacity={f.dominant ? 0.85 : 0.55} />
             <text x={xa - 6} y={cy + 4} fontSize={10} fontFamily="var(--font-mono-ui)" textAnchor="end" fill="#4C5A6E">
               {fmt(f.low)}
             </text>

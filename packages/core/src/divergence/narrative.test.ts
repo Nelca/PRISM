@@ -103,4 +103,18 @@ describe("buildNarrative", () => {
 
     expect(narrative).toContain("説明されない残差");
   });
+
+  it("比率が1未満でも、大きい値が小さい値の何倍かを明示する", () => {
+    const narrative = buildNarrative({
+      methodIdA: "small-method",
+      methodIdB: "large-method",
+      mode: "multiplicative",
+      ratio: 0.25,
+      contributions: [],
+      residual: { multiplier: 0.25 },
+    });
+
+    expect(narrative).toContain("large-method は small-method の 4.00倍");
+    expect(narrative).not.toContain("差は 0.25倍");
+  });
 });
