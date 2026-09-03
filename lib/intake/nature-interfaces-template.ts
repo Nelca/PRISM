@@ -25,6 +25,13 @@ const VALID_LAYER_TYPES: NatureInterfaceLayerType[] = [
   "dependency_impact",
 ];
 const VALID_LICENSE_MODES: LicenseMode[] = ["embedded", "reference_only", "bring_your_own_license", "pending_review"];
+const HEADER_ALIASES: Record<string, string> = {
+  拠点ID: "site_id",
+  レイヤー種別: "layer_type",
+  データソース: "data_source",
+  照会結果: "raw_result",
+  利用条件: "license_mode",
+};
 
 export interface NatureInterfacesCsvParseResult {
   lookupsBySite: Record<string, LayerLookup[]>;
@@ -54,7 +61,7 @@ export function parseNatureInterfacesCsv(text: string): NatureInterfacesCsvParse
   }
 
   const [header, ...dataRows] = table;
-  const columnIndex = new Map(header.map((col, i) => [col.trim(), i]));
+  const columnIndex = new Map(header.map((col, i) => [HEADER_ALIASES[col.trim()] ?? col.trim(), i]));
 
   const requiredHeaders = ["site_id", "layer_type", "data_source", "raw_result", "license_mode"];
   const headerErrors = requiredHeaders

@@ -76,7 +76,7 @@ export function ImportForm() {
         name="sitesCsv"
         accept=".csv,text/csv"
         label="① 拠点一覧(sites.csv)"
-        hint="顧客のサステナビリティ/IR部門が記入します。"
+        hint="拠点名・業種・所在地を記入したCSVです。"
         onSelectedChange={trackFile("sitesCsv")}
       />
 
@@ -85,7 +85,7 @@ export function ImportForm() {
         name="natureInterfacesCsv"
         accept=".csv,text/csv"
         label="② 自然との接点の調査結果(nature-interfaces.csv)"
-        hint="PRISM運用チームが外部データベースを照会して記入します。"
+        hint="拠点ごとの外部データベース照会結果を記入したCSVです。"
         onSelectedChange={trackFile("natureInterfacesCsv")}
       />
 
@@ -94,7 +94,7 @@ export function ImportForm() {
         name="engagementConfigJson"
         accept=".json,application/json"
         label="③ 評価・判断の設定(engagement-config.json)"
-        hint="詳細評価の対象・投資判断の前提など。財務部門への確認が必要な項目を含みます。"
+        hint="詳細評価の対象・投資判断の前提を記入したJSONです。"
         onSelectedChange={trackFile("engagementConfigJson")}
       />
 

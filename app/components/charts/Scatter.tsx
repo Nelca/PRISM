@@ -51,7 +51,9 @@ export function Scatter({ points, xLabel, yLabel }: { points: ScatterPointInput[
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img">
-      <title>{xLabel}と{yLabel}の比較</title>
+      {/* SVGのtitle内は1つの文字列にする。複数のReactテキストノードに分かれるとSSR時に
+          ブラウザが結合し、初回表示でhydration mismatchになる。 */}
+      <title>{`${xLabel}と${yLabel}の比較`}</title>
       <desc>{points.map((point) => `${point.label}: ${xLabel}${point.x}、${yLabel}${point.y}`).join("。")}</desc>
       {/* 0の基準線(レンジ内にある場合のみ)。プロット領域の枠は薄く別に描く。 */}
       <rect

@@ -1,11 +1,11 @@
-# NatureInterface照会結果(②PRISM運用チームが記入。顧客は記入しません)
-# layer_type: protected_area / kba / water_stress / ecosystem_integrity / dependency_impact
-# data_source: 出典(例: IBAT Alliance, WRI Aqueduct 4.0, ENCORE)
-# raw_result: true / false、または数値(STARスコア等)。空欄は「未評価」を意味し、
+# 自然との接点の照会結果
+# レイヤー種別: protected_area / kba / water_stress / ecosystem_integrity / dependency_impact
+# データソース: 出典(例: IBAT Alliance, WRI Aqueduct 4.0, ENCORE)
+# 照会結果: true / false、または数値(STARスコア等)。空欄は「未評価」を意味し、
 #             そのレイヤはMaterialIssue判定に使われません(false扱いにはなりません)
-# license_mode: embedded / reference_only / bring_your_own_license / pending_review
+# 利用条件: embedded / reference_only / bring_your_own_license / pending_review
 #               (ライセンス契約が未締結のデータソースは pending_review)
-site_id,layer_type,data_source,raw_result,license_mode
+拠点ID,レイヤー種別,データソース,照会結果,利用条件
 site-001,kba,IBAT Alliance,true,pending_review
 site-001,water_stress,WRI Aqueduct 4.0,true,reference_only
 site-001,dependency_impact,ENCORE,true,reference_only

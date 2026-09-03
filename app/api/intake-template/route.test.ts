@@ -7,11 +7,11 @@ async function download(name: string) {
 
 describe("GET /api/intake-template", () => {
   it.each([
-    ["sites", "sites.csv", "site_id"],
-    ["nature-interfaces", "nature-interfaces.csv", "layer_type"],
+    ["sites", "sites.csv", "拠点ID"],
+    ["nature-interfaces", "nature-interfaces.csv", "レイヤー種別"],
     ["engagement-config", "engagement-config.json", "deepDive"],
-    ["waste", "waste.csv", "quantity_kg"],
-    ["land-use", "land-use.csv", "activity_kind"],
+    ["waste", "waste.csv", "数量kg"],
+    ["land-use", "land-use.csv", "活動区分"],
   ])("keeps %s available as an allow-listed download", async (name, file, marker) => {
     const response = await download(name);
     expect(response.status).toBe(200);

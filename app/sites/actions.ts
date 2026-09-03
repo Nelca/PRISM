@@ -19,6 +19,7 @@ const ACTOR = "宮里";
 
 export interface AddSiteFormState {
   error?: string;
+  success?: string;
 }
 
 function errorMessage(cause: unknown): string {
@@ -51,7 +52,7 @@ export async function addSiteAction(_prevState: AddSiteFormState, formData: Form
   }
 
   revalidatePath("/", "layout");
-  return {};
+  return { success: "拠点を登録しました。続けて別の拠点も登録できます。" };
 }
 
 /**

@@ -101,6 +101,7 @@ export default async function FinancialBridgePage({
     siteRows.find((row) => row.impairmentAffected)?.siteId ??
     [...siteRows].sort((a, b) => Math.abs(b.adjustmentRatioPct) - Math.abs(a.adjustmentRatioPct))[0]?.siteId;
   const openSiteId = siteRows.some((row) => row.siteId === siteParam) ? siteParam : defaultOpenSiteId;
+  const openSiteName = siteRows.find((row) => row.siteId === openSiteId)?.siteName;
 
   const expectedLossScale = pickYenScale(...siteRows.map((row) => row.expectedLoss));
 
@@ -115,7 +116,7 @@ export default async function FinancialBridgePage({
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">{detailOnly ? "拠点の財務影響" : "財務への影響"}</h1>
+          <h1 className="screen__title">{detailOnly && openSiteName ? `${openSiteName}の財務影響` : "財務への影響"}</h1>
           {!detailOnly && <GuideButton />}
         </div>
         <ScreenLead>選んだ代表値が利益・リスクにどう効くかを確認します</ScreenLead>
@@ -199,11 +200,11 @@ export default async function FinancialBridgePage({
       <Card
         id="site-summary"
         title="拠点サマリー"
-        subtitle="1拠点1行。行の「詳細」から下の拠点別詳細が開きます"
+        subtitle="行の「詳細」から拠点別の内訳へ進みます"
         padBody={false}
         foot="利益への影響:自然関連コストを織り込んだときの、営業利益(決算値)からの変化率(マイナスは利益の下振れ)"
       >
-        <table className="data-table">
+        <table className="data-table data-table--linked">
           <thead>
             <tr>
               <th>拠点</th>
@@ -216,7 +217,7 @@ export default async function FinancialBridgePage({
           </thead>
           <tbody>
             {siteRows.map((row) => (
-              <tr key={row.siteId} style={row.siteId === openSiteId ? { background: "var(--accent-soft)" } : undefined}>
+              <tr key={row.siteId}>
                 <td>
                   <b>{row.siteName}</b>
                 </td>
@@ -283,9 +284,9 @@ export default async function FinancialBridgePage({
         転送量・描画コストが破綻する。他の拠点はサマリーテーブルの行リンク
         (?site=...)から開く。中身の既存カード群と並び順は維持。
       */}
-      {siteRows
+      {detailOnly && siteRows
         .filter((row) => row.siteId === openSiteId)
-        .map(({ siteId, siteName, financialBridge, comparisonTargets }) => {
+        .map(({ siteId, financialBridge, comparisonTargets }) => {
         const waterfallSteps = buildWaterfallSteps(financialBridge.bridge1);
         const expectedLoss = financialBridge.natureDebt.totalDebt;
         const operatingProfit = financialBridge.bridge1.reportedOperatingProfit;
@@ -305,12 +306,7 @@ export default async function FinancialBridgePage({
         );
 
         return (
-          <details key={siteId} id={`site-${siteId}`} className="foldout" open>
-            <summary>
-              {siteName} の詳細
-              <small>自然コスト反映後の利益・期待損失・比較先 ・ 他の拠点の詳細は上の拠点サマリーの行から開けます</small>
-            </summary>
-            <div className="foldout__body">
+          <div key={siteId} id={`site-${siteId}`} className="detail-stack">
               <Card
                 title={term("自然コスト反映後の営業利益")}
                 subtitle="報告財務からの調整"
@@ -462,8 +458,7 @@ export default async function FinancialBridgePage({
                   本システムは、これらの変化が実際の格付・資本コストにどう影響するかを予測・断定するものではありません。
                 </p>
               </Card>
-            </div>
-          </details>
+          </div>
         );
       })}
 

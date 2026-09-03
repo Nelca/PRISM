@@ -486,6 +486,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     const isClimateShowcaseSite = siteId === CLIMATE_SITE_ID;
     const representativeCategory = assessment.materialIssues.find((issue) => issue.id === materialIssueId)?.impactCategory;
     if (!representativeCategory) return [];
+    const isClimateCategory = representativeCategory === "climate";
     const additionalExchangeRecords = materialIssueIds.flatMap((issueId) => {
       const category = assessment.materialIssues.find((issue) => issue.id === issueId)?.impactCategory;
       if (!category) return [];
@@ -501,7 +502,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
 
     // ブリッジ2(厚生価値ビュー)の情報源。水はlime3-water、気候は社会的費用(GAP-11・D-128)。
     // いずれも常にwelfare概念を返す(monetization/plugins/lime3-water.ts・ghg-carbon-price-conversion.ts)。
-    const welfareMethodId = isClimateShowcaseSite ? "ghg-carbon-price-conversion.ghg-social-cost" : "lime3-water";
+    const welfareMethodId = isClimateCategory ? "ghg-carbon-price-conversion.ghg-social-cost" : "lime3-water";
     const lime3 = siteRecords.find((r) => r.methodId === welfareMethodId) as WelfareValuationRecord | undefined;
     const deepDiveParams = deepDiveParamsBySiteId.get(siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
 
@@ -511,7 +512,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
      * 未入力でも自然調整後NPVのレンジ・自然関連コストは通常どおり算出される(段階的開示)。
      */
     const { baselineNpv, approvalThreshold, companyFinancials } = buildDecisionInputs({
-      siteKind: isFlagshipSite ? "flagship" : isClimateShowcaseSite ? "climate" : "user",
+      siteKind: isFlagshipSite ? "flagship" : isClimateCategory ? "climate" : "user",
       deepDiveParams,
       decisionParameters: interactions.decisionParameters.get(siteId),
       companyFinancials: interactions.companyFinancials,
@@ -525,7 +526,8 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       ...(lime3 ? { welfareRecord: lime3 } : {}),
       baselineNpv,
       companyFinancials,
-      isClimateShowcaseSite,
+      isClimateCategory,
+      climatePhysicalQuantity: isClimateCategory ? deepDiveParams.physicalQuantity : undefined,
     });
 
     // --- M6:対策案4種を並行して計算し、比較テーブル/散布図に使う ---
@@ -613,11 +615,10 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   });
 
   // --- M7:開示検証(site-042固定claim + 深掘りに進んだ他拠点の自動生成claim) ---
-  // site-070(気候カテゴリ実証用、D-128)は除外する。buildUserDisclosureClaimは水消費削減の
-  // コミットメントを模した文言を生成するため、気候カテゴリの拠点には意味を持たない。
+  // 固定デモ拠点以外の水・GHGについては、フォームのカテゴリに合う記載文を生成する。
   const decisionsForAutoClaims = decisions.filter((d) => {
     const category = assessment.materialIssues.find((issue) => issue.id === d.materialIssueId)?.impactCategory;
-    return d.siteId !== "site-042" && d.siteId !== CLIMATE_SITE_ID && category === "water";
+    return d.siteId !== "site-042" && d.siteId !== CLIMATE_SITE_ID && (category === "water" || category === "climate");
   });
   const userClaims: DisclosureClaim[] = decisionsForAutoClaims.map((d) => {
     const site = assessment.sites.find((s) => s.id === d.siteId)!;

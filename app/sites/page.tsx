@@ -9,40 +9,7 @@ import { DataSourceAttribution } from "../components/attribution";
 import { EditSiteButton } from "./add-site-form";
 import { RemoveSiteButton } from "./remove-site-button";
 import { TaskBanner } from "../components/task-banner";
-
-/**
- * 記入者の対応表(指示02)。以前は `docs/data-intake-guide.md` というリポジトリ内パスを
- * 案内していたが、非エンジニアには辿れないため画面内に置く。
- * 由来の異なるデータ(顧客提供・PRISM運用チームの調査・顧客財務部門)を1つのファイルに
- * 混ぜないため、ファイルを3つに分けている。
- */
-const INTAKE_FILES = [
-  {
-    template: "sites",
-    file: "sites.csv",
-    title: "拠点一覧",
-    owner: "顧客のサステナビリティ/IR部門",
-    ownerNote: undefined as string | undefined,
-    content: "拠点名・種別・業種・所在地(座標または住所)",
-  },
-  {
-    template: "nature-interfaces",
-    file: "nature-interfaces.csv",
-    title: "自然との接点の調査結果",
-    owner: "PRISM運用チーム",
-    ownerNote: undefined as string | undefined,
-    content: "外部データベースを照会した拠点ごとの自然との関わり",
-  },
-  {
-    template: "engagement-config",
-    file: "engagement-config.json",
-    title: "評価・判断の設定",
-    // B-10:「顧客の財務部門への確認が必要」は担当名ではないため分離する。
-    owner: "顧客の財務部門",
-    ownerNote: "確認が必要" as string | undefined,
-    content: "詳細評価の対象・投資判断の前提(投資価値NPV・承認ライン)",
-  },
-];
+import { IntakeReference } from "./intake-reference";
 
 /** 操作列に出す「なぜ編集できないのか」。空欄のまま放置しない(指示B-03)。 */
 const LOCKED_REASON = {
@@ -112,50 +79,7 @@ export default async function SitesPage() {
           </div>
         </Card>
 
-        <Card
-          title="記入するファイルと担当"
-          padBody={false}
-          foot="3ファイルすべてが揃って初めて取り込めます(相互参照の検証があるため)"
-        >
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ファイル</th>
-                <th>記入する人</th>
-                <th>テンプレート</th>
-              </tr>
-            </thead>
-            <tbody>
-              {INTAKE_FILES.map((entry) => (
-                <tr key={entry.template}>
-                  <td>
-                    <b>{entry.title}</b>
-                    <span style={{ display: "block", color: "var(--ink-faint)", fontSize: 11 }}>{entry.content}</span>
-                  </td>
-                  <td>
-                    {entry.owner}
-                    {/* B-10:担当名ではない注記(確認が必要 等)は小書きで分離する。 */}
-                    {entry.ownerNote && (
-                      <span style={{ display: "block", color: "var(--ink-faint)", fontSize: 10.5 }}>({entry.ownerNote})</span>
-                    )}
-                  </td>
-                  <td>
-                    {/* B-07:「記入例をダウンロード」は縦折れしていたため短縮。全文はtitleに残す。 */}
-                    <a
-                      href={`/api/intake-template?name=${entry.template}`}
-                      className="pill-btn pill-btn--sm"
-                      style={{ textDecoration: "none", display: "inline-block" }}
-                      download={entry.file}
-                      title="記入例をダウンロード"
-                    >
-                      記入例
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <IntakeReference />
       </div>
 
       <Card

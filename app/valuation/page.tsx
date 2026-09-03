@@ -395,7 +395,7 @@ export default async function ValuationPage({
           </h2>
           <p>
             {exchangeRecords.length > 0
-              ? "詳細分析は必要なときだけ開き、まずこの評価対象で必要な判断を完了します。"
+              ? "代表値の状態を確認し、下に表示された手法別の試算幅と照合します。"
               : "この結果は企業NPV・ROIへ加算せず、開示の参考値として扱います。"}
           </p>
         </div>
@@ -577,10 +577,10 @@ export default async function ValuationPage({
         </Card>
       )}
 
-      <details className="foldout">
+      <details className="foldout" open>
         <summary>
           この画面内で詳細分析を確認する
-          <small>通常は「手法差を分析」から専用画面を使います</small>
+          <small>試算幅・手法差・不確実性をこの画面でまとめて表示しています</small>
         </summary>
         <div className="foldout__body">
       {/* (2) 試算の幅(フットボールチャートは画面に1回だけ) */}

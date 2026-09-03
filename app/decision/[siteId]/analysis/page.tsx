@@ -6,6 +6,7 @@ import { bindingLabel, verdictLabel, verdictTagVariant } from "../../../componen
 import { Num, pickYenScale } from "../../../components/numeric";
 import { Card, ScreenLead, Stat, TableScroll, Tag } from "../../../components/ui";
 import { Scatter } from "../../../components/charts/Scatter";
+import { SectionNav } from "../../../components/section-nav";
 
 export const metadata: Metadata = { title: "対策・判定の分析 | PRISM" };
 
@@ -35,7 +36,26 @@ export default async function DecisionAnalysisPage({ params }: { params: Promise
       <div className="screen__head">
         <div className="screen__title-row"><h1 className="screen__title">{siteName}の判定分析</h1></div>
         <ScreenLead>対策候補の比較と、確定済み判定の前提を読み取り専用で確認します</ScreenLead>
+        <p className="page-back"><Link href={`/decision/${encodeURIComponent(siteId)}`}>← 判定の編集へ戻る</Link></p>
       </div>
+
+      <SectionNav
+        label={`${siteName}の判定内の画面`}
+        items={[
+          {
+            href: `/decision/${encodeURIComponent(siteId)}`,
+            label: "判定を編集",
+            description: "前提・対策・反映先を変更",
+            active: false,
+          },
+          {
+            href: `/decision/${encodeURIComponent(siteId)}/analysis`,
+            label: "比較分析",
+            description: "回避量と追加リターンを確認",
+            active: true,
+          },
+        ]}
+      />
 
       <Card title="現在の判定" headExtra={<Tag variant={verdictTagVariant(record.verdict)}>{record.verdict === "pending" ? "保留中" : verdictLabel(record.verdict)}</Tag>}>
         <div className="grid-3">
@@ -43,7 +63,6 @@ export default async function DecisionAnalysisPage({ params }: { params: Promise
           <Stat label="自然コスト反映後NPV" value={<Num value={Number(record.natureAdjustedNpv.central)} unit="円" scale={scale} />} />
           <Stat label="結果の反映先" value={<span style={{ fontFamily: "var(--font-body)", fontSize: 13 }}>{bindingLabel(record.bindingMechanism.kind)}</span>} />
         </div>
-        <p className="page-back"><Link href={`/decision/${encodeURIComponent(siteId)}`}>前提・対策・反映先を変更する →</Link></p>
       </Card>
 
       <Card title="対策候補の比較" subtitle="選択操作は拠点の判定画面で行います" padBody={false}>

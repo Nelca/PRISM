@@ -126,8 +126,9 @@ function parseCrosswalk(
     return [];
   }
   const header = rows[0].fields.map((field) => field.trim());
-  if (header.length !== CROSSWALK_COLUMNS.length || CROSSWALK_COLUMNS.some((column, index) => header[index] !== column)) {
-    errors.push(`${fileName} 1行目: ヘッダーは ${CROSSWALK_COLUMNS.join(",")} の順にしてください。`);
+  const normalizedHeader = header.map((field) => ({ 報告年度: "reporting_year", 事業所ID: "facility_id", 拠点ID: "site_id" })[field] ?? field);
+  if (normalizedHeader.length !== CROSSWALK_COLUMNS.length || CROSSWALK_COLUMNS.some((column, index) => normalizedHeader[index] !== column)) {
+    errors.push(`${fileName} 1行目: ヘッダーは 報告年度,事業所ID,拠点ID の順にしてください。`);
   }
 
   const result: CrosswalkRow[] = [];

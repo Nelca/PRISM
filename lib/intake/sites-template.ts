@@ -22,6 +22,15 @@ export interface SitesCsvParseResult {
 }
 
 const REQUIRED_HEADERS = ["site_id", "name", "site_type", "industry_sector"];
+const HEADER_ALIASES: Record<string, string> = {
+  拠点ID: "site_id",
+  拠点名: "name",
+  拠点区分: "site_type",
+  業種: "industry_sector",
+  緯度: "lat",
+  経度: "lng",
+  住所: "address",
+};
 
 export function parseSitesCsv(text: string): SitesCsvParseResult {
   const table = parseCsv(text).filter((row) => row.length > 0 && !(row[0]?.trim().startsWith("#")));
@@ -31,7 +40,7 @@ export function parseSitesCsv(text: string): SitesCsvParseResult {
   }
 
   const [header, ...dataRows] = table;
-  const columnIndex = new Map(header.map((col, i) => [col.trim(), i]));
+  const columnIndex = new Map(header.map((col, i) => [HEADER_ALIASES[col.trim()] ?? col.trim(), i]));
 
   const headerErrors: string[] = [];
   for (const required of REQUIRED_HEADERS) {

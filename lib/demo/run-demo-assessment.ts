@@ -23,7 +23,11 @@ export function runDemoAssessment(
   physicalInputs: PhysicalQuantityInput[] = [],
   activeMaterialIssueTargets: { siteId: string; category: ImpactCategory }[] = []
 ) {
+  const userCategoryBySite = new Map(userSites.map((entry) => [entry.row.id, entry.deepDive.category ?? "water"] as const));
   const activeCategoriesBySite = new Map<string, Set<PhysicalQuantityInput["category"]>>();
+  for (const entry of userSites) {
+    activeCategoriesBySite.set(entry.row.id, new Set([entry.deepDive.category ?? "water"]));
+  }
   for (const physicalInput of physicalInputs) {
     const categories = activeCategoriesBySite.get(physicalInput.siteId) ?? new Set();
     categories.add(physicalInput.category);
@@ -35,7 +39,9 @@ export function runDemoAssessment(
     activeCategoriesBySite.set(target.siteId, categories);
   }
   const manualOverrides = new Set([
-    ...userSites.filter((entry) => entry.deepDive.forcePromote).map((entry) => `${entry.row.id}-mi-water`),
+    ...userSites
+      .filter((entry) => entry.deepDive.forcePromote)
+      .map((entry) => `${entry.row.id}-mi-${entry.deepDive.category ?? "water"}`),
     "site-042-mi-water",
     `${CLIMATE_SITE_ID}-mi-climate`,
     ...physicalInputs.map((entry) => `${entry.siteId}-mi-${entry.category}`),
@@ -43,8 +49,14 @@ export function runDemoAssessment(
   ]);
   const manualDemotions = new Set<string>();
   for (const [materialIssueId, mode] of interactions.depthOverrides) {
-    if (mode === "promote") manualOverrides.add(materialIssueId);
-    else manualDemotions.add(materialIssueId);
+    if (mode === "promote") {
+      manualDemotions.delete(materialIssueId);
+      manualOverrides.add(materialIssueId);
+    } else {
+      // 最新の明示操作を優先する。既定の手動昇格と同居させるとcoreでは昇格が勝つため除外する。
+      manualOverrides.delete(materialIssueId);
+      manualDemotions.add(materialIssueId);
+    }
   }
 
   return runAssessmentPipeline({
@@ -53,6 +65,14 @@ export function runDemoAssessment(
     interfacesByCategoryForSite: (site) => {
       const base = interfacesByCategoryForSite(site);
       const reusableInterfaces = Object.values(base)[0] ?? [];
+      const directCategory = userCategoryBySite.get(site.id);
+      if (directCategory) {
+        const userBase: Partial<Record<ImpactCategory, typeof reusableInterfaces>> = {
+          [directCategory]: reusableInterfaces,
+        };
+        for (const category of activeCategoriesBySite.get(site.id) ?? []) userBase[category] = reusableInterfaces;
+        return userBase;
+      }
       for (const category of activeCategoriesBySite.get(site.id) ?? []) {
         base[category] = reusableInterfaces;
       }

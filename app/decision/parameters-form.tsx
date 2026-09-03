@@ -70,7 +70,7 @@ export function DecisionParametersForm({
 
       <p className="tooltip-note">
         承認ラインが未入力でも、自然コスト反映後の投資価値の幅と自然関連コストは表示されます。判定(結論が変わるか)だけが
-        保留になります。**業界標準値で仮置きすることはしません。**
+        保留になります。業界標準値で仮置きすることはしません。
       </p>
     </ModalForm>
   );

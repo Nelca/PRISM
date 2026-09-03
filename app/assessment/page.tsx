@@ -139,6 +139,7 @@ export default async function AssessmentPage() {
                 評価の深さ
               </th>
               <th rowSpan={2}>理由</th>
+              <th rowSpan={2}><span className="sr-only">操作</span></th>
             </tr>
             <tr>
               <th title="TNFDの5基準(水ストレス・生物多様性の重要性など)のうち該当した数。数が多いほど自然への依存・影響が強い">自然との関わり</th>
@@ -154,7 +155,7 @@ export default async function AssessmentPage() {
               const isPromoted = decision?.depth === "deep_dive";
               const priorityRatio = maxNormalizedScore > 0 ? score.normalizedScore / maxNormalizedScore : 0;
               return (
-                <tr key={score.materialIssueId} style={isPromoted ? { background: "var(--accent-soft)" } : undefined}>
+                <tr key={score.materialIssueId} className={`assessment-row${isPromoted ? " assessment-row--promoted" : ""}`}>
                   <td>
                     {/* 課題IDそのものではなく「拠点名 × カテゴリ名」で示す(指示06)。IDは小書きに退避。 */}
                     <b>
@@ -215,6 +216,13 @@ export default async function AssessmentPage() {
                   <td style={{ fontSize: 11.5, color: "var(--ink-soft)", maxWidth: 240 }}>
                     {depthJudgmentText(decision, promotionPercent)}
                   </td>
+                  <td>
+                    {issue && (
+                      <Link href={`/assessment/${encodeURIComponent(issue.id)}`} className="pill-btn pill-btn--sm assessment-row__detail">
+                        詳細 →
+                      </Link>
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -225,7 +233,7 @@ export default async function AssessmentPage() {
               (第1版§5「除外・未評価を黙って消さない」)。
             */}
             {unscoredIssues.map((issue) => (
-              <tr key={issue.id} style={{ color: "var(--ink-soft)" }}>
+              <tr key={issue.id} className="assessment-row assessment-row--unscored">
                 <td>
                   {/* 座標が解決できていないため、カテゴリまでは確定していない。拠点名だけを出す。 */}
                   <b>
@@ -247,6 +255,11 @@ export default async function AssessmentPage() {
                   {issue.exclusionReason
                     ? formatIssueExclusionReason(issue.exclusionReason)
                     : "優先度の算定対象に含まれていません。"}
+                </td>
+                <td>
+                  <Link href={`/assessment/${encodeURIComponent(issue.id)}`} className="pill-btn pill-btn--sm assessment-row__detail">
+                    詳細 →
+                  </Link>
                 </td>
               </tr>
             ))}

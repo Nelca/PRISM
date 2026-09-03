@@ -9,11 +9,11 @@ import { bindingLabel, categoryLabel, formatDominantAssumption, materialIssueLab
 import { methodLabel } from "../components/method-labels";
 import { StepNav } from "../components/step-nav";
 import { TaskBanner } from "../components/task-banner";
-import { Scatter } from "../components/charts/Scatter";
 import { CountermeasureSelector } from "./countermeasure-selector";
 import { BindingForm } from "./binding-form";
 import { DecisionParametersForm } from "./parameters-form";
 import { PipelineWarnings } from "../components/pipeline-warnings";
+import { SectionNav } from "../components/section-nav";
 
 export const metadata: Metadata = {
   title: "対策と判定 | PRISM",
@@ -126,6 +126,7 @@ export default async function DecisionPage({
   /** 既定で展開する拠点:残タスクがある先頭の拠点、なければ先頭。URLの?site=を優先。 */
   const defaultOpenSiteId = siteRows.find((row) => row.remaining.length > 0)?.siteId ?? siteRows[0]?.siteId;
   const openSiteId = siteRows.some((row) => row.siteId === siteParam) ? siteParam : defaultOpenSiteId;
+  const openSiteName = siteRows.find((row) => row.siteId === openSiteId)?.siteName;
 
   /** どの拠点の判定にも対応しない「真のはぐれ」アラート(D-23。上の安全弁コメント参照)。 */
   const knownDecisionRecordIds = new Set(siteRows.map((row) => row.record.id));
@@ -135,7 +136,7 @@ export default async function DecisionPage({
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">{detailOnly ? "拠点の対策と判定" : "対策と判定"}</h1>
+          <h1 className="screen__title">{detailOnly && openSiteName ? `${openSiteName}の対策と判定` : "対策と判定"}</h1>
           {!detailOnly && <GuideButton />}
         </div>
         <ScreenLead>対策を選び、投資の結論が変わるかの判定を確定します</ScreenLead>
@@ -145,6 +146,26 @@ export default async function DecisionPage({
           承認ラインを入力し、対策を選び、結果を反映する社内制度を指定します。
         </GuideBox>}
       </div>
+
+      {detailOnly && openSiteId && (
+        <SectionNav
+          label={`${openSiteName ?? "拠点"}の判定内の画面`}
+          items={[
+            {
+              href: `/decision/${encodeURIComponent(openSiteId)}`,
+              label: "判定を編集",
+              description: "前提・対策・反映先を変更",
+              active: true,
+            },
+            {
+              href: `/decision/${encodeURIComponent(openSiteId)}/analysis`,
+              label: "比較分析",
+              description: "回避量と追加リターンを確認",
+              active: false,
+            },
+          ]}
+        />
+      )}
 
       {!detailOnly && <>
 
@@ -180,10 +201,10 @@ export default async function DecisionPage({
       <Card
         id="site-summary"
         title="拠点サマリー"
-        subtitle="1拠点1行。行の「詳細」から下の拠点別詳細が開きます"
+        subtitle="行の「詳細」から判定と対策の編集へ進みます"
         padBody={false}
       >
-        <table className="data-table">
+        <table className="data-table data-table--linked">
           <thead>
             <tr>
               <th>拠点</th>
@@ -196,7 +217,7 @@ export default async function DecisionPage({
           </thead>
           <tbody>
             {siteRows.map((row) => (
-              <tr key={row.siteId} style={row.siteId === openSiteId ? { background: "var(--accent-soft)" } : undefined}>
+              <tr key={row.siteId}>
                 <td>
                   <b>{row.siteName}</b>
                 </td>
@@ -229,34 +250,11 @@ export default async function DecisionPage({
         対策比較テーブル・散布図×100がHTMLに含まれ、畳んであっても破綻する。
         他の拠点はサマリーテーブルの行リンク(?site=...)から開く。
       */}
-      {siteRows
+      {detailOnly && siteRows
         .filter((row) => row.siteId === openSiteId)
-        .map(({ siteId, siteName, decision, countermeasureCandidates, selectedCountermeasureKey, alerts }) => {
+        .map(({ siteId, decision, countermeasureCandidates, selectedCountermeasureKey, alerts }) => {
         const record = decision.decisionRecord;
         const threshold = record.approvalThreshold === "pending" ? null : (record.approvalThreshold.value);
-        /**
-         * 「投資1億円あたり」に揃える(指示09)。100_000_000円=1億円。
-         *
-         * 第5版レビュー(2026-08-17):**通常NPV(全候補共通の巨大な定数)を含む絶対値**で
-         * 割っていたため、投資額がわずかな候補(保険契約・監視継続)だけ分母が極小になり、
-         * 比率が桁違いに跳ね上がっていた(例:site-042で「監視継続」は2,400億/投資1億円、
-         * 「効率化投資」は15億/投資1億円 —— 300倍以上の差)。線形軸では他候補がすべて
-         * 原点付近に押しつぶされ、比較として機能しない。**その対策案が通常NPVに対して
-         * 追加でもたらす分(natureAdjustedNpv − baselineNpv)**を使うべきで、これなら
-         * 「対策を実施しない」案は自然に0(追加投資も追加効果もない)に収まる。
-         */
-        const invPerOku = (c: (typeof countermeasureCandidates)[number]) => {
-          const invest = c.investmentCost.initial + c.investmentCost.recurring;
-          if (invest === 0) return 0;
-          const npv = c.decisionRecord.natureAdjustedNpv.central;
-          const baseline = c.decisionRecord.baselineNpv.value;
-          return ((npv - baseline) / invest) * 100_000_000;
-        };
-        const avoidedPerOku = (c: (typeof countermeasureCandidates)[number]) => {
-          const invest = c.investmentCost.initial + c.investmentCost.recurring;
-          if (invest === 0) return 0;
-          return (c.avoidedPhysicalQuantity / invest) * 100_000_000;
-        };
         const meaningSentence = verdictMeaningSentence(record.verdict);
         // 指示09:⑤の対策表で列ごとに単位を揃える(初期投資額は拠点によって百万円台と
         // 億円台が混在し、そのまま自動判定すると同じ列内で単位が割れる)。
@@ -271,12 +269,7 @@ export default async function DecisionPage({
         );
 
         return (
-          <details key={siteId} id={`site-${siteId}`} className="foldout" open>
-            <summary>
-              {siteName} の詳細
-              <small>判定結果・対策案の比較・結果の反映先 ・ 他の拠点の詳細は上の拠点サマリーの行から開けます</small>
-            </summary>
-            <div className="foldout__body">
+          <div key={siteId} id={`site-${siteId}`} className="detail-stack">
               {/* (1) 判定結果を先頭・大きく(指示15。プロダクトの価値の中心) */}
               <Card
                 title="判定結果"
@@ -377,71 +370,51 @@ export default async function DecisionPage({
               )}
 
               {/* (2) 対策案の比較:一覧画面では要点、拠点画面では専用分析へ分離する。 */}
-              {detailOnly ? (
-                <Card title="対策案を詳しく比較する" subtitle="候補ごとの投資額・回避物理量・投資価値を確認します">
-                  <p style={{ marginTop: 0, color: "var(--ink-soft)" }}>
-                    分析画面は読み取り専用です。比較後の候補選択は、この画面に戻って変更できます。
-                  </p>
-                  <Link href={`/decision/${encodeURIComponent(siteId)}/analysis`} className="pill-btn">
-                    対策案の分析を見る →
-                  </Link>
-                </Card>
-              ) : (
-                <Card
-                  id="countermeasure-analysis"
-                  title="対策案の比較"
-                  foot="縦軸:投資1億円あたりの回避物理量 ・ 横軸:投資1億円あたりの追加リターン(投資価値の純増)。「対策を実施しない」案は追加投資も追加効果もないため原点付近になります"
+              <Card
+                  title="対策案を選ぶ"
+                  subtitle="候補を比較して、この拠点の判定に使う案を選択します"
+                  padBody={false}
                 >
-                <table className="data-table" style={{ margin: "0 0 16px" }}>
-                  <thead>
-                    <tr>
-                      <th>対策</th>
-                      <th>投資額</th>
-                      <th>回避物理量/年</th>
-                      <th title="投資価値(NPV)に自然関連のコスト・便益を加えた値と、その判定">投資価値(反映後)と判定</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {countermeasureCandidates.map((c) => {
-                      const selected = c.key === selectedCountermeasureKey;
-                      return (
-                        <tr key={c.key} style={selected ? { background: "var(--accent-soft)" } : undefined}>
-                          <td>
-                            <b>{c.label}</b>
-                          </td>
-                          <td className="num">
-                            <Num value={c.investmentCost.initial} unit="円" scale={investInitialScale} />(初期) /{" "}
-                            <Num value={c.investmentCost.recurring} unit="円/年" scale={investRecurringScale} />
-                          </td>
-                          <td className="num">
-                            <Num value={c.avoidedPhysicalQuantity} unit="m3" />
-                          </td>
-                          <td className="num" style={{ fontWeight: 600 }}>
-                            <Num value={c.decisionRecord.natureAdjustedNpv.central} unit="円" scale={npvScale} />(
-                            {verdictLabel(c.decisionRecord.verdict)})
-                          </td>
-                          <td>
-                            <CountermeasureSelector siteId={siteId} candidateKey={c.key} selected={selected} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-
-                <Scatter
-                  points={countermeasureCandidates.map((c) => ({
-                    x: invPerOku(c),
-                    y: avoidedPerOku(c),
-                    label: c.label,
-                    color: c.key === selectedCountermeasureKey ? "#2F68F6" : "#8B8F86",
-                  }))}
-                  xLabel="投資1億円あたりの追加リターン"
-                  yLabel="投資1億円あたりの回避物理量"
-                />
-                </Card>
-              )}
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>対策</th>
+                        <th>投資額</th>
+                        <th>投資価値(反映後)</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {countermeasureCandidates.map((candidate) => {
+                        const selected = candidate.key === selectedCountermeasureKey;
+                        return (
+                          <tr key={candidate.key} style={selected ? { background: "var(--accent-soft)" } : undefined}>
+                            <td>
+                              <b>{candidate.label}</b>
+                              {selected && <span className="cell-note">選択中</span>}
+                            </td>
+                            <td className="num">
+                              <Num value={candidate.investmentCost.initial} unit="円" scale={investInitialScale} /> /{" "}
+                              <Num value={candidate.investmentCost.recurring} unit="円/年" scale={investRecurringScale} />
+                            </td>
+                            <td className="num">
+                              <Num value={candidate.decisionRecord.natureAdjustedNpv.central} unit="円" scale={npvScale} />
+                              <span className="cell-note">{verdictLabel(candidate.decisionRecord.verdict)}</span>
+                            </td>
+                            <td>
+                              <CountermeasureSelector siteId={siteId} candidateKey={candidate.key} selected={selected} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="card-action-row">
+                    <Link href={`/decision/${encodeURIComponent(siteId)}/analysis`} className="pill-btn pill-btn--sm">
+                      回避量と追加リターンを分析する →
+                    </Link>
+                  </div>
+              </Card>
 
               {/* (3) この結果の反映先(指示15) */}
               <Card title="この結果の反映先">
@@ -458,8 +431,7 @@ export default async function DecisionPage({
                   </div>
                 )}
               </Card>
-            </div>
-          </details>
+          </div>
         );
       })}
 

@@ -8,6 +8,8 @@
 import type { SiteRow } from "@core/site/ingest";
 
 export interface UserSiteDeepDiveParams {
+  /** 1件追加フォームで直接算定できるカテゴリ。古い保存データはwaterとして扱う。 */
+  category?: "water" | "climate";
   physicalQuantity: number;
   unit: string;
   unitReplacementCost: number;

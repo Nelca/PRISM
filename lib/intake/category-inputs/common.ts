@@ -12,14 +12,19 @@ export interface ParsedCategoryCsv {
   errors: string[];
 }
 
-export function parseCategoryCsv(text: string, fileName: string, requiredHeaders: readonly string[]): ParsedCategoryCsv {
+export function parseCategoryCsv(
+  text: string,
+  fileName: string,
+  requiredHeaders: readonly string[],
+  headerAliases: Readonly<Record<string, string>> = {}
+): ParsedCategoryCsv {
   const rows = parseCsv(text.replace(/^\uFEFF/, "")).filter(
     (row) => row.some((cell) => cell.trim() !== "") && !row[0]?.trim().startsWith("#")
   );
   if (rows.length === 0) return { rows: [], columns: new Map(), errors: [`${fileName}が空です。`] };
 
   const [header, ...dataRows] = rows;
-  const normalizedHeader = header.map((cell) => cell.trim());
+  const normalizedHeader = header.map((cell) => headerAliases[cell.trim()] ?? cell.trim());
   const columns = new Map(normalizedHeader.map((name, index) => [name, index]));
   const errors: string[] = [];
   if (columns.size !== normalizedHeader.length) errors.push(`${fileName}のヘッダーが重複しています。`);

@@ -3,8 +3,7 @@
  * lib/demo/company.tsは架空企業「東海化成」site-042専用の固定データなので変更しない。
  * ここでは同じ形のレコードを、フォーム入力(またはデフォルト値)から任意の拠点向けに組み立てる。
  *
- * M3の評価手法(packages/core/src/monetization/registry.ts)は現状waterカテゴリの
- * 3手法のみが実装されているため、新規拠点もwaterカテゴリで評価する。
+ * 1件追加フォームで扱える水・GHGの2カテゴリを、実装済みの算定手法へ接続する。
  */
 
 import { getPluginsForCategory } from "@core/monetization/registry";
@@ -13,11 +12,12 @@ import type { Site } from "@core/types/site";
 import type { DisclosureClaim } from "@core/types/disclosure";
 import type { BaselineNpvInput } from "@core/types/financial-bridge";
 import type { DeepDiveConfig } from "@core/pipeline/valuation-pipeline";
-import { DEEP_DIVE_CALIBRATION } from "./company";
+import { CLIMATE_DEEP_DIVE_CALIBRATION, CLIMATE_DEEP_DIVE_CONFIG, DEEP_DIVE_CALIBRATION } from "./company";
 import type { CountermeasureCandidate } from "./company";
 import type { UserSiteDeepDiveParams } from "./site-entry";
 
 export const DEFAULT_DEEP_DIVE_PARAMS: UserSiteDeepDiveParams = {
+  category: "water",
   physicalQuantity: 10_000,
   unit: "m3",
   unitReplacementCost: 500,
@@ -29,6 +29,26 @@ export const DEFAULT_DEEP_DIVE_PARAMS: UserSiteDeepDiveParams = {
 };
 
 export function buildUserDeepDiveConfig(siteId: string, params: UserSiteDeepDiveParams): DeepDiveConfig {
+  const category = params.category ?? "water";
+  if (category === "climate") {
+    return {
+      physicalQuantityId: `pq-${siteId}-climate-2027`,
+      input: {
+        category: "climate",
+        physicalQuantity: params.physicalQuantity,
+        unit: params.unit,
+        siteId,
+        sourceRegion: "JP",
+        targetRegion: "JP",
+      },
+      config: CLIMATE_DEEP_DIVE_CONFIG,
+      calibration: CLIMATE_DEEP_DIVE_CALIBRATION,
+      plugins: getPluginsForCategory("climate"),
+      calibrationSetVersion: "ghg-carbon-price-conversion-v1",
+      reconciliationFunctionVersion: "none",
+      fitnessTierThresholdVersion: "fitness-tier-v1",
+    };
+  }
   return {
     physicalQuantityId: `pq-${siteId}-water-2027`,
     input: {
@@ -84,6 +104,7 @@ export function buildUserCountermeasureCandidates(
   replacementCostRecordId: string,
   params: UserSiteDeepDiveParams
 ): CountermeasureCandidate[] {
+  const climate = (params.category ?? "water") === "climate";
   const reductionAvoided = Math.round(params.physicalQuantity * params.unitReplacementCost * 0.7);
   const avoidanceAvoidedYear0 = Math.round(reductionAvoided * 0.5);
   const avoidanceAvoidedYear1 = Math.round(reductionAvoided * 1.15);
@@ -92,7 +113,7 @@ export function buildUserCountermeasureCandidates(
   return [
     {
       key: "reduction",
-      label: "取水設備の効率化投資",
+      label: climate ? "省エネ・排出削減設備への投資" : "取水設備の効率化投資",
       avoidedPhysicalQuantity: params.physicalQuantity,
       countermeasure: {
         type: "reduction",
@@ -106,7 +127,7 @@ export function buildUserCountermeasureCandidates(
     },
     {
       key: "avoidance",
-      label: "調達先の変更(水源の多様化)",
+      label: climate ? "再生可能エネルギーへの切り替え" : "調達先の変更(水源の多様化)",
       avoidedPhysicalQuantity: Math.round(params.physicalQuantity * 1.1),
       countermeasure: {
         type: "avoidance",
@@ -120,7 +141,7 @@ export function buildUserCountermeasureCandidates(
     },
     {
       key: "transfer",
-      label: "自然リスク保険契約",
+      label: climate ? "炭素価格リスクの移転" : "自然リスク保険契約",
       avoidedPhysicalQuantity: 0,
       countermeasure: {
         type: "transfer",
@@ -147,15 +168,17 @@ export function buildUserCountermeasureCandidates(
 }
 
 export function buildUserDisclosureClaim(site: Site, params: UserSiteDeepDiveParams): DisclosureClaim {
+  const category = params.category ?? "water";
+  const subject = category === "climate" ? "GHG排出量" : "水使用量";
   return {
     id: `claim-${site.id}-2027`,
     sourceDocument: "統合報告書2027(デモ入力)",
     sourcePageOrSection: "—",
     rawText:
-      params.disclosureClaimText?.trim() || `当社は2030年までに${site.name}における水使用量を20%削減することを目指します。`,
+      params.disclosureClaimText?.trim() || `当社は2030年までに${site.name}における${subject}を20%削減することを目指します。`,
     claimType: "future_commitment",
     extractedMetadata: {
-      category: "water",
+      category,
       quantityMentioned: { value: 20, unit: "%" },
       periodMentioned: { startYear: 2027, endYear: 2030 },
       scopeMentioned: site.name,

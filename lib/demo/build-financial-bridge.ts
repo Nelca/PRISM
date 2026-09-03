@@ -21,7 +21,8 @@ export function buildFinancialBridge(input: {
   welfareRecord?: WelfareValuationRecord;
   baselineNpv: DecisionInputs["baselineNpv"];
   companyFinancials: DecisionInputs["companyFinancials"];
-  isClimateShowcaseSite: boolean;
+  isClimateCategory: boolean;
+  climatePhysicalQuantity?: number;
 }) {
   const corporateContribution = (
     record: ExchangeValuationRecord,
@@ -44,9 +45,9 @@ export function buildFinancialBridge(input: {
     };
   };
   const uninternalizedCostByScenario: Partial<Record<CarbonPriceScenario, ExchangeAmount>> | undefined =
-    input.isClimateShowcaseSite
+    input.isClimateCategory
       ? (() => {
-          const physicalQuantityTco2 = CLIMATE_DEEP_DIVE_INPUT.physicalQuantity;
+          const physicalQuantityTco2 = input.climatePhysicalQuantity ?? CLIMATE_DEEP_DIVE_INPUT.physicalQuantity;
           const year = 2030;
           const costFor = (scenario: "net_zero_2050" | "current_policies", model: "gcam" | "remind") =>
             exchangeAmount(

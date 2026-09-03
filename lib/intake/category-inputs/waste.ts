@@ -23,6 +23,19 @@ const REQUIRED_HEADERS = [
   "linked_prtr_transfer_input_id",
   "internal_treatment_cost",
 ] as const;
+const HEADER_ALIASES: Record<string, string> = {
+  拠点ID: "site_id",
+  報告期間: "reporting_period",
+  廃棄物種別コード: "waste_type_code",
+  有害廃棄物: "hazardous",
+  処理方法: "treatment_route",
+  処理場所: "treatment_location",
+  重量基準: "weight_basis",
+  数量kg: "quantity_kg",
+  元データID: "source_record_id",
+  PRTR移動量ID: "linked_prtr_transfer_input_id",
+  内部処理費用: "internal_treatment_cost",
+};
 
 export interface WasteCsvParseResult {
   inputs: WasteQuantityInput[] | null;
@@ -30,7 +43,7 @@ export interface WasteCsvParseResult {
 }
 
 export function parseWasteCsv(text: string, options: CategoryInputParseOptions = {}): WasteCsvParseResult {
-  const parsed = parseCategoryCsv(text, FILE_NAME, REQUIRED_HEADERS);
+  const parsed = parseCategoryCsv(text, FILE_NAME, REQUIRED_HEADERS, HEADER_ALIASES);
   if (parsed.errors.length > 0) return { inputs: null, errors: parsed.errors };
 
   const errors: string[] = [];

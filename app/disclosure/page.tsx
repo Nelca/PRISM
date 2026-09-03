@@ -1,12 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPipelineView } from "@/lib/views/pipeline";
-import { buildDisclosureView } from "@core/disclosure/build-disclosure-view";
-import { INTERNAL_REVIEW_TEMPLATE } from "@core/disclosure/templates/internal-review-template";
 import { Card, GuideBox, GuideButton, KV, ScreenLead, Tag } from "../components/ui";
 import { categoryLabel, formatDepthReason, gapTypeLabel, materialIssueLabel } from "../components/labels";
 import { Num } from "../components/numeric";
 import { StepNav } from "../components/step-nav";
+import { SectionNav } from "../components/section-nav";
 import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
 import { TaskBanner } from "../components/task-banner";
 import { inputSourceLabel } from "../valuation/category-expansion";
@@ -55,18 +54,6 @@ export default async function DisclosurePage({
   const selectedFindingId = findings.some((f) => f.id === findingParam) ? findingParam : defaultFindingId;
   const selectedFinding = findings.find((f) => f.id === selectedFindingId);
 
-  // 出力3層目:自社のレコードから開示文の下書きを組み立てる(GAP-19)
-  const { view: disclosureView, unfilledRequirements } = buildDisclosureView(
-    `dv-${result.recalculationHash.hash}`,
-    INTERNAL_REVIEW_TEMPLATE,
-    {
-      materialIssues: result.assessment.materialIssues,
-      valuationRecords: Object.values(result.valuation.valuationRecordsByMaterialIssue).flat(),
-      decisionRecords: result.decisions.map((entry) => entry.decision.decisionRecord),
-    },
-    new Date().toISOString()
-  );
-
   return (
     <div className="screen">
       <div className="screen__head">
@@ -82,27 +69,19 @@ export default async function DisclosurePage({
         </GuideBox>}
       </div>
 
+      <SectionNav
+        label="開示内の画面"
+        items={[
+          { href: "/disclosure", label: "指摘", description: "根拠との不一致に対応", active: true },
+          { href: "/disclosure/intake", label: "PDF取込", description: "開示文から主張を抽出", active: false },
+          { href: "/disclosure/draft", label: "下書き", description: "登録済みレコードから作成", active: false },
+        ]}
+      />
+
       {!detailOnly && <>
 
       {/* D-11-1:残タスクの頭出しバナー(全6画面共通。残タスクがある時だけ出る)。 */}
       <TaskBanner current="/disclosure" result={result} />
-
-      <Card title="開示作業" subtitle="未対応の指摘を確認し、必要なときだけ取込・下書きへ進みます">
-        <div className="action-list">
-          <Link href="#gap-findings" className="action-link">
-            <b>未対応の指摘を確認する</b>
-            <span>根拠不足の記載と、対応操作を先に確認します</span>
-          </Link>
-          <Link href="/disclosure/intake" className="action-link">
-            <b>PDFから主張を抽出する</b>
-            <span>AIは抽出だけを行い、根拠の十分性判定は既存ルールで行います</span>
-          </Link>
-          <Link href="/disclosure/draft" className="action-link">
-            <b>開示文の下書きを確認する</b>
-            <span>登録済みレコードから機械的に組み立てた文案を確認します</span>
-          </Link>
-        </div>
-      </Card>
 
       {coverageSummaries.length > 0 && (
         <Card
@@ -156,11 +135,11 @@ export default async function DisclosurePage({
         <Card
           id="gap-findings"
           title="指摘の一覧"
-          subtitle="1記載1行。行の「詳細」から下の詳細と対応操作が開きます"
+          subtitle="行の「詳細」から根拠確認と対応操作へ進みます"
           padBody={false}
           foot="記載の真偽は断定せず、根拠の充足状況だけを示します"
         >
-          <table className="data-table">
+          <table className="data-table data-table--linked">
             <thead>
               <tr>
                 <th>記載</th>
@@ -174,10 +153,7 @@ export default async function DisclosurePage({
               {findings.map((finding) => {
                 const claim = claimsById.get(finding.claimId);
                 return (
-                  <tr
-                    key={finding.id}
-                    style={finding.id === selectedFindingId ? { background: "var(--accent-soft)" } : undefined}
-                  >
+                  <tr key={finding.id}>
                     <td title={claim?.rawText}>
                       <b>{truncateClaim(claim?.rawText)}</b>
                       {claim && (
@@ -224,7 +200,7 @@ export default async function DisclosurePage({
       </>}
 
       {/* 詳細は選択した1件だけを描画する(指摘が100件でもDOMは1件分)。 */}
-      {[selectedFinding].filter((finding) => finding !== undefined).map((finding) => {
+      {detailOnly && [selectedFinding].filter((finding) => finding !== undefined).map((finding) => {
         const claim = claimsById.get(finding.claimId);
         const siteId = result.disclosureClaimSiteId[finding.claimId];
         const materialIssueId = siteId
@@ -237,7 +213,7 @@ export default async function DisclosurePage({
             key={finding.id}
             id="finding-detail"
             title={claim?.rawText}
-            subtitle={claim ? `${claim.sourceDocument} ${claim.sourcePageOrSection} ・ 他の記載は上の一覧から開けます` : undefined}
+            subtitle={claim ? `${claim.sourceDocument} ${claim.sourcePageOrSection}` : undefined}
             headExtra={
               <>
                 {finding.gapType ? <Tag variant="warn">{gapTypeLabel(finding.gapType)}</Tag> : <Tag variant="ok">根拠充足</Tag>}
@@ -302,54 +278,7 @@ export default async function DisclosurePage({
         );
       })}
 
-      {/*
-        構想書8.1の出力3層目(DisclosureView)。自社のレコードから開示文の下書きを組み立てる。
-        検証(上のギャップ検出)とは逆向きの機能で、PDFもAIも使わない。
-        基準への項目マッピングは未確定のため、SSBJ準拠とは称さない(GAP-19)。
-      */}
-      {!detailOnly && <Card
-        title="開示文の下書き"
-        subtitle="登録済みのレコードから組み立て"
-        headExtra={<Tag variant="neutral">基準へのマッピング前</Tag>}
-        foot="固定の文章テンプレートに数値を機械的に埋め込んでいます。AIによる文章生成は行っていません"
-      >
-        {disclosureView.generatedText ? (
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              fontFamily: "var(--font-body)",
-              fontSize: 13,
-              lineHeight: 1.9,
-              margin: 0,
-            }}
-          >
-            {disclosureView.generatedText}
-          </pre>
-        ) : (
-          <p style={{ color: "var(--ink-faint)" }}>下書きを組み立てる材料がまだありません。</p>
-        )}
-
-        {unfilledRequirements.length > 0 && (
-          <>
-            <hr className="rule" />
-            <div className="section-label">材料が足りず記載できていない項目</div>
-            <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-              {unfilledRequirements.map((requirement) => (
-                <li key={requirement} style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>
-                  {requirement}
-                </li>
-              ))}
-            </ul>
-            <p className="tooltip-note">空欄を文章で埋めることはしません。材料が揃った時点で自動的に記載されます。</p>
-          </>
-        )}
-
-        <p className="tooltip-note" style={{ marginTop: 10 }}>
-          SSBJ等の基準のどの開示項目に何を載せるかは未確定です(基準本文の取得待ち)。この下書きは社内確認用です。
-        </p>
-      </Card>}
-
-      <StepNav current="/disclosure" result={result} />
+      {!detailOnly && <StepNav current="/disclosure" result={result} />}
     </div>
   );
 }

@@ -41,6 +41,16 @@ function dismissOrientation() {
   orientationStoreListeners.forEach((listener) => listener());
 }
 
+function showOrientation() {
+  dismissedForSession = false;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // 保存領域を利用できない環境でも、このセッション中は再表示する。
+  }
+  orientationStoreListeners.forEach((listener) => listener());
+}
+
 export function HomeOrientation() {
   const visible = useSyncExternalStore(
     subscribeOrientationStore,
@@ -49,7 +59,14 @@ export function HomeOrientation() {
   );
 
   if (!visible) {
-    return <h1 className="sr-only">ダッシュボード</h1>;
+    return (
+      <div className="home-orientation-restore">
+        <h1 className="sr-only">ダッシュボード</h1>
+        <button type="button" className="pill-btn pill-btn--sm" onClick={showOrientation}>
+          PRISMとはを再表示
+        </button>
+      </div>
+    );
   }
 
   return (

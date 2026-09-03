@@ -10,6 +10,7 @@ export interface ParsedSiteForm {
 }
 
 const VALID_SITE_TYPES: SiteType[] = ["own_site", "supplier_site"];
+const VALID_DIRECT_CATEGORIES = ["water", "climate"] as const;
 
 function numberOrFallback(formData: FormData, name: string, label: string, fallback: number, min?: number) {
   const raw = formData.get(name);
@@ -25,9 +26,13 @@ export function parseSiteForm(
   const siteType = String(formData.get("siteType") ?? "");
   const industrySector = String(formData.get("industrySector") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();
+  const category = String(formData.get("category") ?? fallback.category ?? "water");
   if (!name) return { error: "拠点名を入力してください。" };
   if (!VALID_SITE_TYPES.includes(siteType as SiteType)) return { error: "種別を選択してください。" };
   if (!industrySector) return { error: "業種を入力してください。" };
+  if (!VALID_DIRECT_CATEGORIES.includes(category as (typeof VALID_DIRECT_CATEGORIES)[number])) {
+    return { error: "評価する環境データを選択してください。" };
+  }
 
   const fields = {
     physicalQuantity: numberOrFallback(formData, "physicalQuantity", "物理量", fallback.physicalQuantity, 0),
@@ -45,8 +50,11 @@ export function parseSiteForm(
   if ("error" in fields.approvalThresholdValue) return fields.approvalThresholdValue;
 
   const deepDive: UserSiteDeepDiveParams = {
+    category: category as UserSiteDeepDiveParams["category"],
     physicalQuantity: fields.physicalQuantity.value,
-    unit: String(formData.get("unit") ?? "").trim() || fallback.unit,
+    unit:
+      String(formData.get("unit") ?? "").trim() ||
+      (category === (fallback.category ?? "water") ? fallback.unit : category === "climate" ? "tCO2e" : "m3"),
     unitReplacementCost: fields.unitReplacementCost.value,
     investmentCostInitial: fields.investmentCostInitial.value,
     investmentCostRecurring: fields.investmentCostRecurring.value,

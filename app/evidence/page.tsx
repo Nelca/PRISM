@@ -5,6 +5,7 @@ import { loadPipelineView } from "@/lib/views/pipeline";
 import { Card, ScreenLead, TableScroll, Tag } from "../components/ui";
 import { categoryLabel, materialIssueLabel } from "../components/labels";
 import { inputSourceLabel } from "../valuation/category-expansion";
+import { methodShortLabel } from "../components/method-labels";
 
 export const metadata: Metadata = {
   title: "証拠・入力根拠 | PRISM",
@@ -13,11 +14,20 @@ export const metadata: Metadata = {
 export default async function EvidencePage({ searchParams }: { searchParams: Promise<{ issue?: string }> }) {
   const { issue: issueParam } = await searchParams;
   const result = await loadPipelineView();
-  if (issueParam && !Object.hasOwn(result.valuation.coverageByMaterialIssue, issueParam)) notFound();
+  const evidenceIssueIds = new Set([
+    ...Object.keys(result.valuation.coverageByMaterialIssue),
+    ...Object.keys(result.valuation.valuationRecordsByMaterialIssue),
+  ]);
+  if (issueParam && !evidenceIssueIds.has(issueParam)) notFound();
   const issueById = new Map(result.assessment.materialIssues.map((issue) => [issue.id, issue]));
   const siteNameById = new Map(result.assessment.sites.map((site) => [site.id, site.name]));
-  const rows = Object.entries(result.valuation.coverageByMaterialIssue)
-    .map(([materialIssueId, coverage]) => ({ materialIssueId, coverage, issue: issueById.get(materialIssueId) }))
+  const rows = [...evidenceIssueIds]
+    .map((materialIssueId) => ({
+      materialIssueId,
+      coverage: result.valuation.coverageByMaterialIssue[materialIssueId],
+      records: result.valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [],
+      issue: issueById.get(materialIssueId),
+    }))
     .sort((a, b) => Number(b.materialIssueId === issueParam) - Number(a.materialIssueId === issueParam));
 
   return (
@@ -28,6 +38,10 @@ export default async function EvidencePage({ searchParams }: { searchParams: Pro
         </div>
         <ScreenLead>入力、係数、除外理由を作業画面から分離して確認します</ScreenLead>
       </div>
+
+      <p className="page-back page-back--top">
+        <Link href="/valuation#representative-selection">← 価値の算定へ戻る</Link>
+      </p>
 
       <Card
         title="入力・係数・除外の一覧"
@@ -55,24 +69,30 @@ export default async function EvidencePage({ searchParams }: { searchParams: Pro
                 </td>
               </tr>
             ) : (
-              rows.map(({ materialIssueId, coverage, issue }) => (
+              rows.map(({ materialIssueId, coverage, records, issue }) => (
                 <tr key={materialIssueId}>
                   <td>
                     <b>{issue ? materialIssueLabel(siteNameById.get(issue.siteId), issue.impactCategory, issue.siteId) : materialIssueId}</b>
                     {issue && <span className="id-note">{categoryLabel(issue.impactCategory)}</span>}
                   </td>
-                  <td>{inputSourceLabel(coverage.sourceKind)}</td>
-                  <td>{coverage.reportingPeriod}</td>
+                  <td>{coverage ? inputSourceLabel(coverage.sourceKind) : "直接入力・算定設定"}</td>
+                  <td>{coverage?.reportingPeriod ?? "年次入力"}</td>
                   <td>
-                    {coverage.quantities.some((quantity) => quantity.rowCounts.blocked > 0 || quantity.rowCounts.unmapped > 0) ? (
+                    {coverage?.quantities.some((quantity) => quantity.rowCounts.blocked > 0 || quantity.rowCounts.unmapped > 0) ? (
                       <Tag variant="warn">未算定あり</Tag>
                     ) : (
                       <Tag variant="ok">算定済み</Tag>
                     )}
                   </td>
                   <td style={{ fontSize: 12 }}>
-                    {coverage.mappingVersion ?? "対応表なし"}
-                    {coverage.coefficientVersion ? ` ・ ${coverage.coefficientVersion}` : ""}
+                    {coverage ? (
+                      <>
+                        {coverage.mappingVersion ?? "対応表なし"}
+                        {coverage.coefficientVersion ? ` ・ ${coverage.coefficientVersion}` : ""}
+                      </>
+                    ) : (
+                      [...new Set(records.map((record) => methodShortLabel(record.methodId)))].join("・") || "算定手法なし"
+                    )}
                   </td>
                   <td>
                     <Link href={`/valuation/${encodeURIComponent(materialIssueId)}`} className="pill-btn pill-btn--sm">

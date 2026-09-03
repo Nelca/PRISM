@@ -4,9 +4,10 @@ import { loadLedgerView } from "@/lib/views/pipeline";
 import { recalculateWithPriorParameters } from "@core/ledger/recalculate-with-prior-parameters";
 import { Mono, Num, pickYenScale } from "../components/numeric";
 import { Card, ScreenLead, Stat, Tag } from "../components/ui";
-import { categoryLabel, verdictLabel } from "../components/labels";
+import { categoryLabel, materialIssueLabel, verdictLabel } from "../components/labels";
 import { methodLabel, withMethodLabelsInText } from "../components/method-labels";
 import { DataSourceAttribution } from "../components/attribution";
+import { SectionNav } from "../components/section-nav";
 
 export const metadata: Metadata = {
   title: "記録 | PRISM",
@@ -22,10 +23,55 @@ export const metadata: Metadata = {
  */
 type LedgerSection = "overview" | "history" | "inputs" | "parameter-versions" | "billing";
 
+const PARAMETER_SET_LABEL: Record<string, string> = {
+  "aop-mapping": "健康・生態系影響の対応表",
+  "carbon-price-scenarios": "炭素価格シナリオ",
+  "ghg-carbon-price-conversion": "GHGの金額換算",
+  "m1-sensitivity-criteria": "自然との関わりの判定基準",
+  "m2-priority-formula": "評価優先度の算定式",
+  "m3-fitness-tier-threshold": "手法適合度の判定基準",
+  "m3-geo-calibration": "地域差の調整",
+  "m4-decomposition-algorithm": "手法差の要因分解",
+  "m6-binding-mechanism-definition": "結果の反映先の定義",
+  "m7-gap-detection-rule": "開示と根拠の照合ルール",
+};
+
+function parameterSetLabel(setId: string): string {
+  return PARAMETER_SET_LABEL[setId] ?? methodLabel(setId);
+}
+
 export default async function LedgerPage({ searchParams, section = "overview" }: { searchParams: Promise<{ compareWith?: string }>; section?: LedgerSection }) {
   const { compareWith } = await searchParams;
   const { result, parameterVersions, runs, decisionCounts, priorRun } = await loadLedgerView(compareWith);
   const { decisions } = result;
+  const sectionTitle: Record<LedgerSection, string> = {
+    overview: "記録",
+    history: "変更履歴",
+    inputs: "入力・係数の追跡",
+    "parameter-versions": "係数・パラメータの版",
+    billing: "判定件数",
+  };
+  const sectionLead: Record<LedgerSection, string> = {
+    overview: "確認したい記録を選びます",
+    history: "誰がいつ何を変更したかを確認します",
+    inputs: "算定に使った入力・対応表・係数を照合します",
+    "parameter-versions": "使用中の版と過去の版による再計算を確認します",
+    billing: "確定した判定と従量課金の根拠を確認します",
+  };
+  const displayActionText = (text: string) => {
+    let display = withMethodLabelsInText(text)
+      .replaceAll("IFVI VFaccess", "IFVI 水ストレス係数(将来の水アクセス費用)")
+      .replaceAll("深掘り", "詳細評価");
+    const issues = [...result.assessment.materialIssues].sort((a, b) => b.id.length - a.id.length);
+    for (const issue of issues) {
+      const siteName = result.assessment.sites.find((site) => site.id === issue.siteId)?.name;
+      display = display.replaceAll(issue.id, materialIssueLabel(siteName, issue.impactCategory, issue.id));
+    }
+    for (const site of [...result.assessment.sites].sort((a, b) => b.id.length - a.id.length)) {
+      display = display.replaceAll(site.id, site.name);
+    }
+    return display;
+  };
 
   // --- M8 D-3:版レジストリと、旧版パラメータでの再計算(GAP-07)---
   // 比較元:URLで指定がなければ1つ前のrun。無ければ比較しない。
@@ -92,28 +138,26 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
     <div className="screen">
       <div className="screen__head">
         <div className="screen__title-row">
-          <h1 className="screen__title">{{
-            overview: "記録(監査証跡)",
-            history: "変更履歴",
-            inputs: "入力・係数の追跡",
-            "parameter-versions": "係数・パラメータの版",
-            billing: "判定件数",
-          }[section]}</h1>
+          <h1 className="screen__title">{sectionTitle[section]}</h1>
         </div>
-        <ScreenLead>変更履歴・使用した係数の版・課金の根拠を確認します</ScreenLead>
+        <ScreenLead>{sectionLead[section]}</ScreenLead>
       </div>
 
-      {section === "overview" && <Card title="確認する台帳" subtitle="日常業務と技術的な検証情報を分けています">
-        <div className="action-list action-list--grid">
-          <Link href="/ledger/history" className="action-link"><b>変更履歴</b><span>誰がいつ何を選び、なぜ変更したか</span></Link>
-          <Link href="/ledger/inputs" className="action-link"><b>入力・係数の追跡</b><span>入力ハッシュ、対応表、係数を照合</span></Link>
-          <Link href="/ledger/parameter-versions" className="action-link"><b>係数・パラメータの版</b><span>現在版と旧版での再計算</span></Link>
-          <Link href="/ledger/billing" className="action-link"><b>判定件数</b><span>従量課金の根拠を確認</span></Link>
-        </div>
-      </Card>}
+      <SectionNav
+        label="記録内の画面"
+        items={[
+          ...(section === "overview"
+            ? []
+            : [{ href: "/ledger", label: "記録メニュー", description: "確認する記録を選択", active: false }]),
+          { href: "/ledger/history", label: "変更履歴", description: "担当・日時・変更内容", active: section === "history" },
+          { href: "/ledger/inputs", label: "入力・係数", description: "算定根拠を照合", active: section === "inputs" },
+          { href: "/ledger/parameter-versions", label: "版と再計算", description: "現在版と旧版を比較", active: section === "parameter-versions" },
+          { href: "/ledger/billing", label: "判定件数", description: "従量課金の根拠", active: section === "billing" },
+        ]}
+      />
 
-      {(section === "overview" || section === "history" || section === "parameter-versions") && <div className={section === "overview" ? "grid-2" : undefined}>
-        {(section === "overview" || section === "history") && <Card id="history" title="変更履歴" subtitle="誰がいつ何を選び、なぜか" padBody={false}>
+      {(section === "history" || section === "parameter-versions") && <div>
+        {section === "history" && <Card id="history" padBody={false}>
           <table className="data-table">
             <thead>
               <tr>
@@ -137,7 +181,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
                     </td>
                     <td>{entry.who}</td>
                     {/* 第4版 D-03:古い記録に残る手法IDは、記録を書き換えず表示時だけ読める名前にする。 */}
-                    <td>{withMethodLabelsInText(entry.what)}</td>
+                    <td>{displayActionText(entry.what)}</td>
                   </tr>
                 ))
               )}
@@ -146,17 +190,15 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
         </Card>}
 
         {/* M8 D-3:係数セット・パラメータの版管理。旧版は削除せず保持し続ける。 */}
-        {(section === "overview" || section === "parameter-versions") && <Card
+        {section === "parameter-versions" && <Card
           id="parameter-versions"
-          title="係数・パラメータの版"
-          subtitle="どの版がいつから有効か"
           padBody={false}
           foot="パイプラインが実際に使った版を自動で取り込みます。変更理由は自動では付きません(システムが理由を作らないため)"
         >
           <table className="data-table">
             <thead>
               <tr>
-                <th>セット</th>
+                <th>係数・ルール</th>
                 <th>版</th>
                 <th>有効開始</th>
                 <th>状態</th>
@@ -173,7 +215,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
               ) : (
                 parameterVersions.map((version) => (
                   <tr key={`${version.setId}-${version.version}`}>
-                    <td>{version.setId}</td>
+                    <td>{parameterSetLabel(version.setId)}</td>
                     <td className="num">
                       <Mono>{version.version}</Mono>
                     </td>
@@ -198,7 +240,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
         </Card>}
       </div>}
 
-      {(section === "overview" || section === "inputs") && <Card
+      {section === "inputs" && <Card
         id="inputs"
         title="追加カテゴリの入力・係数の追跡"
         subtitle="算定行ごとに入力、対応表、係数を照合できます"
@@ -244,10 +286,8 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
         構想書6.4が「課金の発生根拠が顧客にとって説明可能である」ことを設計要件としているため、
         件数だけでなく、どの判定がいつ数えられたかの明細も出す。⑤から本画面へ移設(指示05)。
       */}
-      {(section === "overview" || section === "billing") && <Card
+      {section === "billing" && <Card
         id="billing"
-        title="判定件数"
-        subtitle="従量課金の根拠"
         padBody={false}
         foot="判定が確定した時点で1件。判定の内容(結論が変わるか変わらないか)は課金に影響しません。未確定(保留)は数えません"
       >
@@ -287,7 +327,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
         監査対応には必要だが日常業務では読む必要がないため、折りたたみに格下げする
         (第1波が /valuation で使った details.foldout パターンを踏襲)。
       */}
-      {(section === "overview" || section === "parameter-versions") && <details className="foldout" open={section === "parameter-versions"}>
+      {section === "parameter-versions" && <details className="foldout" open>
         <summary>
           技術的な検証情報
           <small>ハッシュ・レコード単位の照合・旧版係数での再計算(監査対応向け)</small>
@@ -447,7 +487,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
         </div>
       </details>}
 
-      <DataSourceAttribution sources={["World Bank"]} />
+      {section === "inputs" && <DataSourceAttribution sources={["World Bank"]} />}
     </div>
   );
 }

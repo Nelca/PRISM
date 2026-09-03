@@ -74,6 +74,10 @@ export default async function AnalysisPage({
         <ScreenLead>代表値を決める前に、手法間の差と試算幅の理由を確認します</ScreenLead>
       </div>
 
+      <p className="page-back page-back--top">
+        <Link href="/valuation#representative-selection">← 価値の算定へ戻る</Link>
+      </p>
+
       {selected && (
         <Card
           id="pair-comparison"

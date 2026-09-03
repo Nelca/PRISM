@@ -4,6 +4,7 @@ import { INTERNAL_REVIEW_TEMPLATE } from "@core/disclosure/templates/internal-re
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { Card, ScreenLead, Tag } from "../../components/ui";
 import Link from "next/link";
+import { SectionNav } from "../../components/section-nav";
 
 export const metadata: Metadata = {
   title: "開示文下書き | PRISM",
@@ -31,6 +32,15 @@ export default async function DisclosureDraftPage() {
         <ScreenLead>登録済みレコードから組み立てた文案だけを確認します</ScreenLead>
       </div>
 
+      <SectionNav
+        label="開示内の画面"
+        items={[
+          { href: "/disclosure", label: "指摘", description: "根拠との不一致に対応", active: false },
+          { href: "/disclosure/intake", label: "PDF取込", description: "開示文から主張を抽出", active: false },
+          { href: "/disclosure/draft", label: "下書き", description: "登録済みレコードから作成", active: true },
+        ]}
+      />
+
       {unfilledRequirements.length > 0 && (
         <Card title="下書きに不足している項目" headExtra={<Tag variant="warn">{unfilledRequirements.length}件</Tag>}>
           <ul className="task-list" style={{ margin: 0 }}>
@@ -40,7 +50,11 @@ export default async function DisclosureDraftPage() {
         </Card>
       )}
 
-      <Card title="下書き" headExtra={<Tag variant="neutral">基準へのマッピング前</Tag>}>
+      <Card
+        title="下書き"
+        headExtra={<Tag variant="neutral">基準へのマッピング前</Tag>}
+        foot="固定の文章テンプレートに数値を機械的に埋め込んでいます。AIによる文章生成は行っていません"
+      >
         <pre className="draft-text">{view.generatedText || "下書きに使えるレコードがまだありません。"}</pre>
       </Card>
     </div>

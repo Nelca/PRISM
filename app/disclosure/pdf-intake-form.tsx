@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { extractDisclosurePdfAction, type PdfIntakeFormState } from "./actions";
 
@@ -36,7 +37,7 @@ export function PdfIntakeForm() {
           </div>
           {state.lowConfidenceCount !== undefined && state.lowConfidenceCount > 0 && (
             <p className="tooltip-note" style={{ marginTop: 6 }}>
-              うち{state.lowConfidenceCount}件は抽出確信度が低いため(extractionConfidence: low)、下記の一覧で内容を確認してください。
+              うち{state.lowConfidenceCount}件は抽出確信度が低いため、指摘の一覧で内容を確認してください。
             </p>
           )}
           {state.failedPages && state.failedPages.length > 0 && (
@@ -44,6 +45,9 @@ export function PdfIntakeForm() {
               抽出できなかったページがあります(ページ {state.failedPages.join(", ")})。スキャン画像等でテキスト層が無い可能性があります。
             </p>
           )}
+          <p className="form-ok">
+            <Link href="/disclosure">抽出した指摘を確認する →</Link>
+          </p>
         </div>
       )}
     </form>

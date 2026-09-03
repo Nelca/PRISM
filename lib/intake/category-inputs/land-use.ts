@@ -20,6 +20,18 @@ const REQUIRED_HEADERS = [
   "land_class_after",
   "source_record_id",
 ] as const;
+const HEADER_ALIASES: Record<string, string> = {
+  拠点ID: "site_id",
+  活動区分: "activity_kind",
+  プロジェクトID: "project_id",
+  数量: "quantity",
+  単位: "unit",
+  土地分類: "land_class",
+  変更前土地分類: "land_class_before",
+  変更後土地分類: "land_class_after",
+  元データID: "source_record_id",
+  形状GeoJSON: "geometry_geojson",
+};
 
 export type ParsedLandUseInput = (LandConversionInput | LandOccupationInput) & { geometryGeoJson?: object };
 
@@ -44,7 +56,7 @@ function parseGeometry(raw: string, label: string, errors: string[]): object | u
 }
 
 export function parseLandUseCsv(text: string, options: CategoryInputParseOptions = {}): LandUseCsvParseResult {
-  const parsed = parseCategoryCsv(text, FILE_NAME, REQUIRED_HEADERS);
+  const parsed = parseCategoryCsv(text, FILE_NAME, REQUIRED_HEADERS, HEADER_ALIASES);
   if (parsed.errors.length > 0) return { inputs: null, errors: parsed.errors };
 
   const errors: string[] = [];

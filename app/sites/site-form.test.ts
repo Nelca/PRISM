@@ -28,4 +28,13 @@ describe("site form", () => {
     invalidQuantity.set("physicalQuantity", "Infinity");
     expect(parseSiteForm(invalidQuantity, DEFAULT_DEEP_DIVE_PARAMS)).toHaveProperty("error");
   });
+
+  it("GHG排出量を選ぶと気候カテゴリと単位を保存する", () => {
+    const form = baseForm();
+    form.set("category", "climate");
+    form.set("physicalQuantity", "8000");
+    form.set("unit", "tCO2e");
+    const parsed = parseSiteForm(form, DEFAULT_DEEP_DIVE_PARAMS);
+    expect(parsed).toMatchObject({ deepDive: { category: "climate", physicalQuantity: 8000, unit: "tCO2e" } });
+  });
 });
