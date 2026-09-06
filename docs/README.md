@@ -55,6 +55,7 @@ docs/
   roadmap/
     build-plan.md                  フェーズ0からMVP完成までの作業指示
     category-expansion-directive.md PRTR汚染→廃棄物→土地利用のPlanモード実装指示書
+    divergence-decomposition-completion-directive.md M4乖離原因分解を実データ実証まで完成させる自律実装指示書
 
   data/                          外部データの調査結果(フェーズ0の成果物)
     aop-mapping-v1.md                初版済 — AoP正規化対応表(IFVI/LIME3確認済、CE Delft未着手)
@@ -125,6 +126,8 @@ docs/
 - **実データ受け入れテンプレートを実装。** `lib/intake/`(引用符対応の最小限CSVパーサ・拠点一覧CSVテンプレート・NatureInterface調査結果CSVテンプレート・エンゲージメント設定JSONテンプレート・統合ローダー)。実データが「①顧客提供・②PRISM運用チーム調査・③顧客財務部門」という由来の異なる3種のデータの合流であることを整理し、ファイルを分けた(design-rationale-log D-105)。M1実装時に「スコープ外」としていたCSV文字列パースを、実データ投入という別の関心事のために`lib/intake/`限定で追加した(D-106)。`lib/intake/templates/`の記入例が実際にM1〜M7を通しで実行できることをテストで検証済み。`docs/data-intake-guide.md`に非エンジニア向けの記入ガイドを作成した。テスト31件追加(リポジトリ全体で289件)すべて通過、`tsc --noEmit`・ESLintも通過
 - 次は実データでの[GATE]検証・パイロット(build-plan §7、デザインパートナーとの調整が必要)。並行して現在の実装(ダミーデータ上で動く一連の機能)をブラッシュアップしていくフェーズ
 - **算定対象拡大の方針をADR-0004で確定。** PRTR対象有害化学物質を汚染MVPの最初の入力とし、廃棄物を同リリース後半へ追加、LIME3単独の土地利用パイロットを並行開始する。実装順・完了条件・人間GATEは`roadmap/category-expansion-directive.md`、外部データ取得は`data/category-expansion-acquisition.md`に整理済み
+- **M4乖離原因分解の完成実装指示書を作成。** 現行の日本水ケースでは7ペア中6ペアがゼロ値フォールバック、残る1ペアも説明率0%であるため、比較意味論・計算トレース・真正な反実仮想評価・実データ実証・人間GATEを`roadmap/divergence-decomposition-completion-directive.md`に再定義した。現行の「M4実装済み」はアルゴリズム骨格の完成を意味し、プロダクト完成判定は同指示書を優先する
 
 次にやることは `roadmap/build-plan.md` §12 のチェックリストを参照。
 算定対象拡大を進める場合は、先に `roadmap/category-expansion-directive.md` を参照。
+乖離原因分解の完成実装を進める場合は、先に `roadmap/divergence-decomposition-completion-directive.md` を参照。
