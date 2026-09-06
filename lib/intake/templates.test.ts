@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { TEST_DECOMPOSITION_VERSIONS_V2 } from "@core/divergence/test-helpers";
 import { loadCompanyDataset } from "./load-company-dataset";
 import { runAssessmentPipeline } from "@core/pipeline/assessment-pipeline";
 import { runValuationPipeline } from "@core/pipeline/valuation-pipeline";
@@ -102,13 +103,7 @@ describe("templates/の記入例からM1〜M8を通しで実行できる", () =>
         reconciliationFunctionVersion: "ifvi-reconciliation-v1",
         fitnessTierThresholdVersion: "fitness-tier-v1",
       }),
-      decompositionVersions: {
-        algorithmVersion: "shapley-v1",
-        cicesMatchLevel: "group",
-        aopMappingVersion: "aop-mapping-v1",
-        f3ThresholdVersion: "f3-v1",
-        f8ThresholdVersion: "f8-v1",
-      },
+      decompositionVersions: TEST_DECOMPOSITION_VERSIONS_V2,
       idSequence,
       now: NOW,
     });

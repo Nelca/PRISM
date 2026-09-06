@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { computeTornadoChart } from "@core/monetization/tornado";
-import type { PairwiseDecomposition } from "@core/types/divergence";
+import type { PairwiseDecompositionV2 } from "@core/types/divergence";
 import { decomposeQuantileRange } from "@core/divergence/quantile-decomposition";
 import type { ValuationRecord } from "@core/types/valuation";
 import { loadPipelineView } from "@/lib/views/pipeline";
@@ -19,13 +19,18 @@ import { categoryLabel, materialIssueLabel } from "../components/labels";
 import { StepNav } from "../components/step-nav";
 import { Football } from "../components/charts/Football";
 import { Tornado } from "../components/charts/Tornado";
-import { Waterfall } from "../components/charts/Waterfall";
 import { RepresentativeSelector } from "./representative-selector";
 import { DataSourceAttribution } from "../components/attribution";
 import { PipelineWarnings } from "../components/pipeline-warnings";
 import { ScalableSelector } from "../components/scalable-selector";
 import { TaskBanner } from "../components/task-banner";
-import { additivePairSteps, pairwiseToWaterfallSteps, readablePairNarrative, UNCERTAINTY_FACTOR_LABEL, zeroValueNote } from "./view-model";
+import {
+  pairImplicationDisplay,
+  readablePairNarrative,
+  recordZeroMeaning,
+  residualRatioLabel,
+  UNCERTAINTY_FACTOR_LABEL,
+} from "./view-model";
 import {
   availabilityLabel,
   coverageRows,
@@ -124,10 +129,11 @@ export default async function ValuationPage({
   );
 
   // 中心値が0円の手法(D-08:0の行も非表示にせず、理由を添えて出す)。同じ理由はまとめて1文にする。
-  const zeroRecords = records.filter((r) => zeroValueNote(r) !== null);
+  // 完成実装 §5.6:methodIdの文字列判定ではなく、手法アダプターが確定した trace.zeroMeaning を読む。
+  const zeroRecords = records.filter((r) => recordZeroMeaning(r) !== null);
   const zeroNoteGroups = new Map<string, string[]>();
   for (const record of zeroRecords) {
-    const note = zeroValueNote(record)!;
+    const note = recordZeroMeaning(record)!;
     zeroNoteGroups.set(note.detail, [...(zeroNoteGroups.get(note.detail) ?? []), methodLabel(record.methodId)]);
   }
 
@@ -158,9 +164,9 @@ export default async function ValuationPage({
    * 同じ選択ペアに連動する。
    */
   const pairOptions = (decomposition?.groups ?? []).flatMap((group) =>
-    group.pairwiseDecompositions.map((pair) => ({ concept: group.valueConcept, pair }))
+    group.crossMethodPairs.map((pair) => ({ concept: group.valueConcept, pair }))
   );
-  const pairKeyOf = (pair: PairwiseDecomposition) => `${pair.methodIdA}~${pair.methodIdB}`;
+  const pairKeyOf = (pair: PairwiseDecompositionV2) => `${pair.methodIdA}~${pair.methodIdB}`;
   const defaultPairOption =
     pairOptions.length > 0
       ? pairOptions.reduce((best, option) => {
@@ -179,13 +185,6 @@ export default async function ValuationPage({
   const widthRecordA = selectedPair ? records.find((r) => r.methodId === selectedPair.methodIdA) : undefined;
   const widthRecordB = selectedPair ? records.find((r) => r.methodId === selectedPair.methodIdB) : undefined;
   const quantileDecomposition = widthRecordA && widthRecordB ? decomposeQuantileRange(widthRecordA, widthRecordB) : null;
-
-  /** ペアのうち中心値が0円の側(加法フォールバック時の理由文に使う)。 */
-  const zeroSideRecord = selectedPair
-    ? [selectedPair.methodIdA, selectedPair.methodIdB]
-        .map((methodId) => records.find((r) => r.methodId === methodId))
-        .find((record) => record !== undefined && (record.centralValue) === 0)
-    : undefined;
 
   const currentRepresentativeId = representativeRecordByMaterialIssue[selectedIssueId];
   const changeLog = m4ChangeLogByMaterialIssue[selectedIssueId];
@@ -514,10 +513,10 @@ export default async function ValuationPage({
                 </td>
                 <td className="num" style={{ fontWeight: 600 }}>
                   <Num value={r.centralValue} unit="円" scale={recordScale} />
-                  {/* D-08:0円の行は非表示にせず、なぜ0かの短い注記を値の隣に付ける。 */}
-                  {zeroValueNote(r) && (
-                    <span className="cell-note" style={{ fontWeight: 400 }} title={zeroValueNote(r)!.detail}>
-                      {zeroValueNote(r)!.short}
+                  {/* D-08:0円の行は非表示にせず、なぜ0かの短い注記を値の隣に付ける(§5.6:trace.zeroMeaning由来)。 */}
+                  {recordZeroMeaning(r) && (
+                    <span className="cell-note" style={{ fontWeight: 400 }} title={recordZeroMeaning(r)!.detail}>
+                      0の意味:{recordZeroMeaning(r)!.badgeLabel}
                     </span>
                   )}
                 </td>
@@ -603,31 +602,34 @@ export default async function ValuationPage({
         )}
       </Card>
 
-      {/* (3) 差が生じる理由(第4版 D-07:比較する2手法をユーザーが選べる) */}
+      {/*
+        (3) 差が生じる理由(T-16.1:詳細な要因分解・監査ドリルダウンは/analysisの責務。
+        ここでは結論・含意・寄与合計・残差の要約とリンクに留め、重複表示をしない)。
+      */}
       {selectedPair && (
         <Card
           id="pair-comparison"
           title="差が生じる理由"
-          subtitle={`${methodLabel(selectedPair.methodIdA)} と ${methodLabel(selectedPair.methodIdB)} の比較 ・ 中心値の差を要因に分解`}
+          subtitle={`${methodLabel(selectedPair.methodIdA)} と ${methodLabel(selectedPair.methodIdB)} の比較`}
         >
           {pairOptions.length > 1 && (
             <div style={{ marginBottom: 12 }}>
               <div className="section-label">比較するペアの選択(同じ価値概念どうしのみ。既定は差が最大のペア)</div>
               {decomposition?.groups.map(
                 (group) =>
-                  group.pairwiseDecompositions.length > 0 && (
+                  group.crossMethodPairs.length > 0 && (
                     <div key={group.valueConcept} className="selector-pills" style={{ marginBottom: 6, alignItems: "center" }}>
                       <Tag variant={group.valueConcept === "welfare" ? "welfare" : "exchange"}>
                         {group.valueConcept === "welfare" ? "厚生価値" : "交換価値"}
                       </Tag>
-                      {group.pairwiseDecompositions.map((pair) => {
+                      {group.crossMethodPairs.map((pair) => {
                         const key = pairKeyOf(pair);
                         const ratio = pairDivergenceRatio(pair);
                         const active = pairKeyOf(selectedPair) === key;
                         return (
                           <Link
                             key={key}
-                            href={`/analysis?issue=${encodeURIComponent(selectedIssueId)}&pair=${encodeURIComponent(key)}#pair-comparison`}
+                            href={`/valuation?issue=${encodeURIComponent(selectedIssueId)}&pair=${encodeURIComponent(key)}#pair-comparison`}
                             className={`pill-btn pill-btn--sm${active ? " pill-btn--accent" : ""}`}
                             title={`${methodLabel(pair.methodIdA)} と ${methodLabel(pair.methodIdB)} の比較`}
                           >
@@ -642,37 +644,40 @@ export default async function ValuationPage({
             </div>
           )}
 
-          {selectedPair.mode === "multiplicative" ? (
-            <>
-              <Waterfall
-                steps={pairwiseToWaterfallSteps(
-                  selectedPair,
-                  methodShortLabel(selectedPair.methodIdA),
-                  methodShortLabel(selectedPair.methodIdB)
-                )}
-              />
-              {/* 読み下し文は図の直下に常設する(以前はtooltip-note扱いで読み飛ばされた)。 */}
-              <p className="chart-narrative">{withMethodLabelsInText(readablePairNarrative(selectedPair))}</p>
-            </>
-          ) : selectedPair.mode === "additive" ? (
-            <>
-              <Waterfall
-                steps={additivePairSteps(
-                  selectedPair,
-                  methodShortLabel(selectedPair.methodIdA),
-                  methodShortLabel(selectedPair.methodIdB)
-                )}
-              />
-              {/* D-07-3:フォールバック文をそのまま出さず、なぜ0円かの理由まで書く(D-08と共用)。 */}
-              <p className="chart-narrative">
-                {zeroSideRecord
-                  ? `${methodLabel(zeroSideRecord.methodId)}の中心値が0円のため、倍率での分解ができず金額差での表示になっています。0円になるのは、${zeroValueNote(zeroSideRecord)!.detail}`
-                  : withMethodLabelsInText(readablePairNarrative(selectedPair))}
-              </p>
-            </>
-          ) : (
-            <p className="chart-narrative">{withMethodLabelsInText(readablePairNarrative(selectedPair))}</p>
-          )}
+          {/* 結論(/analysisと同じ語彙・同じ関数)。 */}
+          <p className="chart-narrative">{withMethodLabelsInText(readablePairNarrative(selectedPair))}</p>
+
+          {/* 含意・寄与合計・残差の要約。詳細な内訳・監査ドリルダウンは/analysisで確認する。 */}
+          <div className="grid-3">
+            <Stat label="意思決定への含意" value={pairImplicationDisplay(selectedPair).headingLabel} />
+            {selectedPair.status === "decomposed" ? (
+              <>
+                <Stat
+                  label="寄与合計"
+                  value={
+                    selectedPair.mode === "multiplicative"
+                      ? `×${Math.exp(selectedPair.explainedSum).toFixed(2)}`
+                      : <Num value={selectedPair.explainedSum} unit="円/年" scale={recordScale} />
+                  }
+                />
+                <Stat
+                  label="残差"
+                  value={
+                    selectedPair.residual.displayMultiplier !== null
+                      ? `×${selectedPair.residual.displayMultiplier.toFixed(2)}(比率:${residualRatioLabel(selectedPair.residual)})`
+                      : <Num value={selectedPair.residual.value} unit="円/年" scale={recordScale} />
+                  }
+                />
+              </>
+            ) : (
+              <Stat label="停止理由" value={pairImplicationDisplay(selectedPair).stopReasonLabel ?? "—"} />
+            )}
+          </div>
+          <div className="detail-actions">
+            <Link href={`/analysis?issue=${encodeURIComponent(selectedIssueId)}&pair=${encodeURIComponent(pairKeyOf(selectedPair))}#pair-conclusion`}>
+              結論・寄与・残差・監査ドリルダウンを詳しく見る →
+            </Link>
+          </div>
         </Card>
       )}
 
@@ -742,7 +747,7 @@ export default async function ValuationPage({
             <div className="section-label" style={{ color: "var(--accent-ink)" }}>
               交換価値グループ ・ {exchangeGroup.usage}
             </div>
-            {exchangeGroup.methodIds.map((id) => {
+            {exchangeGroup.recordMethodIds.map((id) => {
               const r = records.find((rec) => rec.methodId === id && rec.valueConcept === "exchange");
               if (!r) return null;
               return <KV key={id} k={methodLabel(id)} v={<Num value={r.centralValue} unit="円" scale={recordScale} />} />;
@@ -757,7 +762,7 @@ export default async function ValuationPage({
             <div className="section-label" style={{ color: "var(--welfare)" }}>
               厚生価値グループ ・ {welfareGroup.usage}
             </div>
-            {welfareGroup.methodIds.map((id) => {
+            {welfareGroup.recordMethodIds.map((id) => {
               const r = records.find((rec) => rec.methodId === id && rec.valueConcept === "welfare");
               if (!r) return null;
               return <KV key={id} k={methodLabel(id)} v={<Num value={r.centralValue} unit="円" scale={recordScale} />} />;

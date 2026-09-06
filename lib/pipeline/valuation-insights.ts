@@ -1,11 +1,35 @@
 import type { DemoPipelineResult } from "@/lib/demo/run-demo-pipeline";
-import type { DivergenceDecomposition, PairwiseDecomposition } from "@core/types/divergence";
+import type {
+  AnyDivergenceDecomposition,
+  DivergenceDecompositionV2,
+  PairwiseDecompositionV2,
+} from "@core/types/divergence";
+import { isDivergenceDecompositionV2 } from "@core/types/divergence";
+
+/**
+ * 完成実装 T-14:保存済みrunに旧形式(resultSchemaVersion ≤ 10)の分解結果が混ざっていても
+ * 例外にせず「旧形式のため再計算が必要」を返す。`lib/pipeline/execute-run.ts` は
+ * `RESULT_SCHEMA_VERSION` の不一致で再実行するため通常は起きないが、
+ * 型ガードで守っておき、読み手が旧形式を新意味論で誤解しないようにする。
+ */
+export type DivergenceReadResult =
+  | { kind: "v2"; decomposition: DivergenceDecompositionV2 }
+  | { kind: "legacy_needs_recalculation"; id: string }
+  | { kind: "missing" };
+
+export function readDivergenceDecomposition(value: AnyDivergenceDecomposition | undefined): DivergenceReadResult {
+  if (!value) return { kind: "missing" };
+  if (!isDivergenceDecompositionV2(value)) return { kind: "legacy_needs_recalculation", id: value.id };
+  return { kind: "v2", decomposition: value };
+}
 
 export function decompositionForMaterialIssue(
   result: DemoPipelineResult,
   materialIssueId: string
-): DivergenceDecomposition | undefined {
-  return result.valuation.divergenceDecompositions.find((d) => d.id === `dd-${materialIssueId}`);
+): DivergenceDecompositionV2 | undefined {
+  const found = result.valuation.divergenceDecompositions.find((d) => d.id === `dd-${materialIssueId}`);
+  const read = readDivergenceDecomposition(found);
+  return read.kind === "v2" ? read.decomposition : undefined;
 }
 
 export function hasRepresentativeSelection(result: DemoPipelineResult, materialIssueId: string): boolean {
@@ -64,16 +88,20 @@ export function sitesWithDegenerateRepresentative(
     }));
 }
 
-export function pairDivergenceRatio(pair: PairwiseDecomposition): number | null {
+/**
+ * 手法間の乖離倍率。停止ペア(分解できなかったペア)でも両端が正なら倍率は示せる。
+ * 「差の大きさ」と「差を分解できたか」は別の情報であり、後者は `pair.status` が持つ。
+ */
+export function pairDivergenceRatio(pair: PairwiseDecompositionV2): number | null {
   const a = Number(pair.valueA);
   const b = Number(pair.valueB);
   if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
   return Math.max(a, b) / Math.min(a, b);
 }
 
-export function maxDivergenceRatio(decomposition: DivergenceDecomposition): number | null {
+export function maxDivergenceRatio(decomposition: DivergenceDecompositionV2): number | null {
   const ratios = decomposition.groups
-    .flatMap((group) => group.pairwiseDecompositions.map(pairDivergenceRatio))
+    .flatMap((group) => group.crossMethodPairs.map(pairDivergenceRatio))
     .filter((ratio): ratio is number => ratio !== null);
   return ratios.length > 0 ? Math.max(...ratios) : null;
 }

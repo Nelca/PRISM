@@ -38,7 +38,7 @@ docs/
     m1-target-definition.md          済(対象定義とLocate)
     m2-assessment-execution.md       済(評価実行)
     m3-monetization-engine.md        済(貨幣化エンジン)
-    m4-divergence-decomposition.md   済(乖離分解)
+    m4-divergence-decomposition.md   済(乖離分解、完成判定は `divergence-decomposition-completion-directive.md` を優先・2026-09-06)
     m5-financial-bridge.md           済(財務接続)
     m6-decision-record.md            済(対策評価と意思決定注入)
     m7-disclosure-verification.md    済(開示生成と整合検証)
@@ -56,11 +56,16 @@ docs/
     build-plan.md                  フェーズ0からMVP完成までの作業指示
     category-expansion-directive.md PRTR汚染→廃棄物→土地利用のPlanモード実装指示書
     divergence-decomposition-completion-directive.md M4乖離原因分解を実データ実証まで完成させる自律実装指示書
+    divergence-decomposition-work-log.md M4実装の作業台帳(タスク・決定・検証履歴・再開位置)
+    divergence-human-gates.md      M4実装での人間判定(H-01〜H-07)と資料提供状況
+    prism-completion-acceptance.md 全体受入表(M1〜M8・M4変更・下流統合・1社実データ受入)
 
   data/                          外部データの調査結果(フェーズ0の成果物)
     aop-mapping-v1.md                初版済 — AoP正規化対応表(IFVI/LIME3確認済、CE Delft未着手)
     method-recalculability.md        初版済 — 手法別の再計算可能性
     cices-v51-notes.md               済 — CICES階層構造(公式スプレッドシートで確認。4層・コード体系・水の所在・V5.2との差分と追随判断)
+    divergence-feasibility-report.md 初版(2026-09-06) — M4実証候補の可行性評価(4条件判定・採点)
+    divergence-validation-report.md  予定 — 実データ実証結果(技術検証・成立性判定)
     external/                        外部から入手した一次資料の原本(CICES公式スプレッドシート等)
     licensing.md                     初版済 — ライセンス条件(WDPA/ENCORE/ESVD/CE Delft/IFVIの料金・条項を確認済み、契約締結は未)
     calibration-parameters-v1.md     初版済 — 地理較正パラメータの実値と出典(World Bank PPP/所得/デフレータ、η、相対価格上昇率)

@@ -17,6 +17,8 @@ import type {
   WelfareAmount,
 } from "./common";
 import type { AssessmentDepth } from "./assessment";
+import type { CausalPathway, EvidenceRef, ZeroMeaning } from "./comparison";
+import type { Availability, MethodEvaluationTrace, TraceStepDraft } from "./trace";
 
 interface PhysicalQuantityInputBase {
   physicalQuantity: number;
@@ -173,9 +175,54 @@ export interface CurrencyConversionRecord {
   source: string;
 }
 
+/**
+ * LIME3 水(取水)係数の構成要素(完成実装 T-05)。`externalValueFactors["lime3-water"]` の
+ * 最終値だけでなく、物理量→DALY→US$ の2段を公表列から復元できる形で持つ。
+ * 出典: docs/data/external/aist-idea-lime3-v4.0-lcia-coefficients.csv(基本フロー 001511000 / 001515000)。
+ */
+export interface Lime3WaterCoefficientComponents {
+  sourceFlowId: "001511000" | "001515000";
+  sourceFlowName: string;
+  waterSource: "surface" | "ground";
+  /** CSV列の地理的視点。水は生産国列が空欄のため消費国のみ。 */
+  perspective: "consumption_world_average" | "consumption_japan";
+  interestRate: 0.02;
+  /** 人間健康 DALY/m³(列「利子率2%、消費国、{世界平均|日本} / 人間健康 / DALY」)。 */
+  humanHealthDalyPerM3: number;
+  /** 統合化 US$/m³(列「… / 統合化 / US$」)。 */
+  integratedUsdPerM3: number;
+  /** 統合化係数 US$/DALY = integratedUsdPerM3 / humanHealthDalyPerM3(検算値 23,696.265)。 */
+  integrationUsdPerDaly: number;
+  /** 社会資産・生物多様性・一次生産の列は空欄(被覆外)。値を0にしない。 */
+  otherEndpoints: { socialAssets: Availability; biodiversity: Availability; primaryProduction: Availability };
+  /** 価格基準年はファイル内に明記がない(lime3-coefficients-notes.md §3.2-4)。推定で埋めない。 */
+  priceYear: number | null;
+  currency: "USD";
+  coefficientSetVersion: string;
+  evidence: EvidenceRef[];
+}
+
+/** IFVI 水消費 VF の出典(Appendix D Table D1 等)。ゼロ意味の付与根拠になる(§5.6)。 */
+export interface IfviWaterValueFactorSource {
+  country: string;
+  table: string;
+  perspective: "global" | "local";
+  priceYear: number;
+  currency: "USD";
+  coefficientSetVersion: string;
+  /** 国レベル値の拠点補正(Eq.3-5)に使う公表値。式が確認できるまで補正は実装しない。 */
+  nationalBiodiversityPressure?: number;
+  nationalWaterStress?: number;
+  evidence: EvidenceRef[];
+}
+
 export interface MethodConfig {
   /** M2のパイプラインから渡される深度。M3のESVD使用範囲(D-6)を左右する。 */
   depth: AssessmentDepth;
+  /** 完成実装 T-05:LIME3 水係数の構成要素。未指定なら `externalValueFactors["lime3-water"]` のみで動く(トレースは係数段が not_published)。 */
+  lime3WaterCoefficient?: Lime3WaterCoefficientComponents;
+  /** 完成実装 T-05:IFVI 水 VF の出典。未指定ならゼロ意味を付与できず、0 は `missing` 扱いにせず理由付きで保留する。 */
+  ifviWaterValueFactorSource?: IfviWaterValueFactorSource;
   /**
    * 代替費用法が使う、物理量1単位あたりの代替調達コスト(円)。企業提供のデータであり、
    * PRISM側で推定しない(D-15「推定で埋めない」)。代替費用法以外のプラグインは無視してよい。
@@ -279,6 +326,26 @@ export interface MethodOutput {
    * このフラグで明示的にスキップする。省略時はfalse(既存の全プラグインの挙動は不変)。
    */
   skipGeographicCalibration?: boolean;
+  /**
+   * 完成実装 §5.6:centralValue が 0 の場合、その意味をアダプターが出典付きで確定する。
+   * コアエンジンは値の大きさからゼロ意味を推論しない。
+   */
+  zeroMeaning?: ZeroMeaning;
+  /**
+   * 完成実装 §5.3:手法内部モデルの計算ステップ草稿(係数照会・係数適用・集計等)。
+   * 通貨換算・地理較正はコアエンジン(monetization/trace/build-trace.ts)が付け足す。
+   */
+  modelSteps?: TraceStepDraft[];
+  /** 完成実装 §5.3:トレースの判別可能な状態と因果経路。 */
+  traceMeta?: {
+    coefficientSetVersion: string;
+    endpointBreakdown: Availability;
+    damageTimeProfile: Availability;
+    siteCorrection: Availability;
+    pathway: CausalPathway;
+    underlyingModel: MethodEvaluationTrace["underlyingModel"];
+    flowInterpretation: MethodEvaluationTrace["flowInterpretation"];
+  };
 }
 
 export interface GoldenTestVector {
@@ -368,11 +435,20 @@ interface ValuationRecordCommon {
   discountRateStatus: DiscountRateStatus;
   geographicCalibration: GeographicCalibrationRecord;
   scopeExclusions: string[];
-  /** F-4判定材料(M4要件定義書§5)。要因別の反実仮想再計算がそもそも可能かどうか。 */
+  /**
+   * F-4判定材料(M4要件定義書§5)。
+   * 完成実装 T-02-10:真実源は `trace.endpointBreakdown` / `trace.damageTimeProfile` に一本化した。
+   * このフィールドはトレースから機械的に導出したミラー(保存済みrunとの後方互換)であり、M4は読まない。
+   */
   recalculability: {
     endpointBreakdownPublished: boolean;
     damageTimeProfilePublished: boolean;
   };
+  /**
+   * 完成実装 §5.3:再生可能な計算トレース。新runでは必ず入る。
+   * 旧run(resultSchemaVersion ≤ 10)には無く、その場合 M4 は `trace_insufficient` で停止する。
+   */
+  trace?: MethodEvaluationTrace;
   assumptionEntryIds: string[];
   recalculationHash: string;
   /** 実際に計算へ入った入力と係数を、再現可能な形で保持する。 */

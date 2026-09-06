@@ -6,7 +6,7 @@ import {
   deriveM3CoefficientCalibrationPayload,
   deriveM3FitnessTierPayload,
   deriveM3ReconciliationCheckPayload,
-  deriveM4DecompositionPayload,
+  deriveM4LegacyDecompositionPayload,
   deriveM4RepresentativeValueSelectionPayload,
   deriveM6BindingMechanismChangePayload,
   deriveM7GapFindingPayload,
@@ -123,13 +123,13 @@ describe("deriveM3FitnessTierPayload", () => {
   });
 });
 
-describe("deriveM4DecompositionPayload", () => {
+describe("deriveM4LegacyDecompositionPayload(旧エンジンの結果)", () => {
   it("PairwiseDecompositionから正しく転記し、not_recalculableな要因をnonDecomposableFactorsに集約する", () => {
     const a = makeValuationRecord({ methodId: "a", centralValue: 100, aopCode: "resource_availability" });
     const b = makeValuationRecord({ methodId: "b", centralValue: 300, aopCode: "human_health" });
     const decomposition = buildPairwiseDecomposition(a, b);
 
-    const payload = deriveM4DecompositionPayload(decomposition, {
+    const payload = deriveM4LegacyDecompositionPayload(decomposition, {
       algorithmVersion: "shapley-v1",
       cicesMatchLevel: "group",
       aopMappingVersion: "aop-mapping-v1",

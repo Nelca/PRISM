@@ -1,10 +1,11 @@
 import type { DemoPipelineResult } from "@/lib/demo/run-demo-pipeline";
 import type { GapType } from "@core/types/disclosure";
-import type { DivergenceDecomposition, PairwiseDecomposition } from "@core/types/divergence";
+import type { DivergenceDecompositionV2, PairwiseDecompositionV2 } from "@core/types/divergence";
 import {
   decompositionFactorLabel,
   gapTypeLabel,
   materialIssueLabel,
+  stopReasonLabel,
 } from "@/app/components/labels";
 import { formatCompactYenRange, formatYen } from "@/app/components/numeric";
 import { pairDivergenceRatio } from "./valuation-insights";
@@ -41,7 +42,7 @@ function formatExactYen(value: number): string {
 }
 
 /** 分解の対象(拠点 × カテゴリ)の表示名を引く。IDは画面に出さない(指示06)。 */
-function issueLabelForDecomposition(result: DemoPipelineResult, decomposition: DivergenceDecomposition): string {
+function issueLabelForDecomposition(result: DemoPipelineResult, decomposition: DivergenceDecompositionV2): string {
   const materialIssueId = materialIssueIdForDecomposition(result, decomposition);
   const issue = result.assessment.materialIssues.find((i) => i.id === materialIssueId);
   const siteName = result.assessment.sites.find((s) => s.id === decomposition.siteId)?.name;
@@ -49,7 +50,7 @@ function issueLabelForDecomposition(result: DemoPipelineResult, decomposition: D
   return materialIssueLabel(siteName, issue.impactCategory, decomposition.siteId);
 }
 
-function materialIssueIdForDecomposition(result: DemoPipelineResult, decomposition: DivergenceDecomposition): string | undefined {
+function materialIssueIdForDecomposition(result: DemoPipelineResult, decomposition: DivergenceDecompositionV2): string | undefined {
   return Object.keys(result.valuation.valuationRecordsByMaterialIssue).find((id) =>
     result.valuation.valuationRecordsByMaterialIssue[id].some(
       (record) => record.physicalQuantityId === decomposition.targetPhysicalQuantityId
@@ -57,17 +58,21 @@ function materialIssueIdForDecomposition(result: DemoPipelineResult, decompositi
   );
 }
 
-/** 差の主因。寄与が分解できていない(残差が支配的な)場合はそれを正直に書く。 */
-function dominantFactorLabel(pair: PairwiseDecomposition): string {
+/**
+ * 差の主因。数値化できた寄与のうち最大のものを返す。寄与より残差が大きい場合、
+ * または反実仮想が成立せず停止した場合は、それを正直に書く(残差へ理由を割り当てない)。
+ */
+function dominantFactorLabel(pair: PairwiseDecompositionV2): string {
+  if (pair.status === "stopped") return `差の要因を数値で分けられませんでした(${stopReasonLabel(pair.reason)})`;
   let best: { label: string; weight: number } | null = null;
   for (const contribution of pair.contributions) {
-    if (contribution.status !== "decomposed") continue;
-    const weight = Math.abs(contribution.logContribution);
+    if (contribution.isZero) continue;
+    const weight = Math.abs(contribution.shapley);
     if (!best || weight > best.weight) {
-      best = { label: decompositionFactorLabel(contribution.factor), weight };
+      best = { label: decompositionFactorLabel(contribution.category), weight };
     }
   }
-  const residualWeight = pair.residual ? Math.abs(pair.residual.logResidual) : 0;
+  const residualWeight = Math.abs(pair.residual.value);
   if (!best || residualWeight > best.weight) return "分解できない残差(方法そのものの違い)";
   return best.label;
 }
@@ -84,11 +89,11 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
   const { decisions, disclosure, valuation } = result;
 
   // 1. 手法間の乖離。価値概念(交換/厚生)をまたいだ比較はしない(合算禁止、concept-v2 §8.2)。
-  let widest: { ratio: number; decomposition: DivergenceDecomposition; pair: PairwiseDecomposition; concept: string } | null =
+  let widest: { ratio: number; decomposition: DivergenceDecompositionV2; pair: PairwiseDecompositionV2; concept: string } | null =
     null;
   for (const decomposition of valuation.divergenceDecompositions) {
     for (const group of decomposition.groups) {
-      for (const pair of group.pairwiseDecompositions) {
+      for (const pair of group.crossMethodPairs) {
         const ratio = pairDivergenceRatio(pair);
         if (ratio === null || ratio <= DIVERGENCE_ALERT_RATIO) continue;
         if (!widest || ratio > widest.ratio) {

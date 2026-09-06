@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildValuationRecords, LicenseGateError } from "../monetization/build-valuation-records";
 import { runValuationPipeline } from "./valuation-pipeline";
+import { TEST_DECOMPOSITION_VERSIONS_V2 } from "../divergence/test-helpers";
 import type {
   FactorResolution,
   GeographicCalibrationRecord,
@@ -134,13 +135,7 @@ describe("追加カテゴリの共通算定契約", () => {
           fitnessTierThresholdVersion: "not-applicable-v1",
         })),
       }),
-      decompositionVersions: {
-        algorithmVersion: "shapley-v1",
-        cicesMatchLevel: "group",
-        aopMappingVersion: "aop-mapping-v1",
-        f3ThresholdVersion: "f3-v1",
-        f8ThresholdVersion: "f8-v1",
-      },
+      decompositionVersions: TEST_DECOMPOSITION_VERSIONS_V2,
       idSequence: () => `ae-${++nextId}`,
       now: "2026-08-28T00:00:00Z",
     });

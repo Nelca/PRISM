@@ -11,6 +11,11 @@ import { applyF9DisplayRule, buildNarrative } from "./narrative";
 import type { DecompositionFactor, FactorContribution, PairwiseDecomposition } from "../types/divergence";
 import type { ValuationRecord } from "../types/valuation";
 
+/**
+ * @deprecated 旧経路。v(S) を固定倍率の合成で作るため、§6.2 が求める「実式の再実行」を満たさない。
+ *   新runは `pairwise-decomposition-v2.ts` の `buildPairwiseDecompositionV2` を使う。
+ *   この関数は保存済みrun(resultSchemaVersion ≤ 10)の再現のためだけに残す。
+ */
 export function buildPairwiseDecomposition(recordA: ValuationRecord, recordB: ValuationRecord): PairwiseDecomposition {
   const valueA = recordA.centralValue;
   const valueB = recordB.centralValue;

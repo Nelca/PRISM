@@ -9,7 +9,7 @@ import {
   deriveM3CoefficientCalibrationPayload,
   deriveM3FitnessTierPayload,
   deriveM3ReconciliationCheckPayload,
-  deriveM4DecompositionPayload,
+  deriveM4LegacyDecompositionPayload,
   deriveM6BindingMechanismChangePayload,
   deriveM7GapFindingPayload,
   deriveM7IntentionalDecisionPayload,
@@ -118,7 +118,7 @@ describe("M8統合テスト", () => {
     const lime3 = records.find((r) => r.methodId === "lime3-water")!;
 
     const decomposition = buildPairwiseDecomposition(vfes, lime3);
-    const payload = deriveM4DecompositionPayload(decomposition, {
+    const payload = deriveM4LegacyDecompositionPayload(decomposition, {
       algorithmVersion: "shapley-v1",
       cicesMatchLevel: "group",
       aopMappingVersion: "aop-mapping-v1",

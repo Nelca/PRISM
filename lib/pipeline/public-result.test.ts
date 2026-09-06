@@ -93,4 +93,57 @@ describe("buildPublicPipelineResult", () => {
     expect(serialized).toContain("factor-1");
     expect(serialized).toContain('"quantitiesRedacted":true');
   });
+
+  it("T-14:トレース内の係数リテラル値と反実仮想の差し替え値を再配布しない", () => {
+    const source = runDemoPipeline();
+    const serialized = JSON.stringify(buildPublicPipelineResult(source));
+
+    // LIME3(AIST-IDEA、BYOL)・IFVI(要契約)の原係数は出力に現れない。
+    for (const coefficient of ["0.0135886259", "5.73450112e-7", "2.97"]) {
+      expect(serialized).not.toContain(coefficient);
+    }
+
+    // 監査に必要な情報(最終値・ハッシュ・入手状態・因果経路・設定キー・出典)は残る。
+    expect(serialized).toContain('"valueRedacted":true');
+    expect(serialized).toContain('"finalValue"');
+    expect(serialized).toContain('"pathway"');
+    expect(serialized).toContain('"settingKey"');
+    expect(serialized).toContain("aist-idea-lime3-v4.0-lcia-coefficients.csv");
+  });
+
+  it("T-14:乖離分解は寄与・残差・到達値・停止理由を返し、差し替え前後の係数値だけを省く", () => {
+    const source = runDemoPipeline();
+    const result = buildPublicPipelineResult(source);
+    const decompositions = result.valuation.divergenceDecompositions as unknown as {
+      schemaVersion: number;
+      groups: {
+        crossMethodPairs: {
+          status: string;
+          vStar?: number;
+          residual?: unknown;
+          reason?: string;
+          contributions?: { swapped: { from: Record<string, unknown> }[] }[];
+        }[];
+      }[];
+    }[];
+    expect(decompositions.length).toBeGreaterThan(0);
+    expect(decompositions[0].schemaVersion).toBe(2);
+
+    const pairs = decompositions.flatMap((decomposition) => decomposition.groups.flatMap((group) => group.crossMethodPairs));
+    expect(pairs.length).toBeGreaterThan(0);
+    for (const pair of pairs) {
+      if (pair.status === "decomposed") {
+        expect(pair.vStar).toBeTypeOf("number");
+        expect(pair.residual).toBeDefined();
+        for (const contribution of pair.contributions ?? []) {
+          for (const swapped of contribution.swapped) {
+            expect(swapped.from).not.toHaveProperty("value");
+            expect(swapped.from.valueRedacted).toBe(true);
+          }
+        }
+      } else {
+        expect(pair.reason).toBeTypeOf("string");
+      }
+    }
+  });
 });

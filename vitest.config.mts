@@ -12,8 +12,12 @@ export default defineConfig({
     /**
      * *.db.test.ts は起動中のPostgresを必要とするため、既定の`npm test`からは除外する。
      * DBありのテストは `npm run test:db`(vitest.db.config.mts)で実行する。
+     *
+     * `.claude/worktrees/` 配下は同一リポジトリの別チェックアウト(gitignore 済み)であり、
+     * 本体の設定で走らせると `@core`/`@` エイリアスが本体側へ解決され、旧コードと新コアの
+     * 組合せで偽の失敗を出す(2026-09-06)。本体の合否判定から除外する。
      */
-    exclude: ["**/node_modules/**", "**/.next/**", "**/*.db.test.ts"],
+    exclude: ["**/node_modules/**", "**/.next/**", "**/*.db.test.ts", "**/.claude/**"],
   },
   resolve: {
     alias: {

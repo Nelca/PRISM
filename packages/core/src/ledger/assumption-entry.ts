@@ -12,7 +12,7 @@ import type { AssumptionEntry, AssumptionEntryPayload, AssumptionSourceModule } 
 import type { DepthDecision } from "../types/assessment";
 import type { GeographicCalibrationRecord, TransferFitness, ValuationRecord } from "../types/valuation";
 import type { ValuationRecordGroup } from "../monetization/build-valuation-records";
-import type { PairwiseDecomposition, RepresentativeValueSelection } from "../types/divergence";
+import type { PairwiseDecomposition, PairwiseDecompositionV2, RepresentativeValueSelection } from "../types/divergence";
 import type { BindingMechanismChangeEntry } from "../types/decision";
 import type { GapFinding, IntentionalDecisionRecord } from "../types/disclosure";
 import type { SiteLocationResolution } from "../site/location";
@@ -149,17 +149,77 @@ export function deriveM3CorporateFinancialEffectPayload(
 
 // --- M4 ---
 
+/**
+ * M4の台帳payloadへ記録する版。完成実装(T-13/T-14)で、比較レシピレジストリ・許容誤差・
+ * 同一対象判定規則・因果経路対応表の版を追加した。`DivergenceDecompositionVersionsV2`
+ * (divergence/pairwise-decomposition-v2.ts)と同じ形であり、そのまま相互に渡せる。
+ */
 export interface M4DecompositionVersions {
   algorithmVersion: string;
   cicesMatchLevel: string;
   aopMappingVersion: string;
   f3ThresholdVersion: string;
   f8ThresholdVersion: string;
+  recipeRegistryVersion: string;
+  toleranceVersion: string;
+  subjectRuleVersion: string;
+  pathwayMappingVersion: string;
 }
 
+/**
+ * 完成実装 T-13/T-14:新エンジン(`PairwiseDecompositionV2`)から台帳payloadを転記する。
+ * 新しい判断は加えない。
+ *
+ * - `fallbackApplied` は「この結果を左右した分岐」を機械的に写す。停止ペアは停止理由コード、
+ *   分解ペアは採用モードと完全/部分の区分。旧エンジンの F-1〜F-9 のような救済分岐は新経路に無い。
+ * - `nonDecomposableFactors` は数値化できなかった既知差異のカテゴリ(§5.5 の分類)。
+ *   金額を割り当てていないことは `StructuredResidual` 側に残る。
+ */
 export function deriveM4DecompositionPayload(
-  decomposition: PairwiseDecomposition,
+  pair: PairwiseDecompositionV2,
   versions: M4DecompositionVersions
+): Extract<AssumptionEntryPayload, { module: "M4"; kind: "decomposition" }> {
+  const nonDecomposableFactors = [
+    ...new Set(
+      (pair.status === "decomposed" ? pair.residual.knownUnquantified : pair.qualitativeDifferences).map(
+        (difference) => difference.category
+      )
+    ),
+  ];
+  const fallbackApplied =
+    pair.status === "stopped" ? [pair.reason] : [pair.mode, pair.kind];
+
+  return {
+    module: "M4",
+    kind: "decomposition",
+    algorithmVersion: versions.algorithmVersion,
+    symmetryAxiomApplied: true,
+    cicesMatchLevel: versions.cicesMatchLevel,
+    aopMappingVersion: versions.aopMappingVersion,
+    fallbackApplied,
+    nonDecomposableFactors,
+    f3ThresholdVersion: versions.f3ThresholdVersion,
+    f8ThresholdVersion: versions.f8ThresholdVersion,
+    recipeId: pair.recipe?.id,
+    recipeVersion: pair.recipe?.version,
+    recipeHash: pair.recipe?.hash,
+    decompositionKind: pair.status === "decomposed" ? pair.kind : undefined,
+    decompositionStatus: pair.status,
+    stopReason: pair.status === "stopped" ? pair.reason : undefined,
+    toleranceVersion: versions.toleranceVersion,
+    subjectRuleVersion: versions.subjectRuleVersion,
+    pathwayMappingVersion: versions.pathwayMappingVersion,
+    evaluationCount: pair.status === "decomposed" ? pair.evaluationCount : undefined,
+  };
+}
+
+/**
+ * 旧エンジン(`PairwiseDecomposition`、resultSchemaVersion ≤ 10)の結果から台帳payloadを作る。
+ * 保存済みrunの読み直し・移行検証にだけ使う。新runは `deriveM4DecompositionPayload` を使う。
+ */
+export function deriveM4LegacyDecompositionPayload(
+  decomposition: PairwiseDecomposition,
+  versions: Pick<M4DecompositionVersions, "algorithmVersion" | "cicesMatchLevel" | "aopMappingVersion" | "f3ThresholdVersion" | "f8ThresholdVersion">
 ): Extract<AssumptionEntryPayload, { module: "M4"; kind: "decomposition" }> {
   const nonDecomposableFactors = decomposition.contributions
     .filter((c) => c.status === "not_recalculable")

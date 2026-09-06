@@ -18,6 +18,8 @@ try {
 export default defineConfig({
   test: {
     include: ["**/*.db.test.ts"],
+    // `.claude/worktrees/` 配下の別チェックアウトは本体の判定から除外する(vitest.config.mts と同じ理由)。
+    exclude: ["**/node_modules/**", "**/.next/**", "**/.claude/**"],
     // DDL・権限を触るテストが並列に走ると互いを壊すため、直列実行にする。
     fileParallelism: false,
     env: {

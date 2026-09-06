@@ -12,7 +12,13 @@ import type { Site } from "@core/types/site";
 import type { DisclosureClaim } from "@core/types/disclosure";
 import type { BaselineNpvInput } from "@core/types/financial-bridge";
 import type { DeepDiveConfig } from "@core/pipeline/valuation-pipeline";
-import { CLIMATE_DEEP_DIVE_CALIBRATION, CLIMATE_DEEP_DIVE_CONFIG, DEEP_DIVE_CALIBRATION } from "./company";
+import { LIME3_WATER_SURFACE_CONSUMPTION_JAPAN } from "@/lib/data/lime3/water-coefficients";
+import {
+  CLIMATE_DEEP_DIVE_CALIBRATION,
+  CLIMATE_DEEP_DIVE_CONFIG,
+  DEEP_DIVE_CALIBRATION,
+  DEEP_DIVE_IFVI_WATER_VALUE_FACTOR_SOURCE,
+} from "./company";
 import type { CountermeasureCandidate } from "./company";
 import type { UserSiteDeepDiveParams } from "./site-entry";
 
@@ -72,6 +78,10 @@ export function buildUserDeepDiveConfig(siteId: string, params: UserSiteDeepDive
         "ifvi-vfes": 2.97,
         "ifvi-vfaccess": 0.0,
       },
+      // 完成実装 T-05:company.tsのDEEP_DIVE_CONFIGと同じ出典・同じ構成要素(物理量→DALY→US$の
+      // 2段トレース用)。
+      lime3WaterCoefficient: LIME3_WATER_SURFACE_CONSUMPTION_JAPAN,
+      ifviWaterValueFactorSource: DEEP_DIVE_IFVI_WATER_VALUE_FACTOR_SOURCE,
       vfesFitnessDimensions: {
         ecologicalFit: 0.75,
         socioeconomicFit: 0.68,

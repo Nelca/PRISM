@@ -1,4 +1,7 @@
 export * from "./common";
+export * from "./comparison";
+export * from "./trace";
+export * from "./recipe";
 export * from "./site";
 export * from "./assessment";
 export * from "./valuation";

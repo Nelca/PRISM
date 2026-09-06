@@ -68,6 +68,11 @@ export interface BuildDivergenceDecompositionOptions {
  * representativeValueSelection はユーザーの選択が入るため、ここでは組み立てない
  * (T-05で別途実装する)。assumptionEntryIds はパイプライン層が実配線する。
  */
+/**
+ * @deprecated 旧経路。グループ内レコード数の超過で例外を投げ、同一手法の内訳と手法間比較を
+ *   区別しない。新runは `build-divergence-decomposition-v2.ts` の
+ *   `buildDivergenceDecompositionV2`(`schemaVersion: 2`)を使う。
+ */
 export function buildDivergenceDecomposition(options: BuildDivergenceDecompositionOptions): DivergenceDecomposition {
   const { exchange, welfare } = partitionByValueConcept(options.records);
   const crossGroupComparison = buildCrossGroupComparison(exchange, welfare);

@@ -14,6 +14,12 @@
  */
 
 import { quantitiesInDeepDiveConfig, runValuationPipeline } from "@core/pipeline/valuation-pipeline";
+import type { DivergenceDecompositionVersionsV2 } from "@core/divergence/pairwise-decomposition-v2";
+import { F3_THRESHOLD_DISABLED_VERSION, F8_THRESHOLD_DISABLED_VERSION } from "@core/divergence/mode-selection";
+import { RECIPE_REGISTRY_VERSION } from "@core/divergence/recipes/registry";
+import { SUBJECT_IDENTITY_RULE_VERSION } from "@core/divergence/comparability";
+import { TOLERANCE_POLICY } from "@core/divergence/tolerance";
+import { PATHWAY_MAPPING_VERSION } from "@core/monetization/trace/pathway-mapping";
 import type { DeepDiveQuantityConfig } from "@core/pipeline/valuation-pipeline";
 import { RepresentativeValueSelectionError } from "@core/divergence/representative-value";
 import { runDisclosurePipeline } from "@core/pipeline/disclosure-pipeline";
@@ -89,13 +95,22 @@ const DECISION_MAKER = "宮里(サステナビリティ推進室)";
 /** M6 D-6の拘束方式定義の版。DecisionRecordの再計算ハッシュに入る(GAP-06)。 */
 const DECISION_VERSIONS = { bindingMechanismDefinitionVersion: "binding-mechanism-v1" };
 
-const DECOMPOSITION_VERSIONS = {
-  algorithmVersion: "shapley-v1",
+/**
+ * M4 完成実装(T-13/T-14):新経路(V2)の版集合。
+ * 旧経路の `shapley-v1` / `f3-v1` / `f8-v1` から差し替えた。F-3/F-8 の業務閾値は H-06 未承認のため
+ * 適用せず、**無効化していること自体を版として記録する**(有効時と再計算ハッシュが区別される)。
+ */
+const DECOMPOSITION_VERSIONS: DivergenceDecompositionVersionsV2 = {
+  algorithmVersion: "shapley-subset-v2",
   cicesMatchLevel: "group",
   aopMappingVersion: "aop-mapping-v1",
-  f3ThresholdVersion: "f3-v1",
-  f8ThresholdVersion: "f8-v1",
-} as const;
+  f3ThresholdVersion: F3_THRESHOLD_DISABLED_VERSION,
+  f8ThresholdVersion: F8_THRESHOLD_DISABLED_VERSION,
+  recipeRegistryVersion: RECIPE_REGISTRY_VERSION,
+  toleranceVersion: TOLERANCE_POLICY.version,
+  subjectRuleVersion: SUBJECT_IDENTITY_RULE_VERSION,
+  pathwayMappingVersion: PATHWAY_MAPPING_VERSION,
+};
 
 /** MaterialIssue.id は "${siteId}-mi-${category}" の形式(build-material-issues.ts)。 */
 function siteIdFromMaterialIssueId(materialIssueId: string): string {
@@ -763,6 +778,10 @@ export const DEFAULT_RNG_SEED = 42;
 // 9: 入力未登録時のPRTR・廃棄物・土地利用デモ算定を追加。保存済みrunも追加カテゴリを
 //    表示するため、新しい入力フォールバックで再計算する。
 // 10: 追加3カテゴリの企業交換価値、拠点別財務ブリッジ内訳、確認済み増分便益を追加。
-export const RESULT_SCHEMA_VERSION = 10;
+// 11: M4を新エンジン(DivergenceDecompositionV2、schemaVersion 2)へ切り替えた。
+//     結果の形が変わる(groups[].pairwiseDecompositions → crossMethodPairs / breakdownAnalyses、
+//     PairwiseDecomposition → decomposed|stopped の判別可能union、subject・versions の追加)。
+//     旧形式のまま保存されたrunを新コードが読むと表示が壊れるため、読み出し時に再実行する。
+export const RESULT_SCHEMA_VERSION = 11;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

@@ -8,6 +8,7 @@
  * →M8(RecalculationHash)までを通しで検証する。
  */
 import { describe, expect, it } from "vitest";
+import { TEST_DECOMPOSITION_VERSIONS_V2 } from "../divergence/test-helpers";
 import { runAssessmentPipeline } from "./assessment-pipeline";
 import { runValuationPipeline } from "./valuation-pipeline";
 import { runDecisionPipeline } from "./decision-pipeline";
@@ -164,13 +165,7 @@ describe("パイプライン統合テスト:架空の1社分のデータでM1〜
         reconciliationFunctionVersion: "ifvi-reconciliation-v1",
         fitnessTierThresholdVersion: "fitness-tier-v1",
       }),
-      decompositionVersions: {
-        algorithmVersion: "shapley-v1",
-        cicesMatchLevel: "group",
-        aopMappingVersion: "aop-mapping-v1",
-        f3ThresholdVersion: "f3-v1",
-        f8ThresholdVersion: "f8-v1",
-      },
+      decompositionVersions: TEST_DECOMPOSITION_VERSIONS_V2,
       idSequence,
       now: NOW,
     });

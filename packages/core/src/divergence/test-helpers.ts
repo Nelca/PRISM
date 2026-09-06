@@ -6,6 +6,8 @@
 import type { AoPCode, DiscountRateStatus, ExchangeAmount, ValueConcept, WelfareAmount } from "../types/common";
 import { exchangeAmount, welfareAmount } from "../types/common";
 import type { Distribution, QuantileRange } from "../types/common";
+import type { ComparisonSubject } from "../types/comparison";
+import type { MethodEvaluationTrace } from "../types/trace";
 import type {
   ExchangeValuationRecord,
   GeographicCalibrationRecord,
@@ -13,6 +15,10 @@ import type {
   ValuationRecord,
   WelfareValuationRecord,
 } from "../types/valuation";
+import { F3_THRESHOLD_DISABLED_VERSION, F8_THRESHOLD_DISABLED_VERSION } from "./mode-selection";
+import { RECIPE_REGISTRY_VERSION } from "./recipes/registry";
+import { SUBJECT_IDENTITY_RULE_VERSION } from "./comparability";
+import { TOLERANCE_POLICY } from "./tolerance";
 
 export const IDENTITY_CALIBRATION: GeographicCalibrationRecord = {
   pppSource: "test",
@@ -50,6 +56,39 @@ export const TEST_DECISION_VERSIONS = {
   bindingMechanismDefinitionVersion: "test-binding-mechanism-v1",
 };
 
+/** 新経路(V2)の版フィクスチャ。F-3/F-8 は H-06 未承認のため無効化版を使う(T-02-9)。 */
+export const TEST_DECOMPOSITION_VERSIONS_V2 = {
+  algorithmVersion: "test-shapley-v2",
+  cicesMatchLevel: "group",
+  aopMappingVersion: "test-aop-mapping-v1",
+  f3ThresholdVersion: F3_THRESHOLD_DISABLED_VERSION,
+  f8ThresholdVersion: F8_THRESHOLD_DISABLED_VERSION,
+  recipeRegistryVersion: RECIPE_REGISTRY_VERSION,
+  toleranceVersion: TOLERANCE_POLICY.version,
+  subjectRuleVersion: SUBJECT_IDENTITY_RULE_VERSION,
+  pathwayMappingVersion: "test-pathway-mapping-v1",
+};
+
+/** 比較対象(§5.1)のテスト用フィクスチャ。既定は水・消費水・m³・年次2027・年間フロー。 */
+export function makeComparisonSubject(overrides: Partial<ComparisonSubject> = {}): ComparisonSubject {
+  return {
+    id: "subject:pq-test-water-2027",
+    physicalQuantityId: "pq-1",
+    sourceRecordIds: [],
+    category: "water",
+    flow: { kind: "water", waterSource: "surface", waterUse: "consumption" },
+    quantity: { value: 1, unit: "m3", measurementBoundary: "site" },
+    location: { siteId: "site-042", region: "JP" },
+    period: { kind: "annual", year: 2027 },
+    timeBasis: "annual",
+    boundary: { siteId: "site-042" },
+    identityRuleVersion: SUBJECT_IDENTITY_RULE_VERSION,
+    provenance: "demo_default",
+    sourceHash: "test:subject",
+    ...overrides,
+  };
+}
+
 export interface ValuationRecordFixtureOptions {
   methodId: string;
   centralValue: number;
@@ -61,6 +100,10 @@ export interface ValuationRecordFixtureOptions {
   transferFitness?: TransferFitness;
   parameterUncertainty?: Distribution;
   quantileRange?: QuantileRange;
+  /** 完成実装 §5.3:再生可能な計算トレース。新経路のテストで使う。 */
+  trace?: MethodEvaluationTrace;
+  methodVersion?: string;
+  id?: string;
 }
 
 export function makeValuationRecord(
@@ -73,9 +116,10 @@ export function makeValuationRecord(options: ValuationRecordFixtureOptions): Val
   const valueConcept = options.valueConcept ?? "welfare";
 
   const common = {
-    id: `vr-${options.methodId}`,
+    id: options.id ?? `vr-${options.methodId}`,
     methodId: options.methodId,
-    methodVersion: "1.0.0",
+    methodVersion: options.methodVersion ?? "1.0.0",
+    trace: options.trace,
     physicalQuantityId: "pq-1",
     siteId: "site-042",
     aopCode: options.aopCode ?? "human_health",

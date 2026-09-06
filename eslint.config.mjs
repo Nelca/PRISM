@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 同一リポジトリの別チェックアウト(gitignore 済み)。本体の lint 対象にしない(2026-09-06)。
+    ".claude/worktrees/**",
   ]),
 ]);
 

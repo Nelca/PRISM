@@ -6,10 +6,12 @@
  * サーバーコンポーネントからも呼べるよう、純粋な定数・関数のみを置く(tag-utils.tsと同じ方針)。
  */
 
-import type { ImpactCategory } from "@core/types/common";
+import type { AoPCode, ImpactCategory } from "@core/types/common";
 import type { BindingMechanism, DecisionVerdict } from "@core/types/decision";
 import type { GapType } from "@core/types/disclosure";
-import type { DecompositionFactor } from "@core/types/divergence";
+import type { DecisionImplication, DecompositionFactor } from "@core/types/divergence";
+import type { ValuationTechnique, ZeroMeaningCode } from "@core/types/comparison";
+import type { Availability } from "@core/types/trace";
 import type { TagVariant } from "./tag-utils";
 
 /**
@@ -109,8 +111,159 @@ export const DECOMPOSITION_FACTOR_LABEL: Record<DecompositionFactor, string> = {
   geographicCalibration: "地域差による調整の違い",
 };
 
+/**
+ * 完成実装(M4 V2):要因は §5.5 の原因分類(`FactorCategory`)で表す。
+ * 旧エンジンの3要因ID(endpointCoverage / discountRate / geographicCalibration)は
+ * 保存済みrunの読み直し用に残す。
+ */
+export const FACTOR_CATEGORY_LABEL: Record<string, string> = {
+  normalization: "比較前の表現合わせ(単位・通貨・価格年)",
+  value_concept: "問いそのものの違い(価値概念)",
+  coverage_pathway: "何を測っているかの違い(対象範囲・因果経路)",
+  time_model: "時間の扱いの違い(割引率・予測期間)",
+  geographic_model: "地域差による調整の違い",
+  valuation_technique: "価値の測り方の違い(評価技法)",
+  underlying_model_data: "基礎モデル・データの違い",
+  unclassified: "分類できていない差",
+};
+
 export function decompositionFactorLabel(factor: string): string {
-  return DECOMPOSITION_FACTOR_LABEL[factor as DecompositionFactor] ?? factor;
+  return FACTOR_CATEGORY_LABEL[factor] ?? DECOMPOSITION_FACTOR_LABEL[factor as DecompositionFactor] ?? factor;
+}
+
+/**
+ * 分解を止めた理由(§6.1・§6.3 の `StopReasonCode`)。1つの「比較できません」へ潰さず、
+ * 利用者が次に何をすればよいか分かる言い方にする。
+ */
+export const STOP_REASON_LABEL: Record<string, string> = {
+  different_subject: "比べている対象そのものが違う",
+  value_concept_mismatch: "問い(価値概念)が違う",
+  sign_mismatch: "費用と便益で符号の意味が違う",
+  counterfactual_sign_mismatch: "計算途中で符号の意味が揃わない",
+  non_finite: "計算に必要な値が欠けている",
+  normalization_mismatch: "単位・通貨・価格年が揃っていない",
+  recipe_missing: "この手法の組合せの比較手順が未登録",
+  recipe_version_unsupported: "比較手順が対象の手法版に対応していない",
+  recipe_not_registrable: "比較手順がまだレビュー中",
+  trace_insufficient: "再計算に必要な計算過程が揃っていない",
+  no_numerizable_factors: "差を数値で入れ替えられる要因が定義できない",
+  budget_exceeded: "要因が多く計算量の上限を超える",
+  full_decomposition_endpoint_mismatch: "完全分解の到達値が一致しない",
+  efficiency_violation: "寄与の合計が全体差と一致しない",
+  group_limit_exceeded: "同じ価値概念グループの手法数が上限を超えた",
+  license_blocked: "ライセンス上この結果を表示できない",
+};
+
+export function stopReasonLabel(reason: string): string {
+  return STOP_REASON_LABEL[reason] ?? reason;
+}
+
+/**
+ * ゼロ値の意味(§5.6・T-15)。手法アダプターが出典付きで確定した区分を、
+ * 「0円」という数値だけでは伝わらない別々の状態として画面に出す。
+ */
+export const ZERO_MEANING_LABEL: Record<ZeroMeaningCode, string> = {
+  published_zero: "出典が0と公表",
+  not_applicable: "概念が適用されない",
+  not_covered: "手法の評価範囲外",
+  below_detection_or_rounding: "閾値・丸めにより0",
+  missing: "必要値が未取得",
+  computed_zero: "入力0等により計算結果が0",
+};
+
+export function zeroMeaningLabel(code: string): string {
+  return ZERO_MEANING_LABEL[code as ZeroMeaningCode] ?? code;
+}
+
+/**
+ * 意思決定への含意(§6.4・T-15の2番目の見出し)。代表値選択・追加調査・比較不能の3種を
+ * 見出し語にする。要約文(summary)はエンジンの決定論的テンプレートをそのまま使う。
+ */
+export const DECISION_IMPLICATION_LABEL: Record<DecisionImplication["kind"], string> = {
+  representative_choice: "代表値を選べる",
+  additional_investigation: "追加調査が必要",
+  not_comparable: "比較できない",
+};
+
+export function decisionImplicationLabel(kind: string): string {
+  return DECISION_IMPLICATION_LABEL[kind as DecisionImplication["kind"]] ?? kind;
+}
+
+/** 残差比率を表示できない理由(§6.4・§6.5)。相殺・全体差ゼロの場合に「割合表示不能」の内訳を示す。 */
+export const RATIO_UNAVAILABLE_REASON_LABEL: Record<string, string> = {
+  total_difference_within_tolerance: "全体差が許容誤差内のため割合を表示できません",
+  mixed_signs: "寄与・残差の符号が混在するため割合を表示できません",
+};
+
+export function ratioUnavailableReasonLabel(reason: string | undefined): string {
+  if (!reason) return "割合表示不能";
+  return RATIO_UNAVAILABLE_REASON_LABEL[reason] ?? reason;
+}
+
+/**
+ * 計算トレースの入手状態(`Availability.status`、trace.ts)。M3の`MethodAvailability`
+ * (利用可能・利用条件確認中等、category-expansion.tsのavailabilityLabel)とは別の状態集合。
+ */
+const TRACE_AVAILABILITY_LABEL: Record<Availability["status"], string> = {
+  available: "利用可能",
+  not_applicable: "該当なし",
+  not_published: "未公表",
+  not_licensed: "ライセンス未許諾",
+  unmapped: "未対応付け",
+  not_implemented_formula_published: "式は公表済み・未実装",
+};
+
+export function traceAvailabilityLabel(status: string): string {
+  return TRACE_AVAILABILITY_LABEL[status as Availability["status"]] ?? status;
+}
+
+/** 保護対象領域(AoP)。監査ドリルダウンの因果経路表示でのみ使う(M4要件定義書§6.2)。 */
+const AOP_CODE_LABEL: Record<AoPCode, string> = {
+  human_health: "人の健康",
+  ecosystem_quality: "生態系の質",
+  resource_availability: "資源の入手可能性",
+  social_assets: "社会資産",
+  unmapped: "未対応付け",
+  not_applicable: "該当なし(エンドポイントモデルを使わない手法)",
+};
+
+export function aopCodeLabel(code: string): string {
+  return AOP_CODE_LABEL[code as AoPCode] ?? code;
+}
+
+/** 価値評価技法(§5.2 因果経路の末端)。監査ドリルダウンでのみ使う。 */
+const VALUATION_TECHNIQUE_LABEL: Record<ValuationTechnique, string> = {
+  revealed_preference: "顕示選好法",
+  stated_preference: "表明選好法",
+  vsl: "統計的生命価値(VSL)",
+  vsly: "統計的生存年価値(VSLY)",
+  daly_monetization: "DALYの貨幣化(統合化係数)",
+  replacement_cost: "代替費用法",
+  avoided_cost: "回避費用法",
+  damage_cost: "損害費用法",
+  market_price: "市場価格法",
+  benefit_transfer_esvd: "便益移転(ESVD)",
+  unmapped: "未対応付け",
+};
+
+export function valuationTechniqueLabel(code: string): string {
+  return VALUATION_TECHNIQUE_LABEL[code as ValuationTechnique] ?? code;
+}
+
+/** 入力が手法の前提と一致するか(`MethodEvaluationTrace.flowInterpretation.status`)。 */
+const FLOW_INTERPRETATION_STATUS_LABEL: Record<"match" | "assumed_equivalent" | "mismatch", string> = {
+  match: "入力と手法の前提が一致",
+  assumed_equivalent: "同等とみなして適用(要確認)",
+  mismatch: "入力と手法の前提が一致しない",
+};
+
+export function flowInterpretationStatusLabel(status: string): string {
+  return FLOW_INTERPRETATION_STATUS_LABEL[status as keyof typeof FLOW_INTERPRETATION_STATUS_LABEL] ?? status;
+}
+
+/** トレースの各ステップが比較前正規化(reconciliation)か手法内部モデル(method_model)か(§5.5)。 */
+export function traceStepRoleLabel(role: "reconciliation" | "method_model"): string {
+  return role === "reconciliation" ? "比較前正規化(方法論寄与に含めない)" : "手法内部モデル";
 }
 
 /**
@@ -125,8 +278,24 @@ export const DECOMPOSITION_FACTOR_SHORT_LABEL: Record<DecompositionFactor, strin
   geographicCalibration: "地域差調整の違い",
 };
 
+/** 図の軸ラベル用の短縮版(§5.5 の原因分類と旧3要因の両方に対応する)。 */
+export const FACTOR_CATEGORY_SHORT_LABEL: Record<string, string> = {
+  normalization: "表現合わせ",
+  value_concept: "問いの違い",
+  coverage_pathway: "対象範囲の違い",
+  time_model: "時間の扱いの違い",
+  geographic_model: "地域差調整の違い",
+  valuation_technique: "評価技法の違い",
+  underlying_model_data: "基礎モデルの違い",
+  unclassified: "未分類の差",
+};
+
 export function decompositionFactorShortLabel(factor: string): string {
-  return DECOMPOSITION_FACTOR_SHORT_LABEL[factor as DecompositionFactor] ?? decompositionFactorLabel(factor);
+  return (
+    FACTOR_CATEGORY_SHORT_LABEL[factor] ??
+    DECOMPOSITION_FACTOR_SHORT_LABEL[factor as DecompositionFactor] ??
+    decompositionFactorLabel(factor)
+  );
 }
 
 /**

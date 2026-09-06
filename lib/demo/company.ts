@@ -38,7 +38,14 @@ import { lookupEcologicalIntegrityTrend } from "@core/site/ecological-integrity-
 import { defaultResolveCriterion } from "@core/site/criteria";
 import type { CriterionKey } from "@core/site/criteria";
 import type { NatureInterface, Site } from "@core/types/site";
-import type { GeographicCalibrationRecord, MethodConfig, PhysicalQuantityInput, ExchangeValuationRecord } from "@core/types/valuation";
+import type {
+  GeographicCalibrationRecord,
+  IfviWaterValueFactorSource,
+  MethodConfig,
+  PhysicalQuantityInput,
+  ExchangeValuationRecord,
+} from "@core/types/valuation";
+import { LIME3_WATER_SURFACE_CONSUMPTION_JAPAN } from "@/lib/data/lime3/water-coefficients";
 import type { SiteRow } from "@core/site/ingest";
 import type { Countermeasure } from "@core/types/decision";
 import type { BaselineNpvInput } from "@core/types/financial-bridge";
@@ -353,7 +360,31 @@ export const DEEP_DIVE_CALIBRATION: Omit<GeographicCalibrationRecord, "sourceReg
  * 受け取る前提のため、PPP等の変換は行わずIFVI公表値をそのまま渡す
  * (`packages/core/src/monetization/calibration.ts`が地理較正を一元的に適用する)。
  * 旧仮値(1.35 / 1.05 / 1.62 / 0.34)からの差し替え。
+ *
+ * 完成実装 T-05:ゼロ意味(§5.6)の付与根拠として`ifviWaterValueFactorSource`を追加する。
+ * `nationalBiodiversityPressure`/`nationalWaterStress`は本文Eq.3-5(拠点補正、式は公開済みだが
+ * 未実装)向けに保持するのみで、現状の計算には使わない(docs/data/acquisition-runbook.md §3.4)。
  */
+export const DEEP_DIVE_IFVI_WATER_VALUE_FACTOR_SOURCE: IfviWaterValueFactorSource = {
+  country: "JP",
+  table: "Appendix D Table D1",
+  perspective: "global",
+  priceYear: 2024,
+  currency: "USD",
+  coefficientSetVersion: "ifvi-water-consumption-2026-03-final:jp-table-d1-v1",
+  nationalBiodiversityPressure: 3.59,
+  nationalWaterStress: 1.97,
+  evidence: [
+    {
+      source: "IFVI_VBA_Environmental_Methodology-2_Water-Consumption_FIN_04.pdf(最終承認版)",
+      locator: "Appendix D Table D1、日本(Japan)の行",
+      version: "2026年3月",
+      tier: "primary",
+      note: "docs/data/acquisition-runbook.md §3.4で取得・確認済み(取得日2026-08-10)",
+    },
+  ],
+};
+
 export const DEEP_DIVE_CONFIG: MethodConfig = {
   depth: "deep_dive",
   unitReplacementCost: 620, // 円/m3(代替水源調達コスト、企業提供の想定値)
@@ -367,6 +398,10 @@ export const DEEP_DIVE_CONFIG: MethodConfig = {
     "ifvi-vfes": 2.97,
     "ifvi-vfaccess": 0.0,
   },
+  // 完成実装 T-05:externalValueFactors["lime3-water"]と同じ値(0.0135886259)に一致する
+  // 表層水・消費国=日本の構成要素(物理量→DALY→US$の2段トレース用)。
+  lime3WaterCoefficient: LIME3_WATER_SURFACE_CONSUMPTION_JAPAN,
+  ifviWaterValueFactorSource: DEEP_DIVE_IFVI_WATER_VALUE_FACTOR_SOURCE,
   vfesFitnessDimensions: {
     ecologicalFit: 0.75,
     socioeconomicFit: 0.68,

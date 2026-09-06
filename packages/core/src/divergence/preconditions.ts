@@ -22,6 +22,11 @@ export type PairPrecondition =
  * V_A(手法A中心値)・V_B(手法B中心値)から、Shapley分解に進めるかを判定する。
  * 判定順序はF-0の記載順(符号一致 → 正値 → 桁差 → 閾値)に従う。
  */
+/**
+ * @deprecated 旧経路。F-3(桁差)・F-8(軽微な乖離)の業務閾値を含むが、これらは H-06 未承認のため
+ *   新経路では適用しない(`mode-selection.ts` の `F3_THRESHOLD_DISABLED_VERSION` /
+ *   `F8_THRESHOLD_DISABLED_VERSION` を参照)。新runは `selectDecompositionMode` を使う。
+ */
 export function classifyPairPrecondition(valueA: number, valueB: number): PairPrecondition {
   const signA = Math.sign(valueA);
   const signB = Math.sign(valueB);

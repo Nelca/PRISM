@@ -9,7 +9,13 @@
 
 import { buildValuationRecords } from "../monetization/build-valuation-records";
 import { computeFitnessTier } from "../monetization/fitness";
-import { buildDivergenceDecomposition } from "../divergence/build-divergence-decomposition";
+import {
+  buildDivergenceDecompositionV2,
+  type IntraMethodBreakdownSpec,
+} from "../divergence/build-divergence-decomposition-v2";
+import { buildDefaultBreakdownSpecs } from "../monetization/breakdown-specs";
+import { buildComparisonSubject } from "../divergence/subject";
+import { createProductionRegistry, type RecipeRegistry } from "../divergence/recipes/registry";
 import { buildRepresentativeValueSelection } from "../divergence/representative-value";
 import type { RepresentativeValueSelectionResult } from "../divergence/representative-value";
 import {
@@ -30,7 +36,7 @@ import type {
   PhysicalQuantityInput,
   ValuationRecord,
 } from "../types/valuation";
-import type { DivergenceDecomposition } from "../types/divergence";
+import type { DivergenceDecompositionV2 } from "../types/divergence";
 import type { AssumptionEntry } from "../types/ledger";
 import type { ValueConcept } from "../types/common";
 
@@ -83,6 +89,22 @@ export interface ValuationPipelineOptions {
    */
   representativeSelectionForMaterialIssue?: (materialIssueId: string) => RepresentativeSelectionInput | undefined;
   decompositionVersions: M4DecompositionVersions;
+  /**
+   * 比較レシピレジストリ(T-13)。既定は本番レジストリ(`createProductionRegistry()`)。
+   * テストが合成レシピを使う場合だけ差し替える。宣言した `decompositionVersions.recipeRegistryVersion` と
+   * 実際のレジストリ版が一致しないと `DivergenceVersionMismatchError` になる。
+   */
+  registry?: RecipeRegistry;
+  /**
+   * 同一手法の内訳集計(§4-8)。省略時は水カテゴリの IFVI Eq.2 を自動で組み立てる。
+   * エンジンは集計式を推測しないため、宣言はここ(手法アダプター側の知識を持つ層)が渡す。
+   */
+  breakdownSpecs?: IntraMethodBreakdownSpec[];
+  /**
+   * 比較対象(`ComparisonSubject`)の由来。デモ既定値は "demo_default"、顧客提供の実測値は
+   * "customer_provided"。推定で埋めないため呼び出し側が明示する(§7.3)。
+   */
+  subjectProvenance?: "customer_provided" | "official_public_data" | "official_statistics" | "demo_default";
   idSequence: () => string;
   now: string;
   /**
@@ -94,7 +116,7 @@ export interface ValuationPipelineOptions {
 
 export interface ValuationPipelineResult {
   valuationRecordsByMaterialIssue: Record<string, ValuationRecord[]>;
-  divergenceDecompositions: DivergenceDecomposition[];
+  divergenceDecompositions: DivergenceDecompositionV2[];
   /**
    * 代表値選択の結果ステータス(MaterialIssueId → 結果)。
    * 前年度手法での再計算ができなかった場合(手法セットから消えている等)、
@@ -107,7 +129,8 @@ export interface ValuationPipelineResult {
 export function runValuationPipeline(options: ValuationPipelineOptions): ValuationPipelineResult {
   const assumptionEntries: AssumptionEntry[] = [];
   const valuationRecordsByMaterialIssue: Record<string, ValuationRecord[]> = {};
-  const divergenceDecompositions: DivergenceDecomposition[] = [];
+  const divergenceDecompositions: DivergenceDecompositionV2[] = [];
+  const registry = options.registry ?? createProductionRegistry();
   const representativeSelectionStatus: Record<string, RepresentativeValueSelectionResult> = {};
 
   for (const materialIssueId of options.materialIssueIds) {
@@ -201,18 +224,36 @@ export function runValuationPipeline(options: ValuationPipelineOptions): Valuati
       const isSingleMethodExpansionPilot =
         groups.length === 1 && ["lime3-pollution", "lime3-waste", "lime3-land-use"].includes(groups[0].methodId);
       if (isSingleMethodExpansionPilot || quantityRecords.length < 2) continue;
-      const decomposition = buildDivergenceDecomposition({
+
+      /**
+       * T-13.2:M4 は同じ比較対象のレコードだけを受け取る。比較対象は物理入力から機械的に構築し、
+       * 手作業の値コピーを挟まない。水源種別のように入力に無い属性は "unknown" のままにする(D-15)。
+       */
+      const subject = buildComparisonSubject({
+        input: deepDiveConfig.input,
+        physicalQuantityId: deepDiveConfig.physicalQuantityId,
+        provenance: options.subjectProvenance ?? "demo_default",
+      });
+
+      const decomposition = buildDivergenceDecompositionV2({
         id:
           quantityConfigs.length === 1
             ? `dd-${materialIssueId}`
             : `dd-${materialIssueId}-${deepDiveConfig.physicalQuantityId}`,
         targetPhysicalQuantityId: deepDiveConfig.physicalQuantityId,
         siteId: deepDiveConfig.input.siteId,
+        subject,
         records: quantityRecords,
+        registry,
         versions: options.decompositionVersions,
+        breakdownSpecs: options.breakdownSpecs ?? buildDefaultBreakdownSpecs(quantityRecords),
       });
+      /**
+       * T-13.3:台帳エントリは**手法間ペア**にだけ作る。同一手法の内訳分析(breakdownAnalyses)は
+       * 分解ではないためエントリを作らない。IFVI集計値の整合は既存の M3 reconciliation_check が担う。
+       */
       for (const group of decomposition.groups) {
-        for (const pairwise of group.pairwiseDecompositions) {
+        for (const pairwise of group.crossMethodPairs) {
           const entry = buildAssumptionEntry(
             options.idSequence(),
             options.now,

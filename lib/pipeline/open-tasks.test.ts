@@ -110,14 +110,18 @@ describe("deriveStepProgress", () => {
 });
 
 describe("倍率表示の共通ルール", () => {
+  /** 倍率は両端の値だけで決まる。分解できたか(status)には依存しない。 */
+  const pairWith = (valueA: number, valueB: number) =>
+    ({ valueA, valueB }) as unknown as Parameters<typeof pairDivergenceRatio>[0];
+
   test("大きい値を小さい値で割り、ペアの向きに左右されない", () => {
-    const pair = { valueA: 5, valueB: 100, ratio: 0.05 } as Parameters<typeof pairDivergenceRatio>[0];
-    expect(pairDivergenceRatio(pair)).toBe(20);
+    expect(pairDivergenceRatio(pairWith(5, 100))).toBe(20);
+    expect(pairDivergenceRatio(pairWith(100, 5))).toBe(20);
   });
 
   test("0円や負値が絡む場合は倍率を表示しない", () => {
-    expect(pairDivergenceRatio({ valueA: 0, valueB: 100, ratio: 0 } as Parameters<typeof pairDivergenceRatio>[0])).toBeNull();
-    expect(pairDivergenceRatio({ valueA: -10, valueB: 100, ratio: -0.1 } as Parameters<typeof pairDivergenceRatio>[0])).toBeNull();
+    expect(pairDivergenceRatio(pairWith(0, 100))).toBeNull();
+    expect(pairDivergenceRatio(pairWith(-10, 100))).toBeNull();
   });
 });
 

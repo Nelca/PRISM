@@ -22,6 +22,7 @@ import { exchangeAmount, welfareAmount } from "../types/common";
 import { applyGeographicCalibration } from "./calibration";
 import { combineUncertainty } from "./uncertainty";
 import { computeRecordHash } from "../ledger/recalculation-hash";
+import { buildMethodEvaluationTrace } from "./trace/build-trace";
 
 export class ReconciliationError extends Error {
   constructor(
@@ -89,13 +90,6 @@ export interface ValuationRecordGroup {
   reconciledAggregate?: number;
 }
 
-function deriveRecalculability(output: MethodOutput): ValuationRecord["recalculability"] {
-  return {
-    endpointBreakdownPublished: output.aopMappingConfidence !== "unmapped",
-    damageTimeProfilePublished: output.discountRateStatus === "explicit",
-  };
-}
-
 function buildValuationRecordFromOutput(
   output: MethodOutput,
   methodId: string,
@@ -108,6 +102,8 @@ function buildValuationRecordFromOutput(
   siteId: string,
   calibration: GeographicCalibrationRecord,
   versions: ValuationRecordVersions,
+  plugin: Pick<MonetizationMethodPlugin, "methodId" | "version" | "licenseMode">,
+  config: MethodConfig,
   rng?: () => number
 ): ValuationRecord {
   const financialEffectSnapshot = methodId === "company-exchange-value" ? corporateFinancialEffect : undefined;
@@ -133,6 +129,24 @@ function buildValuationRecordFromOutput(
     output.parameterUncertainty.kind === "not_available"
       ? null
       : combineUncertainty(centralValue, output.parameterUncertainty, output.transferFitness, { rng });
+
+  /**
+   * 完成実装 §5.3・T-05:再生可能な計算トレース。最終値がcentralValueと許容誤差(tol-v1)内で
+   * 一致しなければ例外になる(誤ったトレースを出すより出さない)。
+   * T-02-10の決定により`recalculability`はこのトレースの可用性から機械的に導出する
+   * (`deriveRecalculability`は廃止)。
+   */
+  const trace = buildMethodEvaluationTrace({
+    output,
+    plugin,
+    recordMethodId: methodId,
+    physicalQuantityId,
+    input,
+    calibration,
+    currencyConversion,
+    factorResolution,
+    config,
+  });
 
   const common = {
     id: `${methodId}-${physicalQuantityId}`,
@@ -161,12 +175,20 @@ function buildValuationRecordFromOutput(
       : undefined,
     currencyConversion: factorCurrency === "JPY" ? undefined : currencyConversion,
     financialEffectSnapshot,
-    recalculability: deriveRecalculability(output),
+    trace,
+    // 真実源はtrace.endpointBreakdown/trace.damageTimeProfileであり、これは機械的に導出した
+    // ミラー(保存済みrunとの後方互換のためだけに残す。T-02-10)。M4はこのフィールドを読まない。
+    recalculability: {
+      endpointBreakdownPublished: trace.endpointBreakdown.status === "available",
+      damageTimeProfilePublished: trace.damageTimeProfile.status === "available",
+    },
     assumptionEntryIds: [] as string[], // パイプライン層(valuation-pipeline.ts)が実配線する
     /**
      * このレコードを再現するのに必要なものだけを入れる(GAP-06)。
      * 較正パラメータは版番号だけでなく実際の値も含める。同じ版のまま値が差し替わった場合に
      * ハッシュが変わらないと、監査で「同じ条件で計算した」と誤って読める。
+     * トレース自体のハッシュ(trace.hash)は入力から機械的に決まるため入れないが、
+     * 係数セットの版(coefficientSetVersion)は実際に入った係数を追跡するために入れる。
      */
     recalculationHash: computeRecordHash("vr", {
       methodId,
@@ -179,6 +201,7 @@ function buildValuationRecordFromOutput(
       corporateFinancialEffect: financialEffectSnapshot,
       calibration,
       versions,
+      coefficientSetVersion: trace.coefficientSetVersion,
     }),
   };
 
@@ -272,6 +295,8 @@ export function buildValuationRecordsForPlugin(
       input.siteId,
       calibration,
       versions,
+      plugin,
+      config,
       rng
     );
   });

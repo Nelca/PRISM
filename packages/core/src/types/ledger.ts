@@ -72,6 +72,20 @@ export type AssumptionEntryPayload =
       nonDecomposableFactors: string[];
       f3ThresholdVersion: string;
       f8ThresholdVersion: string;
+      /**
+       * 完成実装 T-14:比較レシピ・分解区分・停止理由・許容誤差・同一性規則の版。
+       * 旧run(2026-08 実装)の台帳には無いため optional。新runでは必ず埋める。
+       */
+      recipeId?: string;
+      recipeVersion?: string;
+      recipeHash?: string;
+      decompositionKind?: "full" | "partial";
+      decompositionStatus?: "decomposed" | "stopped";
+      stopReason?: string;
+      toleranceVersion?: string;
+      subjectRuleVersion?: string;
+      pathwayMappingVersion?: string;
+      evaluationCount?: number;
     }
   | { module: "M4"; kind: "representative_value_selection"; selectedMethodId: string; reason: string }
   | { module: "M6"; kind: "binding_mechanism_change"; previous: string; next: string; reason: string }
@@ -97,6 +111,17 @@ export interface RecalculationHashInputs {
   m4_decompositionAlgorithmVersion: string;
   m4_cicesMatchLevel: string;
   m4_aopMappingVersion: string;
+  /**
+   * 完成実装 T-14:M4の新経路(V2)で結果を左右する版。旧run(resultSchemaVersion ≤ 10)の
+   * ハッシュ入力には無いため optional。新runでは必ず埋める。
+   * F-3/F-8 の閾値は、有効時(f3-v1 等)と無効時(f3-disabled-pending-h06)でハッシュが変わる。
+   */
+  m4_recipeRegistryVersion?: string;
+  m4_toleranceVersion?: string;
+  m4_subjectRuleVersion?: string;
+  m4_pathwayMappingVersion?: string;
+  m4_f3ThresholdVersion?: string;
+  m4_f8ThresholdVersion?: string;
   m5_carbonPriceScenarioSetVersion: string;
   m6_bindingMechanismDefinitionVersion: string;
   m7_gapDetectionRuleVersion: string;
