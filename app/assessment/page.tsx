@@ -107,7 +107,7 @@ export default async function AssessmentPage() {
           <h1 className="screen__title">評価対象の絞り込み</h1>
           <GuideButton />
         </div>
-        <ScreenLead>詳細評価する課題を絞り込みます</ScreenLead>
+        <ScreenLead>優先度を確認して、詳しく調べる課題を選びます。選んだ課題は、次の工程で金額に換算します。</ScreenLead>
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         <GuideBox>
           優先度を確認し、価値算定へ進める課題を「詳細評価」にします。変更理由は記録されます。

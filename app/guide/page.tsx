@@ -103,6 +103,11 @@ export default function GuidePage() {
         <ScreenLead>何を入れると、どの業務で使える情報になるかを2分で確認できます</ScreenLead>
       </div>
 
+      <section className="next-action" aria-label="初めての操作">
+        <div><span className="section-eyebrow">まず、ここから</span><p>デモの課題を1件選んで、算定方法による金額の違いを確認しましょう。</p></div>
+        <Link href="/valuation" className="pill-btn pill-btn--primary">算定結果を見る →</Link>
+      </section>
+
       {/* 1. 何をするプロダクトか(IAの1文+差別化) */}
       <Card title="何をするプロダクトか">
         <p style={{ margin: 0 }}>

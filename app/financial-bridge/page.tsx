@@ -46,7 +46,7 @@ export default async function FinancialBridgePage({
           <div className="screen__title-row">
             <h1 className="screen__title">財務への影響</h1>
           </div>
-          <ScreenLead>選んだ代表値が利益・リスクにどう効くかを確認します</ScreenLead>
+          <ScreenLead>拠点を開き、選んだ金額と財務データから、利益への影響と将来の損失見込みを確認します。</ScreenLead>
         </div>
         {/* 空状態の3点セット(指示11):いま何がない/なぜないか/どこで何をするか+リンク */}
         <Card title="財務への影響を試算する対象がまだありません">
@@ -119,7 +119,7 @@ export default async function FinancialBridgePage({
           <h1 className="screen__title">{detailOnly && openSiteName ? `${openSiteName}の財務影響` : "財務への影響"}</h1>
           {!detailOnly && <GuideButton />}
         </div>
-        <ScreenLead>選んだ代表値が利益・リスクにどう効くかを確認します</ScreenLead>
+        <ScreenLead>拠点を開き、選んだ金額と財務データから、利益への影響と将来の損失見込みを確認します。</ScreenLead>
         {detailOnly && <p className="page-back"><Link href="/financial-bridge">← 拠点一覧へ戻る</Link></p>}
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         {!detailOnly && <GuideBox>

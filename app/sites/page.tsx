@@ -47,7 +47,7 @@ export default async function SitesPage() {
           <h1 className="screen__title">拠点データの登録</h1>
           <GuideButton />
         </div>
-        <ScreenLead>拠点データを登録し、評価の対象を確定します</ScreenLead>
+        <ScreenLead>まずは拠点名・所在地と、取水量や排出量を登録。自然との関わりを評価する土台を作ります。</ScreenLead>
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         <GuideBox>
           拠点を登録し、必要なデータを取り込みます。住所か座標がない拠点は評価できません。

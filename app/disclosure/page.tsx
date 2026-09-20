@@ -61,7 +61,7 @@ export default async function DisclosurePage({
           <h1 className="screen__title">{detailOnly ? "開示の指摘に対応する" : "開示への反映"}</h1>
           {!detailOnly && <GuideButton />}
         </div>
-        <ScreenLead>{detailOnly ? "選択した記載の根拠を確認し、対応を記録します" : "開示文言と根拠の整合を確認します"}</ScreenLead>
+        <ScreenLead>{detailOnly ? "選択した記載の根拠を確認し、対応を記録します" : "算定結果から開示の下書きを作成します。既存の開示PDFを取り込むと、記載と根拠の整合も確認できます。"}</ScreenLead>
         {detailOnly && <p className="page-back"><Link href="/disclosure">← 指摘の一覧へ戻る</Link></p>}
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         {!detailOnly && <GuideBox>

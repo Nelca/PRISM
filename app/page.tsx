@@ -14,7 +14,7 @@ import { Num, pickYenScale } from "./components/numeric";
 import { Card, Tag } from "./components/ui";
 
 /** 工程の番号はこの画面(進捗ブロック)にだけ出す。常設ナビには出さない(指示01)。 */
-const STEP_MARK = ["①", "②", "③", "④", "⑤", "⑥"];
+const STEP_MARK = ["01", "02", "03", "04", "05", "06"];
 
 const FINDING_STAGE: Record<string, string> = {
   "finding-divergence": "価値の算定",
@@ -35,16 +35,9 @@ export const metadata: Metadata = {
 };
 
 /**
- * ホーム=ダッシュボード(指示04 → IA-02 → 2026-08-23レビューで図中心に再設計)。
- *
- * (0)流れ図と成果物:環境データ → 金額に換算 → 3つの成果物(判定・開示・記録)を、
- *    文章ではなく図+件数で示す。初見の利用者には「何を入れると何が出るか」の説明、
- *    常用の利用者には成果物の現況サマリーとして働く(同じ表現・状態で形を変えない)。
- *    旧指示04の「M6の判定表・M8の件数カードはホームに置かない」は判定表・課金明細の
- *    再掲の禁止であり、件数+内訳バーに留めるこのブロックとは衝突しない(IA §3.2)。
- * (a)進捗:6ステップの工程図と完了状態。工程の可視化はこの画面だけが担う。
- * (b)次にやること:未完了の必須判断のチェックリスト(指示13)。
- * (c)分かったこと:実データから導出した発見(指示14)。
+ * 初回の価値理解 → 作業再開 → 全工程 → 結果の順で表示する。
+ * 次の操作・進捗・金額は既存の共通導出関数を使い、業務画面と一致させる。
+ * 参照: docs/uiux-refresh-2026-09-20.md
  */
 export default async function Home() {
   const result = await loadPipelineView();
@@ -106,10 +99,20 @@ export default async function Home() {
   ];
 
   return (
-    <div className="screen">
+    <div className="screen home-screen">
       <HomeOrientation />
 
-      <Card title="進捗と次の操作" subtitle={`要対応 ${tasks.length}件`} padBody={false}>
+      <div className="workspace-heading">
+        <div><p className="section-eyebrow">WORKSPACE</p><h2>評価を進める</h2><p>入力から開示まで。未完了の操作から、作業を再開できます。</p></div>
+        <span className="workspace-heading__count">要対応 <b className="num">{tasks.length}</b> 件</span>
+      </div>
+      {tasks[0] && (
+        <section className="next-action" aria-label="次に進める操作">
+          <div><span className="section-eyebrow">次の操作 · {steps.find((step) => step.href === tasks[0].section)?.label}</span><p>{tasks[0].text}</p></div>
+          <Link href={tasks[0].href} className="pill-btn pill-btn--primary">{tasks[0].linkLabel} <span aria-hidden="true">→</span></Link>
+        </section>
+      )}
+      <Card title="全体の流れ" subtitle="各工程から詳細を開けます" padBody={false}>
         <ol className="home-workflow" aria-label="業務工程ごとの進捗と次の操作">
           {steps.map((step) => {
             const stepTasks = tasksBySection.get(step.href) ?? [];

@@ -12,7 +12,7 @@ import { usePathname } from "next/navigation";
  */
 const NAV = [
   {
-    group: "評価",
+    group: "データを評価する",
     items: [
       { href: "/sites", label: "拠点とデータ" },
       { href: "/assessment", label: "評価対象" },
@@ -20,14 +20,14 @@ const NAV = [
     ],
   },
   {
-    group: "判断",
+    group: "経営判断につなげる",
     items: [
       { href: "/financial-bridge", label: "財務影響" },
       { href: "/decision", label: "対策と判定" },
     ],
   },
   {
-    group: "開示",
+    group: "社内外に伝える",
     items: [{ href: "/disclosure", label: "開示" }],
   },
 ];

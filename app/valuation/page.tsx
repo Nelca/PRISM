@@ -325,7 +325,7 @@ export default async function ValuationPage({
           <h1 className="screen__title">価値の算定</h1>
           <GuideButton />
         </div>
-        <ScreenLead>投資判断に使う代表値を選び、必要なときだけ手法差を詳しく確認します</ScreenLead>
+        <ScreenLead>課題を選んで算定方法ごとの金額を比較し、投資判断に使う値を理由とともに選びます。</ScreenLead>
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         <GuideBox>
           投資判断に使う代表値を1つ選びます。迷う場合は「手法差を分析」で算定方法を比較します。

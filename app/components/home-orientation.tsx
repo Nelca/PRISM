@@ -83,45 +83,38 @@ export function HomeOrientation() {
 
       <div className="home-orientation__head">
         <div className="home-orientation__intro">
-          <p className="home-orientation__eyebrow">PRISMとは</p>
+          <p className="home-orientation__eyebrow">環境データから、次の意思決定へ</p>
           <h1 id="home-orientation-title" className="home-orientation__title">
-            環境データを、投資判断・開示・監査に使える財務情報へ
+            自然への影響を、経営の判断材料に。
           </h1>
           <p className="home-orientation__lead">
-            取水量・GHG排出量など、すでにある環境データを金額の幅に換算し、投資判断への影響、開示文と根拠、選択理由の記録までを一つの流れで扱います。
+            取水量やGHG排出量から、事業への影響を金額で捉える。対策に投資する判断も、開示の説明も、同じ根拠から始められます。
           </p>
         </div>
-        <Link href="/guide" className="home-orientation__guide">
-          PRISMを2分で理解する <span aria-hidden="true">→</span>
-        </Link>
       </div>
+
+      <div className="welcome-actions">
+        <Link href="/valuation" className="pill-btn pill-btn--primary">デモの算定結果を見る <span aria-hidden="true">→</span></Link>
+        <Link href="/sites/register" className="welcome-actions__secondary">自分の拠点を登録する <span aria-hidden="true">↗</span></Link>
+        <Link href="/guide" className="home-orientation__guide">使い方ガイド</Link>
+      </div>
+      <p className="welcome-note">まずは登録済みのデモデータで、金額の比較から判断までの流れを確認できます。</p>
 
       <ol className="home-orientation__flow" aria-label="環境データから成果物までの流れ" role="list">
         <li>
-          環境データ
+          手元の環境データを登録
+          <small>既存の取水量・排出量から始められます</small>
           <span className="home-orientation__arrow" aria-hidden="true">→</span>
         </li>
         <li>
-          複数手法で金額換算
+          金額の幅と差の理由を確認
+          <small>算定方法の違いを、根拠から説明できます</small>
           <span className="home-orientation__arrow" aria-hidden="true">→</span>
         </li>
-        <li>投資判断・開示・監査証跡</li>
+        <li>投資判断と開示に活用<small>同じ結果を稟議・開示・監査対応に使えます</small></li>
       </ol>
 
-      <ul className="home-orientation__benefits" aria-label="PRISMを利用する利点" role="list">
-        <li>
-          <strong>手元のデータから始められる</strong>
-          <span>新しい計測を始めずに着手できる</span>
-        </li>
-        <li>
-          <strong>差の理由を説明できる</strong>
-          <span>複数手法の結果差と理由を確認できる</span>
-        </li>
-        <li>
-          <strong>同じ結果を繰り返し使える</strong>
-          <span>投資判断、開示、監査対応に再利用できる</span>
-        </li>
-      </ul>
+
     </section>
   );
 }

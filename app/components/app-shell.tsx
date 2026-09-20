@@ -78,7 +78,7 @@ export function AppShell({
         本文へ移動
       </a>
 
-      <div className="demo-banner">デモデータ</div>
+      <div className="demo-banner"><span className="demo-banner__dot" aria-hidden="true" /> デモワークスペース <span>架空企業のデータで操作を試せます</span></div>
 
       <header className="app-header">
         <button

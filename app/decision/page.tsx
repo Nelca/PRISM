@@ -80,7 +80,7 @@ export default async function DecisionPage({
           <div className="screen__title-row">
             <h1 className="screen__title">対策と判定</h1>
           </div>
-          <ScreenLead>対策を選び、投資の結論が変わるかの判定を確定します</ScreenLead>
+          <ScreenLead>拠点ごとに対策と投資の承認ラインを設定し、自然コストを織り込むと結論が変わるか確認します。</ScreenLead>
         </div>
         {/* 空状態の3点セット(指示11):いま何がない/なぜないか/どこで何をするか+リンク */}
         <Card title="対策案を比較する対象がまだありません">
@@ -139,7 +139,7 @@ export default async function DecisionPage({
           <h1 className="screen__title">{detailOnly && openSiteName ? `${openSiteName}の対策と判定` : "対策と判定"}</h1>
           {!detailOnly && <GuideButton />}
         </div>
-        <ScreenLead>対策を選び、投資の結論が変わるかの判定を確定します</ScreenLead>
+        <ScreenLead>拠点ごとに対策と投資の承認ラインを設定し、自然コストを織り込むと結論が変わるか確認します。</ScreenLead>
         {detailOnly && <p className="page-back"><Link href="/decision">← 拠点一覧へ戻る</Link></p>}
         {/* C-04:仕組みの説明ではなく、この画面でする操作の順序を書く。 */}
         {!detailOnly && <GuideBox>
