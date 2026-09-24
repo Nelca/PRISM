@@ -69,7 +69,7 @@ describe("deriveStepProgress", () => {
     // 代表値が未選択のため③は未完了、判定は確定しているため⑤は完了。
     expect(byHref.get("/valuation")!.done).toBe(false);
     expect(byHref.get("/financial-bridge")!.done).toBe(true);
-    expect(byHref.get("/decision")!.done).toBe(true);
+    expect(byHref.get("/decision")!.done).toBe(false); // 反映先はまだ明示選択されていない
   });
 
   test("進捗件数は全課題・優先度算定済み・詳細評価・代表値対象・厚生価値のみを分けて返す", () => {
@@ -126,13 +126,14 @@ describe("倍率表示の共通ルール", () => {
 });
 
 describe("deriveFindings", () => {
-  test("「結論は変わらない」も確定した結論として出す", () => {
+  test("基準をまたがない結果は前提付きで示し、追加調査不要とは断言しない", () => {
     const findings = deriveFindings(run());
     const notCrossing = findings.find((finding) => finding.id === "finding-verdict-does-not-cross");
 
     expect(notCrossing).toBeDefined();
-    expect(notCrossing!.headline).toContain("投資判断の結論は変わらない");
-    expect(notCrossing!.detail).toContain("この論点は今回の投資判断を変えない");
+    expect(notCrossing!.headline).toContain("現在の試算の幅が承認ラインをまたがない");
+    expect(notCrossing!.detail).toContain("現在の入力・評価範囲");
+    expect(notCrossing!.detail).not.toContain("調査は不要");
   });
 
   test("減損テストの前提に抵触する拠点を発見として出す(正確な値はtitle属性に退避)", () => {

@@ -64,6 +64,26 @@ const source: DisclosureViewSource = {
 };
 
 describe("buildDisclosureView", () => {
+  const alternative = makeValuationRecord({ methodId: "alternative-cost", centralValue: 20_000_000, valueConcept: "exchange" });
+  it("同じ物理量の複数の交換価値を合計せず、代表値未選択は未記入にする", () => {
+    const result = buildDisclosureView("dv-multi", INTERNAL_REVIEW_TEMPLATE, { ...source, valuationRecords: [...source.valuationRecords, alternative] }, NOW);
+    expect(result.unfilledRequirements).toContain("財務影響の試算");
+    expect(result.view.generatedText).not.toContain("32,000,000円");
+  });
+  it("明示した代表値だけを使い、厚生価値を選んだ場合は財務額を補完しない", () => {
+    const records = [...source.valuationRecords, alternative];
+    const chosen = buildDisclosureView("dv-selected", INTERNAL_REVIEW_TEMPLATE, { ...source, valuationRecords: records, selectedValuationRecordIds: [alternative.id] }, NOW);
+    expect(chosen.view.generatedText).toContain("20,000,000円");
+    expect(chosen.view.generatedText).not.toContain("32,000,000円");
+    const welfare = buildDisclosureView("dv-welfare", INTERNAL_REVIEW_TEMPLATE, { ...source, selectedValuationRecordIds: [source.valuationRecords[1].id] }, NOW);
+    expect(welfare.unfilledRequirements).toContain("財務影響の試算");
+  });
+  it("明示的なゼロの代表値を別手法に置き換えない", () => {
+    const zero = makeValuationRecord({ methodId: "zero-cost", centralValue: 0, valueConcept: "exchange" });
+    const result = buildDisclosureView("dv-zero", INTERNAL_REVIEW_TEMPLATE, { ...source, valuationRecords: [...source.valuationRecords, zero], selectedValuationRecordIds: [zero.id] }, NOW);
+    expect(result.view.generatedText).toContain("試算額は0円");
+    expect(result.view.generatedText).not.toContain("試算額は12,000,000円");
+  });
   it("自社のレコードから開示文の下書きを組み立てる(AIを使わない)", () => {
     const { view } = buildDisclosureView("dv-1", INTERNAL_REVIEW_TEMPLATE, source, NOW);
 

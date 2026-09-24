@@ -1,9 +1,11 @@
+import { ResourceDecisions } from "./resource-decisions";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { listConfirmedDecisionSnapshots } from "@/lib/db/repositories/decision-counts";
 import { detectReassessmentAlerts } from "@core/decision/reassessment";
 import { loadInteractivePipelineView } from "@/lib/views/pipeline";
-import { Num, pickYenScale } from "../components/numeric";
+import { verdictMeaningSentence } from "./verdict-summary";
+import { Num, pickYenScale, formatYen, formatCompactYenRange } from "../components/numeric";
 import { Card, GuideBox, GuideButton, ScreenLead, Stat, Tag } from "../components/ui";
 import { bindingLabel, categoryLabel, formatDominantAssumption, materialIssueLabel, verdictLabel, verdictTagVariant } from "../components/labels";
 import { methodLabel } from "../components/method-labels";
@@ -13,26 +15,12 @@ import { CountermeasureSelector } from "./countermeasure-selector";
 import { BindingForm } from "./binding-form";
 import { DecisionParametersForm } from "./parameters-form";
 import { PipelineWarnings } from "../components/pipeline-warnings";
+import { DeferredDecisions } from "./deferred-decisions";
 import { SectionNav } from "../components/section-nav";
 
 export const metadata: Metadata = {
   title: "対策と判定 | PRISM",
 };
-
-/**
- * ★判定の意味を一文にする(指示15 → 第4版 D-13で拡張)。
- *
- * **PRISMは投資可否そのものを断定しない**(構想書の規律)。「投資して良い」とは書かず、
- * 「結論(判定)が変わるか」の言い回しに徹する。保留中は本文先頭の first-action
- * (閾値入力の案内)がこの役割を担うため、ここではnullを返す。
- */
-function verdictMeaningSentence(verdict: string): string | null {
-  if (verdict === "does_not_cross")
-    return "自然関連コストを織り込んでも投資判断の結論は変わらない、と確定できました。この課題の追加調査は不要です。";
-  if (verdict === "crosses")
-    return "自然関連コストを織り込むと、投資の承認ラインを上回るか下回るかが変わる可能性があります。結論を確定するには、幅を支配する前提の詳細調査が必要です。";
-  return null;
-}
 
 export default async function DecisionPage({
   searchParams,
@@ -82,6 +70,8 @@ export default async function DecisionPage({
           </div>
           <ScreenLead>拠点ごとに対策と投資の承認ラインを設定し、自然コストを織り込むと結論が変わるか確認します。</ScreenLead>
         </div>
+        <ResourceDecisions records={[...interactions.environmentalTargets.values()]} siteNames={siteNameById} decisions={decisions.map((entry) => entry.decision.decisionRecord)} />
+        <DeferredDecisions sites={result.deferredDecisions} />
         {/* 空状態の3点セット(指示11):いま何がない/なぜないか/どこで何をするか+リンク */}
         <Card title="対策案を比較する対象がまだありません">
           <p style={{ color: "var(--ink-faint)" }}>
@@ -112,7 +102,7 @@ export default async function DecisionPage({
     const alerts = reassessmentAlerts.filter((alert) => alert.decisionRecordId === record.id);
     const remaining: string[] = [];
     if (record.verdict === "pending") remaining.push("承認ラインの入力");
-    if (record.bindingMechanism.kind === "weak_reference") remaining.push("反映先の決定");
+    if (!interactions.bindingMechanismState.has(entry.siteId)) remaining.push("反映先の決定");
     if (alerts.some((alert) => alert.level === "verdict_changed")) remaining.push("判定の見直し");
     return {
       ...entry,
@@ -147,6 +137,10 @@ export default async function DecisionPage({
         </GuideBox>}
       </div>
 
+      <ResourceDecisions records={[...interactions.environmentalTargets.values()].filter((record) => !detailOnly || record.siteId === openSiteId)} siteNames={siteNameById} decisions={decisions.map((entry) => entry.decision.decisionRecord)} />
+
+      {!detailOnly && <DeferredDecisions sites={result.deferredDecisions} />}
+
       {detailOnly && openSiteId && (
         <SectionNav
           label={`${openSiteName ?? "拠点"}の判定内の画面`}
@@ -170,7 +164,6 @@ export default async function DecisionPage({
       {!detailOnly && <>
 
       {/* D-01-3:保存済みの操作のうち、今回の計算に反映できなかったものを黙って捨てない。 */}
-      <PipelineWarnings warnings={result.warnings} screen="/decision" />
 
       {/* D-11-1:残タスクの頭出し(最下部までスクロールしなくても見える)。 */}
       <TaskBanner current="/decision" result={result} />
@@ -227,7 +220,7 @@ export default async function DecisionPage({
                   </Tag>
                 </td>
                 <td>{row.selectedLabel}</td>
-                <td style={{ fontSize: 12 }}>{bindingLabel(row.record.bindingMechanism.kind)}</td>
+                <td style={{ fontSize: 12 }}>{interactions.bindingMechanismState.has(row.siteId) ? bindingLabel(row.record.bindingMechanism.kind) : "未選択"}</td>
                 <td style={{ fontSize: 12 }}>{row.remaining.length > 0 ? row.remaining.join("・") : "—"}</td>
                 <td>
                   <Link
@@ -244,6 +237,8 @@ export default async function DecisionPage({
       </Card>
       </>}
 
+      <PipelineWarnings warnings={result.warnings} screen="/decision" />
+
       {/*
         拠点別詳細(D-11 → 第6版D-23で改稿)。**選択中の1拠点だけを描画する。**
         以前は全拠点分を`<details>`(既定は閉)でDOMに載せていたが、100拠点では
@@ -255,7 +250,7 @@ export default async function DecisionPage({
         .map(({ siteId, decision, countermeasureCandidates, selectedCountermeasureKey, alerts }) => {
         const record = decision.decisionRecord;
         const threshold = record.approvalThreshold === "pending" ? null : (record.approvalThreshold.value);
-        const meaningSentence = verdictMeaningSentence(record.verdict);
+        const meaningSentence = verdictMeaningSentence(record);
         // 指示09:⑤の対策表で列ごとに単位を揃える(初期投資額は拠点によって百万円台と
         // 億円台が混在し、そのまま自動判定すると同じ列内で単位が割れる)。
         const investInitialScale = pickYenScale(
@@ -315,12 +310,9 @@ export default async function DecisionPage({
                   <Stat
                     label={<span title="投資価値(NPV)に自然関連のコスト・便益を加えた値。この幅が承認ラインと交差するかで判定が決まります">投資価値の幅(自然コスト反映後)</span>}
                     value={
-                      <>
-                        <Num value={record.natureAdjustedNpv.quantileRange.p5} /> 〜{" "}
-                        <Num value={record.natureAdjustedNpv.quantileRange.p95} />
-                      </>
+                      formatCompactYenRange(record.natureAdjustedNpv.quantileRange.p5, record.natureAdjustedNpv.quantileRange.p95)
                     }
-                    unit={`(中心 ${new Intl.NumberFormat("ja-JP").format(record.natureAdjustedNpv.central)})`}
+                    unit={`中心 ${formatYen(record.natureAdjustedNpv.central)}`}
                   />
                   <Stat
                     label="結果の反映先"
@@ -328,7 +320,7 @@ export default async function DecisionPage({
                       // 生値(weak_reference 等)ではなくBindingFormと同じ日本語ラベルを出す(指示06)。
                       // 文なので、数値用の等幅20pxではなく本文サイズで表示する。
                       <span style={{ fontFamily: "var(--font-body)", fontSize: 13.5, lineHeight: 1.5 }}>
-                        {bindingLabel(record.bindingMechanism.kind)}
+                        {interactions.bindingMechanismState.has(siteId) ? bindingLabel(record.bindingMechanism.kind) : "未選択"}
                       </span>
                     }
                   />
@@ -374,6 +366,7 @@ export default async function DecisionPage({
                   title="対策案を選ぶ"
                   subtitle="候補を比較して、この拠点の判定に使う案を選択します"
                   padBody={false}
+                  foot="対策候補の削減率・費用の一部は比較用の仮定です。設備・契約の実行可能性を検証した提案ではありません。分析画面で前提を確認してください。"
                 >
                   <table className="data-table">
                     <thead>
@@ -418,7 +411,7 @@ export default async function DecisionPage({
 
               {/* (3) この結果の反映先(指示15) */}
               <Card title="この結果の反映先">
-                <BindingForm siteId={siteId} currentKind={record.bindingMechanism.kind} />
+                <BindingForm siteId={siteId} current={interactions.bindingMechanismState.get(siteId)?.mechanism} />
                 {record.bindingMechanismHistory.length > 0 && (
                   <div style={{ marginTop: 16, borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
                     <div className="section-label">反映先の変更履歴</div>

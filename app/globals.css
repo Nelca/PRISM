@@ -3509,3 +3509,42 @@ table.data-table td { padding: 14px 16px; }
   .home-result-chain strong, .home-result-chain small { white-space: normal; }
   .card__head, .card__body { padding: 16px; }
 }
+
+/* 環境・資源の統合管理。数値を混ぜず、状態と次の操作を整理する。 */
+.portfolio-intro { max-width: 960px; line-height: 1.8; }
+.portfolio-summary { margin: 20px 0 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.portfolio-summary button { text-align: left; background: white; border: 1px solid var(--line); border-radius: 10px; padding: 20px; cursor: pointer; }
+.portfolio-summary button:hover, .portfolio-cell:hover { background: var(--accent-soft); }
+.portfolio-summary strong { display: block; font-size: 28px; color: var(--ink); margin-bottom: 8px; }
+.portfolio-summary span { color: var(--ink-soft); font-size: 13px; }
+.portfolio-heading { font-size: 17px; margin: 0 0 12px; }
+.portfolio-table-scroll { overflow-x: auto; }
+.portfolio-matrix { table-layout: fixed; }
+table.data-table.portfolio-matrix { min-width: 880px; }
+table.data-table.portfolio-matrix :is(th, td) { padding: 10px 6px; white-space: normal; }
+.portfolio-matrix th:first-child { width: 150px; }
+.portfolio-cell { border: 0; border-radius: 5px; background: transparent; color: var(--ink-soft); cursor: pointer; padding: 8px 6px; min-width: 64px; }
+.portfolio-cell small { display: block; margin-top: 4px; }
+.portfolio-cell--attention, .portfolio-status--attention { color: var(--accent); background: var(--accent-soft); }
+.portfolio-status { display: inline-block; border-radius: 5px; padding: 5px 8px; white-space: nowrap; font-size: 12px; }
+.portfolio-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.portfolio-list-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 12px 0; }
+.portfolio-empty { padding: 28px 0; }
+.target-form { max-width: 850px; }
+.target-numbers { border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 18px 0; }
+.target-numbers legend { font-weight: 600; }
+.portfolio-detail-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.portfolio-detail-values span, .portfolio-detail-values strong { display: block; }
+.portfolio-detail-values span { font-size: 12px; color: var(--ink-soft); margin-bottom: 10px; }
+.portfolio-detail-values strong { font-size: 20px; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .portfolio-summary, .portfolio-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portfolio-summary button { padding: 14px; }
+  .portfolio-detail-values { grid-template-columns: 1fr; }
+  .target-form .field-row { flex-wrap: wrap; }
+}
+@media (max-width: 420px) { .portfolio-filters { grid-template-columns: 1fr; } }
+
+.portfolio-import-fields { border: 0; padding: 0; min-width: 0; }
+
+.portfolio-detail-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }

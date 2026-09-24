@@ -33,7 +33,7 @@ const BINDING_LABEL: Record<BindingMechanism["kind"], string> = {
 
 export const INTERNAL_REVIEW_TEMPLATE: DisclosureViewTemplate = {
   standard: "internal_review",
-  version: "internal-review-v1",
+  version: "internal-review-v2",
   sections: [
     {
       requirementLabel: "評価の対象範囲",
@@ -55,21 +55,32 @@ export const INTERNAL_REVIEW_TEMPLATE: DisclosureViewTemplate = {
     },
     {
       requirementLabel: "財務影響の試算",
-      render: ({ valuationRecords }) => {
-        // 投資判断・財務影響には交換価値のみを使う(構想書8.2・X7)
-        const exchange = valuationRecords.filter((record) => record.valueConcept === "exchange");
-        if (exchange.length === 0) {
-          return null;
+      render: ({ valuationRecords, selectedValuationRecordIds = [], siteNames = {} }) => {
+        // 同じ物理量の別手法は代替案であり、足し合わせられない。
+        // 単一の交換価値は利用できるが、複数あるときは明示選択を必要とする。
+        const groups = new Map<string, typeof valuationRecords>();
+        for (const record of valuationRecords) {
+          const key = `${record.siteId}:${record.physicalQuantityId}`;
+          groups.set(key, [...(groups.get(key) ?? []), record]);
         }
-        const total = exchange.reduce((sum, record) => sum + (record.centralValue), 0);
-        const low = exchange.reduce((sum, record) => sum + record.quantileRange.p5, 0);
-        const high = exchange.reduce((sum, record) => sum + record.quantileRange.p95, 0);
-
-        return (
-          `自然関連コストの試算額は${formatYen(total)}です(${exchange.length}件の合計)。` +
-          `不確実性を考慮した幅は${formatYen(low)}〜${formatYen(high)}です。` +
-          "本数値は非GAAP指標であり、監査済み財務諸表の数値ではありません。"
-        );
+        const paragraphs: string[] = [];
+        let missing = 0;
+        for (const records of groups.values()) {
+          const exchange = records.filter((record) => record.valueConcept === "exchange");
+          if (exchange.length === 0) continue;
+          const selected = records.filter((record) => selectedValuationRecordIds.includes(record.id));
+          const record = selected.length === 1 ? selected[0] : selected.length === 0 && exchange.length === 1 ? exchange[0] : undefined;
+          if (!record || record.valueConcept !== "exchange") {
+            missing++;
+            continue;
+          }
+          const siteName = siteNames[record.siteId] ?? record.siteId;
+          paragraphs.push(`${siteName}の試算額は${formatYen(record.centralValue)}です。幅は${formatYen(record.quantileRange.p5)}〜${formatYen(record.quantileRange.p95)}です（評価レコード: ${record.id}）。`);
+        }
+        if (paragraphs.length === 0 || missing > 0) return null;
+        return paragraphs.join("\n") +
+          "\n各対象の交換価値を個別に記載しています。同じ物理量の別手法や厚生価値は合算していません。対象間の期間・範囲や不確実性の相関を確認していないため、総額・合計レンジは表示しません。" +
+          "本数値は非GAAP指標であり、監査済み財務諸表の数値ではありません。";
       },
     },
     {
@@ -98,7 +109,7 @@ export const INTERNAL_REVIEW_TEMPLATE: DisclosureViewTemplate = {
     },
     {
       requirementLabel: "投資判断への反映",
-      render: ({ decisionRecords }) => {
+      render: ({ decisionRecords, confirmedBindingDecisionIds = [] }) => {
         if (decisionRecords.length === 0) {
           return null;
         }
@@ -107,7 +118,10 @@ export const INTERNAL_REVIEW_TEMPLATE: DisclosureViewTemplate = {
           return "投資判断への反映は、承認基準が未設定のため判定を保留しています。";
         }
         const crosses = confirmed.filter((record) => record.verdict === "crosses").length;
-        const binding = [...new Set(confirmed.map((record) => BINDING_LABEL[record.bindingMechanism.kind]))];
+        const recorded = confirmed.filter((record) => confirmedBindingDecisionIds.includes(record.id));
+        const binding = [...new Set(recorded.map((record) => BINDING_LABEL[record.bindingMechanism.kind]))];
+        const bindingText = binding.length > 0 ? `記録済みの社内での取り扱い方針:${binding.join("、")}。` : "";
+        const unconfirmedText = recorded.length < confirmed.length ? `${confirmed.length - recorded.length}件は取り扱い方針が未記録です。` : "";
 
         const verdictSentence =
           crosses === 0
@@ -117,7 +131,7 @@ export const INTERNAL_REVIEW_TEMPLATE: DisclosureViewTemplate = {
         return (
           `${confirmed.length}件の投資判断について、自然関連コストを加味した評価を実施しました。` +
           verdictSentence +
-          `判定結果の社内での取り扱いは次のとおりです:${binding.join("、")}。`
+          bindingText + unconfirmedText
         );
       },
     },

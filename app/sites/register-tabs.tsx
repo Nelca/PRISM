@@ -11,7 +11,7 @@ import { AddSiteForm } from "./add-site-form";
  * 利用者から見ればどちらも「対象を登録する」1つの作業なので、同じ場所にタブで並べる。
  */
 export function RegisterTabs() {
-  const [tab, setTab] = useState<"csv" | "single">("csv");
+  const [tab, setTab] = useState<"csv" | "single">("single");
 
   return (
     <>
@@ -34,11 +34,8 @@ export function RegisterTabs() {
         </button>
       </div>
 
-      {tab === "csv" ? (
-        <ImportForm />
-      ) : (
-        <AddSiteForm />
-      )}
+      <div hidden={tab !== "single"}><AddSiteForm /></div>
+      <div hidden={tab !== "csv"}><ImportForm /></div>
     </>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { sensitivityFraction } from "../components/criteria-labels";
 import type { Metadata } from "next";
 import { computeTornadoChart } from "@core/monetization/tornado";
 import type { PairwiseDecompositionV2 } from "@core/types/divergence";
@@ -361,7 +362,7 @@ export default async function ValuationPage({
       */}
       <Card title="算定の対象" subtitle={labelForIssueId(selectedIssueId)}>
         <div className="grid-3">
-          <Stat label={<span title="TNFDの5基準のうち該当した数。数が多いほど自然への依存・影響が強い">自然との関わり</span>} value={issue ? `${issue.sensitivityScore}/5` : "—"} />
+          <Stat label={<span title="評価できた基準のうち該当した数。データ不足で未評価の基準は分母に含めません">自然との関わり</span>} value={issue ? `${sensitivityFraction(issue)}` : "—"} />
           <Stat
             label={physicalQuantity ? physicalQuantityLabel(physicalQuantity.category) : "物理量"}
             value={
@@ -576,7 +577,7 @@ export default async function ValuationPage({
         </Card>
       )}
 
-      <details className="foldout" open>
+      <details className="foldout">
         <summary>
           この画面内で詳細分析を確認する
           <small>試算幅・手法差・不確実性をこの画面でまとめて表示しています</small>

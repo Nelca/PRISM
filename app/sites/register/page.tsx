@@ -18,7 +18,7 @@ export default async function SiteRegisterPage() {
         <div className="screen__title-row">
           <h1 className="screen__title">拠点データを登録する</h1>
         </div>
-        <ScreenLead>CSV一括登録または1件追加で、評価に使う拠点を追加します</ScreenLead>
+        <ScreenLead>まず1拠点から登録できます。所在地・年間の環境データ・コスト単価を用意してください。投資判断の前提は後から追加できます。</ScreenLead>
       </div>
 
       <Card
@@ -29,6 +29,7 @@ export default async function SiteRegisterPage() {
         <RegisterTabs />
       </Card>
 
+      <details className="foldout"><summary>CSV一括登録に必要な3ファイルと記入例</summary>
       <Card title="CSVフォーマット" subtitle="ダウンロードした記入例は、日本語の列名のまま取り込めます" padBody={false}>
         <table className="data-table csv-format-table">
           <thead>
@@ -52,9 +53,17 @@ export default async function SiteRegisterPage() {
               <td>照会結果: true / false / 数値</td>
               <td><a href="/api/intake-template?name=nature-interfaces" download="nature-interfaces.csv" className="pill-btn pill-btn--sm">ダウンロード</a></td>
             </tr>
+            <tr>
+              <td><b>評価・投資の設定</b><span className="id-note">engagement-config.json</span></td>
+              <td>詳細評価の対象、物理量、コスト、NPV、承認ライン</td>
+              <td>記入例の数値を自社の値に置き換えてください</td>
+              <td><a href="/api/intake-template?name=engagement-config" download="engagement-config.json" className="pill-btn pill-btn--sm">ダウンロード</a></td>
+            </tr>
           </tbody>
         </table>
       </Card>
+
+      </details>
 
       <p className="page-back">
         <Link href="/sites">← 拠点一覧へ戻る</Link>

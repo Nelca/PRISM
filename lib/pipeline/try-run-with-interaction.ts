@@ -22,13 +22,12 @@ import type { UserSiteEntry } from "@/lib/demo/site-entry";
 import { listSiteEntries } from "@/lib/db/repositories/sites";
 import { appendInteractionEvent, listInteractionEvents } from "@/lib/db/repositories/interactions";
 import type { AppendInteractionInput } from "@/lib/db/repositories/interactions";
-import { persistComputedRun } from "./execute-run";
+import { persistComputedRun, loadCategoryExpansion } from "./execute-run";
 import { getDb } from "@/lib/db/client";
 import type { DbTransaction } from "@/lib/db/client";
 import { sql } from "drizzle-orm";
 import { SITE_ROWS } from "@/lib/demo/company";
-import { listActiveInputBatches, listActivePhysicalInputRecords } from "@/lib/db/repositories/physical-inputs";
-import { buildCategoryExpansionRuntime, type CategoryExpansionRuntime } from "./category-expansion-runtime";
+import type { CategoryExpansionRuntime } from "./category-expansion-runtime";
 
 export interface TryRunInput {
   /** 追記しようとしている操作イベント。検証に通るまでDBには書かない。 */
@@ -49,6 +48,8 @@ export interface TryRunInput {
    * 内部IDや例外文言を含めない、利用者の言葉で書く。
    */
   label: string;
+  /** Validate cross-record references against the locked, recomputed result before writing. */
+  validateResult?: (result: ReturnType<typeof runDemoPipeline>) => void;
 }
 
 export type TryRunResult = { ok: true } | { ok: false; message: string };
@@ -101,13 +102,12 @@ export async function tryRunAndPersist(tenantId: string, input: TryRunInput): Pr
       // 1トランザクション=1 client。同一clientへのquery並列実行はpg@9で非対応になる。
       const currentSites = await listSiteEntries(tenantId, tx);
       const currentEvents = await listInteractionEvents(tenantId, tx);
-      const physicalInputRecords = await listActivePhysicalInputRecords(tenantId, undefined, tx);
-      const activeBatches = await listActiveInputBatches(tenantId, tx);
-      const expansion = await buildCategoryExpansionRuntime(physicalInputRecords, activeBatches);
-      const now = new Date().toISOString();
+      const expansion = await loadCategoryExpansion(tenantId, tx);
+      // バッチの連番日時より後に次の操作を置き、再生順序を安定させる。
+      const eventTime = currentEvents.reduce((latest, event) => Math.max(latest, Date.parse(event.createdAt) + 1), Date.now());
       const pendingEvents: InteractionEvent[] = (input.events ?? []).map((event, index) => ({
         id: `pending-${index}`,
-        createdAt: now,
+        createdAt: new Date(eventTime + index).toISOString(),
         actor: event.actor,
         kind: event.kind,
         subjectId: event.subjectId,
@@ -124,8 +124,9 @@ export async function tryRunAndPersist(tenantId: string, input: TryRunInput): Pr
         const committedSites = await listSiteEntries(tenantId, tx);
         result = runWithExpansion(committedSites, interactions, expansion);
       }
+      input.validateResult?.(result);
       for (const [index, event] of (input.events ?? []).entries()) {
-        await appendInteractionEvent(tenantId, { ...event, createdAt: new Date(Date.now() + index) }, tx);
+        await appendInteractionEvent(tenantId, { ...event, createdAt: new Date(eventTime + index) }, tx);
       }
       await persistComputedRun(tenantId, result, tx, expansion.calculationLineItems);
     });

@@ -2,7 +2,7 @@ import { exchangeAmount } from "@core/types/common";
 import type { ApprovalThreshold } from "@core/types/decision";
 import type { BaselineNpvInput } from "@core/types/financial-bridge";
 import type { CompanyFinancialsInput, DecisionParametersInput } from "./interaction-state";
-import type { UserSiteDeepDiveParams } from "./site-entry";
+import type { DecisionReadySiteParams } from "./site-entry";
 import {
   BASELINE_NPV,
   CLIMATE_BASELINE_NPV,
@@ -19,7 +19,7 @@ export interface DecisionInputs {
 
 export function buildDecisionInputs(input: {
   siteKind: "flagship" | "climate" | "user";
-  deepDiveParams: UserSiteDeepDiveParams;
+  deepDiveParams: DecisionReadySiteParams;
   decisionParameters?: DecisionParametersInput;
   companyFinancials?: CompanyFinancialsInput;
 }): DecisionInputs {
@@ -41,13 +41,15 @@ export function buildDecisionInputs(input: {
     ? decisionParameters.approvalThresholdValue === null
       ? "pending"
       : { value: exchangeAmount(decisionParameters.approvalThresholdValue), source: "manual_entry" }
-    : {
+    : siteKind === "user" && deepDiveParams.approvalThresholdValue === null
+      ? "pending"
+      : {
         value: exchangeAmount(
           siteKind === "flagship"
             ? BASELINE_NPV.value + 25_000_000
             : siteKind === "climate"
               ? CLIMATE_BASELINE_NPV.value + 10_000_000
-              : deepDiveParams.approvalThresholdValue
+              : deepDiveParams.approvalThresholdValue!
         ),
         source: "manual_entry",
       };

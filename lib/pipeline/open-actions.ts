@@ -1,5 +1,4 @@
 import type { DemoPipelineResult } from "@/lib/demo/run-demo-pipeline";
-import { bindingLabel } from "@/app/components/labels";
 import { formatYen } from "@/app/components/numeric";
 import {
   decompositionForMaterialIssue,
@@ -41,6 +40,10 @@ export function joinSiteNames(names: string[]): string {
 export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
   const tasks: OpenTask[] = [];
   const { decisions, disclosure, valuation } = result;
+
+  if (result.deferredDecisions.length > 0) {
+    tasks.push({ id: "decision-inputs", section: "/decision", href: "/decision#deferred-decisions", text: `投資の前提が未入力:${result.deferredDecisions.length}拠点（価値算定は利用できます）`, linkLabel: "投資の前提を追加" });
+  }
 
   // ③ 手法間の乖離:実際の分解結果から最大倍率を取る
   const valuationIssueIds = Object.keys(valuation.valuationRecordsByMaterialIssue);
@@ -122,14 +125,14 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
     });
   }
 
-  // ⑤ 反映先が「弱」(参考記載)のままの拠点。R-3(単一値方式と同じ運命)への対応。
-  const weakBindingEntries = decisions.filter((d) => d.decision.decisionRecord.bindingMechanism.kind === "weak_reference");
+  // ⑤ 明示的な選択の有無で判定する。参考記載を選んだ拠点は未完了にしない。
+  const weakBindingEntries = decisions.filter((d) => !d.bindingConfirmed);
   const weakBinding = weakBindingEntries.length;
   if (weakBinding > 0) {
     tasks.push({
       id: "binding-mechanism",
       anchor: "site-summary",
-      text: `反映先が「${bindingLabel("weak_reference")}」:${weakBinding}件`,
+      text: `結果の反映先が未選択:${weakBinding}件`,
       section: "/decision",
       href: `/decision/${encodeURIComponent(weakBindingEntries[0].siteId)}`,
       linkLabel: "反映先を決める",
@@ -164,5 +167,7 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
     });
   }
 
-  return tasks;
+  // 解消できる未入力を先に案内する。算定差や減損の参考情報で入力を遮らない。
+  const order = ["representative-value", "decision-inputs", "approval-threshold", "binding-mechanism", "degenerate-representative", "disclosure-gap", "divergence", "impairment"];
+  return tasks.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
 }

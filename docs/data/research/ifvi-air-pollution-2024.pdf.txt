@@ -1,0 +1,35 @@
+PDF page 47
+   
+ 
+47 
+ 
+Muller (2012) is presented in the table below. Reductions in the level of air pollutants - 
+particularly fine particulate matter, improve visibility, leading to physical and economic 
+benefits in both recreational and residential settings (Industrial Economics, 2011). 
+Pollutant Societal cost per tonne (USD, 
+2011) 
+PM2.5  21.2 
+PM10  63.60 
+SO2  10.43 
+VOC  68.74 
+NOx  37.83 
+NH3  7.71 
+Table 5: Updated societal costs of air pollutants due to reduced visibility per tonne emitted 
+B60. Muller and Mendelsohn (2007) use a model which describes the visual range in each 
+county as a function of climatic and geographical factors and ambient concentrations of 
+PM10. They use a regression model to estimate the relationship between visual range 
+while controlling for temperature, precipitation, latitude and altitude, Muller and 
+Mendelsohn use contingent valuation (Chestnut and Rowe, 1990; Loehman and Boldt, 
+1990; McClelland et al., 1990). Muller and Mendelsohn use estimates of household WTP 
+for incremental changes in visibility associated with recreation experiences and regional 
+estimates from Chestnut and Dennis (1997) and McClelland et al. (1990). 
+B61. Benefit Transfer is the most practical method for estimating the societal cost of air 
+pollution from reductions in visibility33. This is because there are no consistent primary 
+studies estimating WTP to avoid reductions in visibility for specific locations across the 
+global scale an E P&L is likely to cover, and conducting a new, primary study on this scale 
+is not feasible (see above). Multivariate transfer functions, based on the key factors, are 
+derived and applied as outlined by Muller (2012). The same approach as for secondary 
+ 
+33 ExternE (2005) reports that “In the absence of a specific contingent valuation study for Europe aiming to elicit 
+the average willingness-to-pay measure to improve visibility, some adjustment in the US numbers may be done to 
+account for lower concern about visibility effects.” 

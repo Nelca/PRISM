@@ -144,9 +144,9 @@ export function deriveFindings(result: DemoPipelineResult): Finding[] {
   if (notCrossingEntries.length > 0) {
     findings.push({
       id: "finding-verdict-does-not-cross",
-      headline: `${joinSiteNames(notCrossing)}では、自然コストを織り込んでも投資判断の結論は変わらない`,
+      headline: `${joinSiteNames(notCrossing)}では、現在の試算の幅が承認ラインをまたがない`,
       detail:
-        "この論点は今回の投資判断を変えない、と根拠をもって確定できました。追加の調査は不要です。",
+        "試算が基準の上側・下側のどちらにあるか、拠点ごとの判定で確認できます。結果は現在の入力・評価範囲に基づきます。",
       href: `/decision/${encodeURIComponent(notCrossingEntries[0].siteId)}`,
       linkLabel: "対策と判定で詳細",
     });

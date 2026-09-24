@@ -105,9 +105,9 @@ export function deriveStepProgress(result: DemoPipelineResult): StepProgress[] {
       label: "対策と判定",
       note:
         counts.decisionCount > 0
-          ? `判定確定 ${counts.confirmed}/${counts.decisionCount}件`
+          ? `判定確定 ${counts.confirmed}/${counts.decisionCount}件・反映先記録 ${result.decisions.filter((entry) => entry.bindingConfirmed).length}/${counts.decisionCount}件${result.deferredDecisions.length > 0 ? `・投資前提待ち${result.deferredDecisions.length}拠点` : ""}`
           : "判定対象がまだありません",
-      done: counts.decisionCount > 0 && counts.confirmed === counts.decisionCount,
+      done: counts.decisionCount > 0 && counts.confirmed === counts.decisionCount && result.deferredDecisions.length === 0 && result.decisions.every((entry) => entry.bindingConfirmed),
     },
     {
       order: 6,

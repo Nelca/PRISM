@@ -18,6 +18,7 @@ import { getLatestRun } from "@/lib/db/repositories/runs";
 import { addSiteEntry, listSiteEntries, replaceSiteEntries } from "@/lib/db/repositories/sites";
 import { projectInteractionState } from "@/lib/demo/interaction-state";
 import { runDemoPipeline, DEFAULT_RNG_SEED } from "@/lib/demo/run-demo-pipeline";
+import { loadCategoryExpansion } from "./execute-run";
 import { tryRunAndPersist } from "./try-run-with-interaction";
 
 const TENANT = "try-run-with-interaction-test";
@@ -130,7 +131,9 @@ describe("検証してから永続化する(D-01-2)", () => {
 
     const events = await listInteractionEvents(TENANT);
     expect(events).toHaveLength(before + 2);
+    const expansion = await loadCategoryExpansion(TENANT);
     const expected = runDemoPipeline({
+      ...expansion,
       userSites: await listSiteEntries(TENANT),
       interactions: projectInteractionState(events),
       rngSeed: DEFAULT_RNG_SEED,

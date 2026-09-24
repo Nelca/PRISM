@@ -127,6 +127,7 @@ export async function selectCountermeasureAction(
 
 export interface RecordDecisionFormState {
   error?: string;
+  success?: string;
 }
 
 export async function recordDecisionAction(
@@ -165,10 +166,10 @@ export async function recordDecisionAction(
   const mechanismChanged = JSON.stringify(previousMechanism) !== JSON.stringify(mechanism);
 
   // 変更時は理由を必須にする(M6 D-9:デフォルト値を設けず、明示選択と変更履歴の記録を必須とする)。
-  if (mechanismChanged && !reason) {
+  if ((mechanismChanged || !current) && !reason) {
     return { error: "反映先を変更する場合は理由を入力してください。" };
   }
-  if (mechanismChanged && reason.length < 8) {
+  if ((mechanismChanged || !current) && reason.length < 8) {
     return { error: "変更理由が短すぎます。監査証跡として第三者が選択の根拠を理解できるように記入してください(8文字以上)。" };
   }
 
@@ -190,5 +191,5 @@ export async function recordDecisionAction(
   }
 
   revalidatePath("/", "layout");
-  return {};
+  return { success: "結果の反映先を記録しました。" };
 }

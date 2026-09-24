@@ -53,7 +53,7 @@ import type { CountermeasureCandidate } from "./company";
  * 分岐が複数箇所にあるため、定数化してハードコード文字列の重複を避ける。
  */
 const CLIMATE_SITE_ID = "site-070";
-import type { UserSiteEntry } from "./site-entry";
+import { hasDecisionInputs, type UserSiteEntry } from "./site-entry";
 import {
   buildUserCountermeasureCandidates,
   buildUserDeepDiveConfig,
@@ -454,6 +454,8 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     return primaryMaterialIssueId ? [{ siteId, materialIssueId: primaryMaterialIssueId, materialIssueIds }] : [];
   });
 
+  const deferredDecisions = userSiteEntries.filter((entry) => !hasDecisionInputs(entry.deepDive))
+    .map((entry) => ({ siteId: entry.row.id, siteName: entry.row.name }));
   const decisions = decisionTargets.flatMap(({ siteId, materialIssueId, materialIssueIds }) => {
     const siteRecords = valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [];
     const representative = representativeRecordForMaterialIssue(materialIssueId);
@@ -520,6 +522,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     const welfareMethodId = isClimateCategory ? "ghg-carbon-price-conversion.ghg-social-cost" : "lime3-water";
     const lime3 = siteRecords.find((r) => r.methodId === welfareMethodId) as WelfareValuationRecord | undefined;
     const deepDiveParams = deepDiveParamsBySiteId.get(siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
+    if (!hasDecisionInputs(deepDiveParams)) return [];
 
     /**
      * M6 D-4・D-10:通常NPVと承認閾値は企業提供。画面から入力されていればそれを使う。
@@ -527,7 +530,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
      * 未入力でも自然調整後NPVのレンジ・自然関連コストは通常どおり算出される(段階的開示)。
      */
     const { baselineNpv, approvalThreshold, companyFinancials } = buildDecisionInputs({
-      siteKind: isFlagshipSite ? "flagship" : isClimateCategory ? "climate" : "user",
+      siteKind: isFlagshipSite ? "flagship" : isClimateShowcaseSite ? "climate" : "user",
       deepDiveParams,
       decisionParameters: interactions.decisionParameters.get(siteId),
       companyFinancials: interactions.companyFinancials,
@@ -625,28 +628,26 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
         comparisonTargets,
         countermeasureCandidates,
         selectedCountermeasureKey: selectedKey,
+        bindingConfirmed: bindingState !== undefined,
       },
     ];
   });
 
-  // --- M7:開示検証(site-042固定claim + 深掘りに進んだ他拠点の自動生成claim) ---
-  // 固定デモ拠点以外の水・GHGについては、フォームのカテゴリに合う記載文を生成する。
-  const decisionsForAutoClaims = decisions.filter((d) => {
-    const category = assessment.materialIssues.find((issue) => issue.id === d.materialIssueId)?.impactCategory;
-    return d.siteId !== "site-042" && d.siteId !== CLIMATE_SITE_ID && (category === "water" || category === "climate");
+  // --- M7:固定デモの主張 + 利用者が明示入力した主張のみ ---
+  const userClaimEntries = userSiteEntries.flatMap((entry) => {
+    const site = assessment.sites.find((s) => s.id === entry.row.id);
+    if (!site) return [];
+    const claim = buildUserDisclosureClaim(site, entry.deepDive);
+    return claim ? [{ claim, siteId: site.id }] : [];
   });
-  const userClaims: DisclosureClaim[] = decisionsForAutoClaims.map((d) => {
-    const site = assessment.sites.find((s) => s.id === d.siteId)!;
-    const params = deepDiveParamsBySiteId.get(d.siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
-    return buildUserDisclosureClaim(site, params);
-  });
+  const userClaims = userClaimEntries.map(({ claim }) => claim);
   // 実際にアップロードされたPDFからAIが抽出したclaim(GAP-05)。特定拠点のvaluation recordとの
   // 紐づけは持たないため、candidatesForClaimは常に空を返し、段階3はG1(証拠なし)と判定する
   // (推測でsiteを割り当てない。D-15)。
   const extractedClaims: DisclosureClaim[] = [...interactions.extractedDisclosureClaimsBySourceDocument.values()].flat();
   const baseClaims: DisclosureClaim[] = [DISCLOSURE_CLAIM, ...userClaims, ...extractedClaims];
   const claimSiteId = new Map<string, string>([[DISCLOSURE_CLAIM.id, "site-042"]]);
-  userClaims.forEach((claim, i) => claimSiteId.set(claim.id, decisionsForAutoClaims[i].siteId));
+  userClaimEntries.forEach(({ claim, siteId }) => claimSiteId.set(claim.id, siteId));
 
   // M7①(記載を弱める)の上書きテキストを適用する。
   const claims: DisclosureClaim[] = baseClaims.map((claim) => {
@@ -655,6 +656,8 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   });
 
   const candidatesForClaim = (claim: DisclosureClaim): EvidenceCandidate[] => {
+    // 未確認の自由記述は、数量・期間が不明のまま根拠充足と判定しない。
+    if (claim.extractionConfidence === "low") return [];
     const siteId = claimSiteId.get(claim.id);
     return allValuationRecords
       .filter((r) => r.siteId === siteId)
@@ -725,6 +728,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   ];
 
   return {
+    environmentalTargets: [...interactions.environmentalTargets.values()],
     companyName: COMPANY_NAME,
     assessment,
     valuation: {
@@ -737,6 +741,7 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
       methodAvailabilityByMaterialIssue: input.methodAvailabilityByMaterialIssue ?? {},
     },
     decisions,
+    deferredDecisions,
     disclosure,
     disclosureClaims: claims,
     disclosureClaimSiteId: Object.fromEntries(claimSiteId),
@@ -782,6 +787,11 @@ export const DEFAULT_RNG_SEED = 42;
 //     結果の形が変わる(groups[].pairwiseDecompositions → crossMethodPairs / breakdownAnalyses、
 //     PairwiseDecomposition → decomposed|stopped の判別可能union、subject・versions の追加)。
 //     旧形式のまま保存されたrunを新コードが読むと表示が壊れるため、読み出し時に再実行する。
-export const RESULT_SCHEMA_VERSION = 11;
+// 12: 利用者拠点の入力値・未設定の承認基準を保持し、未入力の開示目標を生成しない。
+// 13: 投資前提が未入力の拠点は貨幣化を続け、NPV・ROIの生成を保留する。
+// 14: 物理指標の目標・担当・期限を保存結果に含め、統合管理へ表示する。
+// 15: 年度引継ぎ元、資源費用の前提、物理指標の確認済み開示文案を保持する。
+// 16: 資源対策の複数年比較、既存主張・投資案件との確認済み対応を保持する。
+export const RESULT_SCHEMA_VERSION = 16;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

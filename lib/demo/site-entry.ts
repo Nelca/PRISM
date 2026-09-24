@@ -13,10 +13,10 @@ export interface UserSiteDeepDiveParams {
   physicalQuantity: number;
   unit: string;
   unitReplacementCost: number;
-  investmentCostInitial: number;
-  investmentCostRecurring: number;
-  baselineNpvValue: number;
-  approvalThresholdValue: number;
+  investmentCostInitial: number | null;
+  investmentCostRecurring: number | null;
+  baselineNpvValue: number | null;
+  approvalThresholdValue: number | null;
   /** M2の優先度算定結果によらず深掘り評価に進めるか(manualOverrides)。 */
   forcePromote: boolean;
   disclosureClaimText?: string;
@@ -25,4 +25,16 @@ export interface UserSiteDeepDiveParams {
 export interface UserSiteEntry {
   row: SiteRow;
   deepDive: UserSiteDeepDiveParams;
+}
+
+/** 投資前提が揃うまでは貨幣化のみ行い、NPV・ROIを仮値で作らない。 */
+export type DecisionReadySiteParams = UserSiteDeepDiveParams & {
+  investmentCostInitial: number;
+  investmentCostRecurring: number;
+  baselineNpvValue: number;
+};
+
+export function hasDecisionInputs(params: UserSiteDeepDiveParams): params is DecisionReadySiteParams {
+  return [params.investmentCostInitial, params.investmentCostRecurring, params.baselineNpvValue]
+    .every((value) => typeof value === "number" && Number.isFinite(value));
 }

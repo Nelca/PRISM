@@ -1,0 +1,52 @@
+PDF page 33
+ 
+  
+ 
+32 230107 – Environmental Prices Handbook 2024: EU version – April 2025 
+Central values are also used in LCAs. As a sensitivity variant, the LCA can also be calculated 
+with lower and upper values.  
+2.3 Results: environmental prices at pollutant level 
+In this Section, we provide the results for several common pollutants that can be used in 
+environmental prices valuation. All environmental prices are expressed in euros per kg of 
+pollutant, in 2021 prices.  
+2.3.1 Environmental prices for emissions to air 
+Emissions to air represent significant harm, especially for human health, because these 
+emissions can be inhaled. Air pollutants are also the best researched compartment to 
+describe and quantify the impact of environmental pollutants.  
+ 
+The following table shows environmental prices per kg of pollutant for emissions to air.  
+ 
+Table 3 – Environmental prices for emissions of air pollutants, in €2021/kg 
+Pollutant Pollutant name Lower Central Upper 
+CO2 Carbon dioxide € 0.050 € 0.130 € 0.160 
+CFC-11 Chlorofluorocarbons € 283 € 725 € 926 
+PM2.5 Particulate matter * € 55.4 € 81.2 € 134 
+PM10 Particulate matter * € 29.7 € 44.3 € 73.3 
+NOx Nitrogen oxides € 12.8 € 19.3 € 31.1 
+SO2 Sulphur dioxide € 16.9 € 26.6 € 45.3 
+NH3 Ammonia € 17.4 € 25.2 € 39.5 
+NMVOC Volatile organic compounds (non-methane) € 1.53 € 2.16 € 3.49 
+CH4 Methane € 1.80 € 4.68 € 5.77 
+As Arsenic € 6,271 € 9,275 € 13,980 
+Cd Cadmium € 105,034 € 155,294 € 233,924 
+Cr-VI Chromium VI € 1,815 € 2,703 € 4,121 
+Pb Lead € 18,455 € 27,287 € 41,106 
+Hg Mercury € 9,983 € 14,951 € 23,019 
+Ni Nickel € 68 € 126 € 257 
+ 1.3 Butadiene € 1.37 € 1.91 € 2.87 
+ Benzene € 0.275 € 0.394 € 0.593 
+ Benzo(a)pyrene € 3,859 € 5,704 € 8,590 
+ Dioxins € 34,071,638 € 50,367,195 € 75,846,980 
+ Formaldehyde € 0.474 € 0.642 € 0.965 
+*  The analysis should include either PM2.5 or PM10 and not both at the same time.  
+ 
+As indicated in Section 1.4.2, the environmental prices reported in this chapter are average 
+values for the EU27. The damage costs of most of these pollutants can vary due to local 
+conditions (such as population density) and the nature of emissions (e.g. tall chimneys or 
+exhaust). This is especially true for classic air pollutants that enter the human body through 
+inhalation, such as particulate matter, NOx, SO2, NH3 and NMVOC. As averages for the EU27, 
+these environmental prices cannot readily be applied to specific local environmental 
+pollution, environmental pollution in other countries and/or environmental pollution from 
+non-average emission sources. In Chapter 6 these issues are considered in more detail,  
+as well as the background to the calculations. The chapter also gives values for  particulate 
+matter and NOx that depend on the source of emissions.  

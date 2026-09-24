@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { ModalForm } from "../components/ui";
 import { acquireEvidenceAction, recordIntentionalDecisionAction, weakenClaimAction, type DisclosureActionFormState } from "./actions";
@@ -36,10 +37,11 @@ export function AcquireEvidenceAction({ materialIssueId }: { materialIssueId: st
   return (
     <form action={formAction}>
       <input type="hidden" name="materialIssueId" value={materialIssueId} />
-      <button type="submit" className="pill-btn pill-btn--accent" disabled={pending}>
-        {pending ? "追加しています…" : "② 根拠を追加で取得する"}
+      <button type="submit" className="pill-btn pill-btn--accent" disabled={pending || Boolean(state.success)}>
+        {pending ? "追加しています…" : "② 詳細評価に追加する"}
       </button>
       {state.error && <p className="form-error" role="alert">{state.error}</p>}
+      {state.success && <div role="status"><p className="form-success">{state.success}</p><Link href={`/assessment/${encodeURIComponent(materialIssueId)}`}>不足するデータを確認する →</Link></div>}
     </form>
   );
 }

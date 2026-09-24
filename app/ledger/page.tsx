@@ -161,7 +161,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
           <table className="data-table">
             <thead>
               <tr>
-                <th>日時</th>
+                <th>日時（日本時間）</th>
                 <th>担当</th>
                 <th>内容</th>
               </tr>
@@ -177,7 +177,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
                 result.actionLog.map((entry, i) => (
                   <tr key={i}>
                     <td className="num" style={{ fontSize: 11 }}>
-                      {entry.date.slice(0, 16).replace("T", " ")}
+                      {new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", dateStyle: "short", timeStyle: "short" }).format(new Date(entry.date))}
                     </td>
                     <td>{entry.who}</td>
                     {/* 第4版 D-03:古い記録に残る手法IDは、記録を書き換えず表示時だけ読める名前にする。 */}

@@ -1,0 +1,121 @@
+import { randomUUID } from "node:crypto";
+import { afterAll, describe, expect, it, vi } from "vitest";
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/db/client", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/db/client")>(), getTenantId: async () => tenant }));
+import { closeDb } from "@/lib/db/client";
+import { loadInteractionState, listInteractionEvents } from "@/lib/db/repositories/interactions";
+import { getLatestRun } from "@/lib/db/repositories/runs";
+import { importTargetsAction } from "@/app/portfolio/import/actions";
+import { saveTargetAction } from "@/app/portfolio/actions";
+import { saveTargetReviewAction } from "@/app/portfolio/review-actions";
+import { GET as exportTargets } from "@/app/portfolio/export/route";
+import { parseTargetCsv, editableTargetCsv } from "./csv";
+import { carryForwardValues } from "./carry-forward";
+import { claimFingerprint, decisionFingerprint, resourceInvestmentComparison, physicalDisclosureBundle, resourceCostComparison, targetFingerprint } from "./review";
+import type { EnvironmentalTarget } from "./metrics";
+import { syntheticTargets } from "@/lib/research/samples";
+const tenant = `environment-workflows-${randomUUID()}`;
+const sample: EnvironmentalTarget = { id: "", revision: "", siteId: "site-042", metricId: "biological_procurement", reportingYear: 2026, boundary: "検証用木材", current: 100, baseline: null, target: 80, direction: "at_most", measuredOn: "2026-09-20", evidence: "検証用の2026年度購買台帳", targetBasis: "検証用の2026年度目標80トン", owner: "検証担当", dueDate: "", actionPlan: "", archived: false, updatedAt: "" };
+function form(values: Record<string, unknown>): FormData {
+  const data = new FormData();
+  for (const [key, value] of Object.entries(values)) data.set(key, value === null ? "" : String(value));
+  return data;
+}
+afterAll(closeDb);
+describe("取込・年度引継ぎ・費用・開示の保存フロー", () => {
+  it("プレビューで書き込まず、バッチ全件と直後の更新を順序どおり再生する", async () => {
+    const csv = editableTargetCsv(Array.from({ length: 30 }, (_, index) => ({ ...sample, boundary: `検証用木材${index}` })));
+    const preview = await importTargetsAction(form({ csv, reason: "一括登録の事前確認を実施" }));
+    expect(preview.preview?.rows).toHaveLength(30);
+    expect(await listInteractionEvents(tenant)).toHaveLength(0);
+    expect(await importTargetsAction(form({ csv, reason: "一括登録の事前確認を実施", mode: "commit", previewHash: preview.preview!.hash, confirmed: "on" }))).toEqual({ savedCount: 30 });
+    const saved = [...(await loadInteractionState(tenant)).environmentalTargets.values()];
+    expect(saved).toHaveLength(30);
+    const last = saved.at(-1)!;
+    expect((await saveTargetAction({}, form({ ...last, targetId: last.id, current: 90, reason: "一括登録直後の個別更新を検証" }))).savedId).toBe(last.id);
+    const loaded = (await loadInteractionState(tenant)).environmentalTargets.get(last.id)!;
+    expect(loaded.current).toBe(90);
+    expect((await getLatestRun(tenant))!.result.environmentalTargets.find((record) => record.id === last.id)?.current).toBe(90);
+    const invalid = editableTargetCsv([{ ...loaded, current: 85 }, { ...sample, siteId: "another-tenant-site" }]);
+    expect((await importTargetsAction(form({ csv: invalid, reason: "不正行を含む入力の検証" }))).errors).toBeDefined();
+    expect((await loadInteractionState(tenant)).environmentalTargets.get(last.id)?.current).toBe(90);
+    const staleCsv = editableTargetCsv([last]);
+    expect((await importTargetsAction(form({ csv: staleCsv, reason: "古い版の入力を拒否する検証" }))).errors).toBeDefined();
+    const mixedCsv = editableTargetCsv([{ ...loaded, current: 85 }, { ...sample, boundary: "新規と更新の混合検証" }]);
+    const mixed = await importTargetsAction(form({ csv: mixedCsv, reason: "新規と更新を同時に保存する検証" }));
+    expect(mixed.preview?.rows[0].previous?.current).toBe(90);
+    expect(await importTargetsAction(form({ csv: mixedCsv, reason: "新規と更新を同時に保存する検証", mode: "commit", previewHash: mixed.preview!.hash, confirmed: "on" }))).toEqual({ savedCount: 2 });
+    expect((await loadInteractionState(tenant)).environmentalTargets.get(last.id)?.current).toBe(85);
+  });
+  it("費用前提・開示文案を根拠に紐付け、更新後は再確認し、翌年は新レコードになる", async () => {
+    const created = await saveTargetAction({}, form({ ...sample, boundary: "単独検証用木材", reason: "費用と開示連携を検証する対象を登録" }));
+    expect(created.savedId).toBeDefined();
+    let source = (await loadInteractionState(tenant)).environmentalTargets.get(created.savedId!)!;
+    const costs = await saveTargetReviewAction({}, form({ targetId: source.id, revision: source.revision, kind: "cost", name: "検証用歩留まり改善", baselineUnitCost: 10000, alternativeUnitCost: 11000, alternativeQuantity: 80, additionalAnnualCost: 20000, initialInvestment: 300000, evidence: "対象品目と同年度の見積書により確認", reason: "費用範囲と数量の対応を確認", confirmed: "on" }));
+    expect(costs).toEqual({ saved: true });
+    source = (await loadInteractionState(tenant)).environmentalTargets.get(source.id)!;
+    expect(resourceCostComparison(source, source.costCase!)?.annualSavings).toBe(100000);
+    const pipeline = (await getLatestRun(tenant))!.result;
+    const decision = pipeline.decisions.find((entry) => entry.siteId === source.siteId)!.decision.decisionRecord;
+    const investmentForm = { targetId: source.id, revision: source.revision, kind: "cost", ...source.costCase!, investmentEnabled: "on", horizon: 3, discountRatePercent: 0, approvalThreshold: 0, investmentRationale: "対象期間と社内基準を検証用に確認", investmentConfirmed: "on", decisionId: decision.id, decisionFingerprint: decisionFingerprint(decision), decisionConfirmed: "on", reason: "同じ拠点の案件と費用重複を確認", confirmed: "on" };
+    const before = (await listInteractionEvents(tenant)).length;
+    expect((await saveTargetReviewAction({}, form({ ...investmentForm, horizon: 1.5 }))).error).toBeDefined();
+    expect((await saveTargetReviewAction({}, form({ ...investmentForm, decisionFingerprint: "stale" }))).error).toBeDefined();
+    expect((await listInteractionEvents(tenant)).length).toBe(before);
+    expect(await saveTargetReviewAction({}, form(investmentForm))).toEqual({ saved: true });
+    source = (await loadInteractionState(tenant)).environmentalTargets.get(source.id)!;
+    expect(resourceInvestmentComparison(source, source.costCase!, [decision])?.npv).toBe(0);
+
+    expect(await saveTargetReviewAction({}, form({ targetId: source.id, revision: source.revision, kind: "disclosure", disclosureText: "2026年の検証用木材の調達量は100トンです。", reason: "原本の期間と測定範囲を確認", confirmed: "on" }))).toEqual({ saved: true });
+    source = (await loadInteractionState(tenant)).environmentalTargets.get(source.id)!;
+    expect(physicalDisclosureBundle([source], new Map([[source.siteId, "本社工場"]])).count).toBe(1);
+    expect((await saveTargetAction({}, form({ ...source, targetId: source.id, current: 110, reason: "実測値の修正に伴う再確認を検証" }))).savedId).toBe(source.id);
+    const updated = (await loadInteractionState(tenant)).environmentalTargets.get(source.id)!;
+    expect(updated.costCase).toEqual(source.costCase);
+    expect(updated.costCase!.sourceFingerprint).not.toBe(targetFingerprint(updated));
+    expect(physicalDisclosureBundle([updated], new Map([[source.siteId, "本社工場"]])).count).toBe(0);
+    const next = await saveTargetAction({}, form({ ...carryForwardValues(updated), sourceTargetId: updated.id, sourceRevision: updated.revision, reason: "翌年の管理へ引き継ぐことを検証" }));
+    expect(next.savedId).toBeDefined();
+    const carried = (await loadInteractionState(tenant)).environmentalTargets.get(next.savedId!)!;
+    expect(carried).toMatchObject({ reportingYear: 2027, current: null, target: null, baseline: 110, carriedFrom: { id: updated.id, revision: updated.revision, year: 2026 } });
+    expect(carried.costCase).toBeUndefined();
+    expect(carried.disclosureNote).toBeUndefined();
+    expect((await saveTargetAction({}, form({ ...carryForwardValues(updated), sourceTargetId: updated.id, sourceRevision: updated.revision, reason: "同じ年度への重複引継ぎを検証" }))).error).toContain("登録済み");
+  });
+  it("既存主張との対応を保存し、古い主張での確認は保存しない", async () => {
+    const created = await saveTargetAction({}, form({ ...sample, boundary: "主張との対応検証", reason: "既存主張と指標の対応を検証" }));
+    const source = (await loadInteractionState(tenant)).environmentalTargets.get(created.savedId!)!;
+    const claim = (await getLatestRun(tenant))!.result.disclosureClaims[0];
+    const input = { targetId: source.id, revision: source.revision, kind: "disclosure", disclosureText: "検証用の物理指標について確認した文案", reason: "原文と対象年範囲の違いを確認", confirmed: "on", claimId: claim.id, claimFingerprint: claimFingerprint(claim), claimConfirmed: "on" };
+    expect((await saveTargetReviewAction({}, form({ ...input, claimFingerprint: "old" }))).error).toBeDefined();
+    expect(await saveTargetReviewAction({}, form(input))).toEqual({ saved: true });
+    const saved = (await loadInteractionState(tenant)).environmentalTargets.get(source.id)!;
+    expect(saved.disclosureNote?.linkedClaim?.id).toBe(claim.id);
+    expect(physicalDisclosureBundle([saved], new Map([[source.siteId, "本社工場"]]), [claim]).count).toBe(1);
+  });
+  it("編集用CSVをダウンロード可能なレスポンスとして出力する", async () => {
+    const result = await exportTargets(new Request("http://localhost/portfolio/export"));
+    expect(result.headers.get("content-disposition")).toContain('attachment; filename="prism-targets-editable.csv"');
+    expect(result.headers.get("cache-control")).toBe("private, no-store");
+    const parsed = parseTargetCsv(await result.text());
+    const active = [...(await loadInteractionState(tenant)).environmentalTargets.values()].filter((record) => !record.archived);
+    expect(parsed.rows.map((row) => row.targetId)).toEqual(active.map((record) => record.id));
+    const template = await exportTargets(new Request("http://localhost/portfolio/export?mode=template"));
+    const text = await template.text();
+    expect(text).toContain("管理ID");
+    expect(text).not.toContain("検証用木材");
+  });
+
+  it("研究用4指標をプレビューから保存し、送粉頻度と整数の観察個体数を復元する", async () => {
+    const csv = editableTargetCsv(syntheticTargets("site-042"));
+    const reason = "合成データによる新しい生態系指標の保存を検証";
+    const preview = await importTargetsAction(form({ csv, reason }));
+    expect(preview.preview?.rows).toHaveLength(4);
+    expect(await importTargetsAction(form({ csv, reason, mode: "commit", previewHash: preview.preview!.hash, confirmed: "on" }))).toEqual({ savedCount: 4 });
+    const targets = [...(await loadInteractionState(tenant)).environmentalTargets.values()];
+    expect(targets.find((target) => target.metricId === "pollinator_visits_per_hour")).toMatchObject({ current: 3, baseline: 3, target: 4 });
+    expect(targets.find((target) => target.metricId === "species_observed_count")).toMatchObject({ current: 12, baseline: 10, target: 15 });
+    expect(targets.filter((target) => target.boundary.startsWith("研究用・架空")).every((target) => target.evidence.includes("合成データ"))).toBe(true);
+  });
+
+});

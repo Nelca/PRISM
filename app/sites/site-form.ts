@@ -12,10 +12,8 @@ export interface ParsedSiteForm {
 const VALID_SITE_TYPES: SiteType[] = ["own_site", "supplier_site"];
 const VALID_DIRECT_CATEGORIES = ["water", "climate"] as const;
 
-function numberOrFallback(formData: FormData, name: string, label: string, fallback: number, min?: number) {
-  const raw = formData.get(name);
-  if (raw === null || String(raw).trim() === "") return { value: fallback };
-  return parseRequiredNumber(raw, { label, min });
+function optionalNumber(raw: FormDataEntryValue | null, label: string, min?: number) {
+  return String(raw ?? "").trim() === "" ? { value: null } : parseRequiredNumber(raw, { label, min });
 }
 
 export function parseSiteForm(
@@ -34,13 +32,18 @@ export function parseSiteForm(
     return { error: "評価する環境データを選択してください。" };
   }
 
+  const unit = String(formData.get("unit") ?? "").trim() || (category === "climate" ? "tCO2e" : "m3");
+  if (unit !== (category === "climate" ? "tCO2e" : "m3")) return { error: "単位は水がm3、GHGがtCO2eです。換算して入力してください。" };
+
   const fields = {
-    physicalQuantity: numberOrFallback(formData, "physicalQuantity", "物理量", fallback.physicalQuantity, 0),
-    unitReplacementCost: numberOrFallback(formData, "unitReplacementCost", "単位代替原価", fallback.unitReplacementCost, 0),
-    investmentCostInitial: numberOrFallback(formData, "investmentCostInitial", "初期投資額", fallback.investmentCostInitial, 0),
-    investmentCostRecurring: numberOrFallback(formData, "investmentCostRecurring", "継続投資額", fallback.investmentCostRecurring, 0),
-    baselineNpvValue: numberOrFallback(formData, "baselineNpvValue", "通常NPV", fallback.baselineNpvValue),
-    approvalThresholdValue: numberOrFallback(formData, "approvalThresholdValue", "承認閾値", fallback.approvalThresholdValue),
+    physicalQuantity: parseRequiredNumber(formData.get("physicalQuantity"), { label: "年間の環境データ量", min: 0 }),
+    unitReplacementCost: parseRequiredNumber(formData.get("unitReplacementCost"), { label: "コスト単価", min: 0 }),
+    investmentCostInitial: optionalNumber(formData.get("investmentCostInitial"), "初期投資額", 0),
+    investmentCostRecurring: optionalNumber(formData.get("investmentCostRecurring"), "年間の継続費用", 0),
+    baselineNpvValue: optionalNumber(formData.get("baselineNpvValue"), "自然コスト反映前のNPV"),
+    approvalThresholdValue: String(formData.get("approvalThresholdValue") ?? "").trim() === ""
+      ? { value: null }
+      : parseRequiredNumber(formData.get("approvalThresholdValue"), { label: "投資の承認ライン" }),
   };
   if ("error" in fields.physicalQuantity) return fields.physicalQuantity;
   if ("error" in fields.unitReplacementCost) return fields.unitReplacementCost;
@@ -52,9 +55,7 @@ export function parseSiteForm(
   const deepDive: UserSiteDeepDiveParams = {
     category: category as UserSiteDeepDiveParams["category"],
     physicalQuantity: fields.physicalQuantity.value,
-    unit:
-      String(formData.get("unit") ?? "").trim() ||
-      (category === (fallback.category ?? "water") ? fallback.unit : category === "climate" ? "tCO2e" : "m3"),
+    unit,
     unitReplacementCost: fields.unitReplacementCost.value,
     investmentCostInitial: fields.investmentCostInitial.value,
     investmentCostRecurring: fields.investmentCostRecurring.value,

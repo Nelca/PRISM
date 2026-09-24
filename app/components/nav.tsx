@@ -14,6 +14,7 @@ const NAV = [
   {
     group: "データを評価する",
     items: [
+      { href: "/portfolio", label: "環境・資源の統合管理" },
       { href: "/sites", label: "拠点とデータ" },
       { href: "/assessment", label: "評価対象" },
       { href: "/valuation", label: "価値算定" },

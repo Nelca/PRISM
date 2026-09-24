@@ -10,10 +10,29 @@ function baseForm() {
   form.set("locationKind", "coordinates");
   form.set("lat", "35");
   form.set("lng", "139");
+  for (const [key, value] of Object.entries({ physicalQuantity: 10000, unitReplacementCost: 500, investmentCostInitial: 20000000, investmentCostRecurring: 0, baselineNpvValue: 500000000 })) form.set(key, String(value));
   return form;
 }
 
 describe("site form", () => {
+  it("必須数値の空欄をデモ値で補完しない", () => {
+    for (const field of ["physicalQuantity", "unitReplacementCost"]) {
+      const form = baseForm();
+      form.set(field, "");
+      expect(parseSiteForm(form, DEFAULT_DEEP_DIVE_PARAMS)).toHaveProperty("error");
+    }
+  });
+  it("投資の前提がなくても環境データを登録でき、未入力をnullで保持する", () => {
+    const form = baseForm();
+    for (const field of ["investmentCostInitial", "investmentCostRecurring", "baselineNpvValue"]) form.delete(field);
+    expect(parseSiteForm(form, DEFAULT_DEEP_DIVE_PARAMS)).toMatchObject({ deepDive: { investmentCostInitial: null, investmentCostRecurring: null, baselineNpvValue: null } });
+  });
+  it("承認ラインの空欄は未定、0は明示的な値として保存する", () => {
+    const form = baseForm();
+    expect(parseSiteForm(form, DEFAULT_DEEP_DIVE_PARAMS)).toMatchObject({ deepDive: { approvalThresholdValue: null, investmentCostRecurring: 0 } });
+    form.set("approvalThresholdValue", "0");
+    expect(parseSiteForm(form, DEFAULT_DEEP_DIVE_PARAMS)).toMatchObject({ deepDive: { approvalThresholdValue: 0 } });
+  });
   it("有効な座標入力をドメイン入力へ変換する", () => {
     const parsed = parseSiteForm(baseForm(), DEFAULT_DEEP_DIVE_PARAMS);
     expect(parsed).toMatchObject({ row: { name: "東京工場", lat: 35, lng: 139 } });

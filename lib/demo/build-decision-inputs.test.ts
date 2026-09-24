@@ -3,6 +3,10 @@ import { buildDecisionInputs } from "./build-decision-inputs";
 import { DEFAULT_DEEP_DIVE_PARAMS } from "./user-site-defaults";
 
 describe("buildDecisionInputs", () => {
+  it("新規登録時の未定の承認ラインをデモの値に置き換えない", () => {
+    const result = buildDecisionInputs({ siteKind: "user", deepDiveParams: { ...DEFAULT_DEEP_DIVE_PARAMS, approvalThresholdValue: null } });
+    expect(result.approvalThreshold).toBe("pending");
+  });
   it("keeps an omitted approval threshold pending", () => {
     const result = buildDecisionInputs({
       siteKind: "user",

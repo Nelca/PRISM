@@ -23,6 +23,12 @@ function loadTemplates() {
 }
 
 describe("toSiteEntries", () => {
+  it("CSV設定で未定の承認ラインは未定のまま保持する", () => {
+    const dataset = loadTemplates();
+    dataset.engagementConfig.approvalThreshold = "pending";
+    const target = toSiteEntries(dataset).entries.find((entry) => entry.row.id === dataset.engagementConfig.deepDive.siteId)!;
+    expect(target.deepDive.approvalThresholdValue).toBeNull();
+  });
   it("記入例のテンプレート3ファイルから拠点エントリを組み立てられる", () => {
     const { entries } = toSiteEntries(loadTemplates());
 

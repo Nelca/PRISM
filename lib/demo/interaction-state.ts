@@ -1,3 +1,5 @@
+import { applyTargetUpdate } from "@/lib/environment/projection";
+import type { EnvironmentalTarget } from "@/lib/environment/metrics";
 /**
  * ユーザー操作の「現在値」。追記されたイベント列(interaction_event)を畳み込んで得る射影であり、
  * それ自体を保存しない(承認済み計画のB-1)。
@@ -28,6 +30,7 @@ export interface ActionLogEntry {
 
 /** イベントの種別。DBの interaction_event.kind と1:1で対応する。 */
 export type InteractionKind =
+  | "environmental_target_update"
   | "depth_override"
   | "representative_selection"
   | "countermeasure_selection"
@@ -96,6 +99,7 @@ export interface DecisionParametersInput {
 }
 
 export interface InteractionState {
+  environmentalTargets: Map<string, EnvironmentalTarget>;
   depthOverrides: Map<string, "promote" | "demote">;
   /** 未入力の間はundefined。デモの既定値で埋めない。 */
   companyFinancials?: CompanyFinancialsInput;
@@ -118,6 +122,7 @@ export interface InteractionState {
 
 export function emptyInteractionState(): InteractionState {
   return {
+    environmentalTargets: new Map(),
     depthOverrides: new Map(),
     decisionParameters: new Map(),
     representativeRecordId: new Map(),
@@ -142,6 +147,12 @@ export function projectInteractionState(events: InteractionEvent[]): Interaction
 
   for (const event of ordered) {
     switch (event.kind) {
+      case "environmental_target_update": {
+        const record = event.payload.record as EnvironmentalTarget;
+        if (record.id !== event.subjectId) throw new Error("環境指標の識別子が不一致です。");
+        applyTargetUpdate(state.environmentalTargets, record, event.payload.expectedRevision as string | null);
+        break;
+      }
       case "depth_override": {
         const mode = event.payload.mode as "promote" | "demote" | "auto";
         if (mode === "auto") {

@@ -1,3 +1,5 @@
+import { claimLinkCurrent, targetFingerprint } from "@/lib/environment/review";
+import { METRIC_BY_ID } from "@/lib/environment/metrics";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPipelineView } from "@/lib/views/pipeline";
@@ -169,7 +171,7 @@ export default async function DisclosurePage({
                         <Tag variant="ok">根拠充足</Tag>
                       )}
                       {claim?.extractionConfidence === "low" && (
-                        <span className="id-note">AI抽出確信度低・要レビュー</span>
+                        <span className="id-note">主張の分類・抽出内容を要確認</span>
                       )}
                     </td>
                     <td className="num">{finding.evidenceMatch.matchedRecordIds.length}件</td>
@@ -217,10 +219,11 @@ export default async function DisclosurePage({
             headExtra={
               <>
                 {finding.gapType ? <Tag variant="warn">{gapTypeLabel(finding.gapType)}</Tag> : <Tag variant="ok">根拠充足</Tag>}
-                {claim?.extractionConfidence === "low" && <Tag variant="warn">AI抽出確信度低・要レビュー</Tag>}
+                {claim?.extractionConfidence === "low" && <Tag variant="warn">主張の分類・抽出内容を要確認</Tag>}
               </>
             }
           >
+            {result.environmentalTargets.filter((target) => !target.archived && target.disclosureNote?.linkedClaim?.id === finding.claimId).map((target) => <p key={target.id}>確認記録のある物理指標: <Link href={`/portfolio/${encodeURIComponent(target.id)}`}>{METRIC_BY_ID.get(target.metricId)?.label} · {target.reportingYear}年 · {target.boundary}</Link> — {target.disclosureNote!.sourceFingerprint === targetFingerprint(target) && claimLinkCurrent(target.disclosureNote, result.disclosureClaims) && result.assessment.sites.some((site) => site.id === target.siteId && site.name === target.disclosureNote!.siteName) ? "対応の確認済み（自動指摘の解消とは別）" : "再確認が必要"}</p>)}
             {/*
               照合用のGapFinding IDは本文から外した(指示06)。監査で辿る必要がある場合は
               記録(監査証跡)画面から参照できれば足りる。

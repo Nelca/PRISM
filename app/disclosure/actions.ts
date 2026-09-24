@@ -13,6 +13,7 @@ const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 export interface DisclosureActionFormState {
   error?: string;
+  success?: string;
 }
 
 export interface PdfIntakeFormState {
@@ -156,7 +157,7 @@ export async function acquireEvidenceAction(
   }
 
   revalidatePath("/", "layout");
-  return {};
+  return { success: "詳細評価に追加し、再計算しました。外部データの取得は行っていません。評価画面で不足するデータを確認してください。" };
 }
 
 /** ③意図的判断として記録する(理由は必須。デフォルトを設けない。M7 D-4)。 */

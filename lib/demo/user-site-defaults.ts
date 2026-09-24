@@ -20,9 +20,9 @@ import {
   DEEP_DIVE_IFVI_WATER_VALUE_FACTOR_SOURCE,
 } from "./company";
 import type { CountermeasureCandidate } from "./company";
-import type { UserSiteDeepDiveParams } from "./site-entry";
+import type { UserSiteDeepDiveParams, DecisionReadySiteParams } from "./site-entry";
 
-export const DEFAULT_DEEP_DIVE_PARAMS: UserSiteDeepDiveParams = {
+export const DEFAULT_DEEP_DIVE_PARAMS: DecisionReadySiteParams = {
   category: "water",
   physicalQuantity: 10_000,
   unit: "m3",
@@ -100,7 +100,7 @@ export function buildUserDeepDiveConfig(siteId: string, params: UserSiteDeepDive
   };
 }
 
-export function buildUserBaselineNpv(params: UserSiteDeepDiveParams): BaselineNpvInput {
+export function buildUserBaselineNpv(params: DecisionReadySiteParams): BaselineNpvInput {
   return { value: params.baselineNpvValue, discountRate: 0.06, horizon: 10, source: "manual_entry" };
 }
 
@@ -112,7 +112,7 @@ export function buildUserBaselineNpv(params: UserSiteDeepDiveParams): BaselineNp
 export function buildUserCountermeasureCandidates(
   siteId: string,
   replacementCostRecordId: string,
-  params: UserSiteDeepDiveParams
+  params: DecisionReadySiteParams
 ): CountermeasureCandidate[] {
   const climate = (params.category ?? "water") === "climate";
   const reductionAvoided = Math.round(params.physicalQuantity * params.unitReplacementCost * 0.7);
@@ -177,23 +177,23 @@ export function buildUserCountermeasureCandidates(
   ];
 }
 
-export function buildUserDisclosureClaim(site: Site, params: UserSiteDeepDiveParams): DisclosureClaim {
-  const category = params.category ?? "water";
-  const subject = category === "climate" ? "GHG排出量" : "水使用量";
+export function buildUserDisclosureClaim(site: Site, params: UserSiteDeepDiveParams): DisclosureClaim | null {
+  const rawText = params.disclosureClaimText?.trim();
+  if (!rawText) return null;
   return {
     id: `claim-${site.id}-2027`,
-    sourceDocument: "統合報告書2027(デモ入力)",
-    sourcePageOrSection: "—",
-    rawText:
-      params.disclosureClaimText?.trim() || `当社は2030年までに${site.name}における${subject}を20%削減することを目指します。`,
-    claimType: "future_commitment",
+    sourceDocument: "拠点登録時の手入力（主張の分類・抽出は未確認）",
+    sourcePageOrSection: site.name,
+    rawText,
+    // 自由記述の数量・期間・主張タイプを推測しない。低確信度として要確認に送る。
+    claimType: "state",
     extractedMetadata: {
-      category,
-      quantityMentioned: { value: 20, unit: "%" },
-      periodMentioned: { startYear: 2027, endYear: 2030 },
+      category: params.category ?? "water",
+      quantityMentioned: null,
+      periodMentioned: null,
       scopeMentioned: site.name,
     },
-    extractionConfidence: "high",
+    extractionConfidence: "low",
   };
 }
 
@@ -202,7 +202,7 @@ export function buildUserDisclosureClaim(site: Site, params: UserSiteDeepDivePar
  * 拠点ごとの深掘りパラメータから機械的に導いた**デモ用の仮値**である。
  * 実データの入口はT-15(財務パラメータ入力UI)で作る。
  */
-export function buildUserFinancials(params: UserSiteDeepDiveParams) {
+export function buildUserFinancials(params: DecisionReadySiteParams) {
   const operatingProfit = Math.max(params.baselineNpvValue * 2, 1);
   return {
     reportedOperatingProfit: exchangeAmount(operatingProfit),

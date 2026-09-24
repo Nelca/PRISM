@@ -20,11 +20,8 @@ import type { AppendCalculationLineItemInput } from "@/lib/db/repositories/physi
 import { DEMO_CATEGORY_EXPANSION_BATCHES, DEMO_CATEGORY_EXPANSION_RECORDS } from "@/lib/demo/category-expansion-data";
 import { buildCategoryExpansionRuntime } from "./category-expansion-runtime";
 
-/** 入力を読み直してパイプラインを実行し、新しいrunとして永続化する。 */
-export async function executeAndPersistRun(tenantId: string, db?: DbExecutor): Promise<DemoPipelineResult> {
-  // DbTransactionは単一clientなので、pg@9でも安全なよう同一tx内のqueryを並列実行しない。
-  const userSites = await listSiteEntries(tenantId, db);
-  const interactions = await loadInteractionState(tenantId, db);
+/** 読取と操作保存で同じ入力選択規則を使う。デモと実入力を混在させない。 */
+export async function loadCategoryExpansion(tenantId: string, db?: DbExecutor) {
   const physicalInputRecords = await listActivePhysicalInputRecords(tenantId, undefined, db);
   const activeBatches = await listActiveInputBatches(tenantId, db);
   // 未登録環境でも追加3カテゴリの画面・算定を確認できるよう、入力バッチが一件も
@@ -34,6 +31,16 @@ export async function executeAndPersistRun(tenantId: string, db?: DbExecutor): P
     usesDemoCategoryInputs ? DEMO_CATEGORY_EXPANSION_RECORDS : physicalInputRecords,
     usesDemoCategoryInputs ? DEMO_CATEGORY_EXPANSION_BATCHES : activeBatches
   );
+  // 架空レコードにはphysical_input_recordの外部キーがないため索引行を保存しない。
+  return { ...expansion, calculationLineItems: usesDemoCategoryInputs ? [] : expansion.calculationLineItems };
+}
+
+/** 入力を読み直してパイプラインを実行し、新しいrunとして永続化する。 */
+export async function executeAndPersistRun(tenantId: string, db?: DbExecutor): Promise<DemoPipelineResult> {
+  // DbTransactionは単一clientなので、pg@9でも安全なよう同一tx内のqueryを並列実行しない。
+  const userSites = await listSiteEntries(tenantId, db);
+  const interactions = await loadInteractionState(tenantId, db);
+  const expansion = await loadCategoryExpansion(tenantId, db);
   const result = runDemoPipeline({
     userSites,
     interactions,
@@ -48,7 +55,7 @@ export async function executeAndPersistRun(tenantId: string, db?: DbExecutor): P
   });
   // デモレコードはDBのphysical_input_recordに存在しないため、外部キーを持つ算定行は
   // 保存しない。run内の入力ハッシュ・カバレッジ・仮定台帳には出所を残す。
-  return persistComputedRun(tenantId, result, db, usesDemoCategoryInputs ? [] : expansion.calculationLineItems);
+  return persistComputedRun(tenantId, result, db, expansion.calculationLineItems);
 }
 
 /**

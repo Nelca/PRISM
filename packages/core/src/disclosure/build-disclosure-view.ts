@@ -27,6 +27,10 @@ export interface DisclosureViewSource {
   materialIssues: MaterialIssue[];
   valuationRecords: ValuationRecord[];
   decisionRecords: DecisionRecord[];
+  /** 明示的に選択された代表値。未選択の複数手法は合算も自動選択もしない。 */
+  selectedValuationRecordIds?: string[];
+  confirmedBindingDecisionIds?: string[];
+  siteNames?: Record<string, string>;
 }
 
 /**

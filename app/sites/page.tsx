@@ -107,7 +107,7 @@ export default async function SitesPage() {
                 const editable = stored !== undefined && isUserSiteId(site.id);
                 const locked = stored === undefined ? LOCKED_REASON.demo : LOCKED_REASON.imported;
                 return (
-                  <tr key={site.id}>
+                  <tr key={site.id} id={`site-${site.id}`}>
                     <td>
                       {/* 拠点IDは照合用の内部IDなので、本文からは小書きに退避する(指示06)。 */}
                       <b>{site.name}</b>

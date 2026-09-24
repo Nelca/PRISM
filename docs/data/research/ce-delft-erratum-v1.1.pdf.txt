@@ -1,0 +1,323 @@
+PDF page 1
+ 
+ 
+1 
+ 
+Erratum Environmental Prices Handbook: EU27 version, version 1.1   7 april 2025  
+ 
+  
+In April 2025, CE Delft published a version 1.1. of the Environmental Prices Handbook 
+2024: EU version. In this version, a few corrections were done compared to version 1.0. 
+The cause for the new version is a technical error that occurred in the valuation of human 
+health, which has been corrected. Below, we show the old values, and the new ones 
+resulting from the corrections. The version of the Handbook on our website and the 
+website of Rijksoverheid.nl are the latest, correct version.   
+Valuation of human health 
+In version 1.0 of the handbook, a technical error occurred in the valuation of human health. 
+We corrected this in version 1.1 of the handbook. This leads to changes in the prices that 
+include effects on human health, both on pollutant level and at midpoint level. At midpoint 
+level, the midpoints oxidant formation (human health), particulate matter formation, and 
+NO2-mortality (ReCiPe 2016) are affected. For acidification, a rounding error was 
+corrected. For the PEF methodology the same applies: the prices for oxidant formation 
+(human health) and particulate matter formation are corrected. 
+ 
+At pollutant level, the prices for the following emissions to air were corrected: PM2.5, PM10, 
+Black carbon, NOx, SO2, NH3, NMVOC, 1.3 Butadiene, benzene, 2-ethoxyethanol,  
+2-methoxyethanol, butane, cumene, ethanal, formaldehyde, isobutane, isoprene   
+and trichloroethylene. 
+Midpoint level: old values 
+The affected environmental prices at midpoint level for ReCiPe 2016 and PEF, old values 
+Method Midpoint Lower Central Upper Unit 
+ReCiPe 2016 Oxidant formation (human health) € 1.38 € 2.17 € 2.98 €/kg NOx-eq. 
+ReCiPe 2016 Particulate matter formation € 61.7 € 99.2 € 138.1 €/kg PM2,5-eq. 
+ReCiPe 2016 Acidification € 2.66 € 5.27 € 9.30 €/kg SO2-eq. 
+ReCiPe 2016 NO2-mortality € 4.31 € 6.37 € 9.62 €/kg NOx-eq. 
+PEF Oxidant formation (human health) € 1.04 € 1.48 € 2,04 €/kg NMVOC-eq. 
+PEF Particulate matter formation € 538,733 € 890,182 € 1,267,004 €/Disease 
+incidence 
+Erratum  
+Delft, 7 april 2025 
+Subject: Erratum Environmental Prices Handbook: EU27 version, version 1.1 
+  
+PDF page 2
+ 
+ 
+2 
+ 
+Erratum Environmental Prices Handbook: EU27 version, version 1.1   7 april 2025  
+ 
+  
+Midpoint level: new values 
+The affected environmental prices at midpoint level for ReCiPe 2016 and PEF, new values 
+Method Midpoint Lower Central Upper Unit 
+ReCiPe 2016 Oxidant formation (human health) € 1.28 € 1.86 € 2.97 €/kg NOx-eq. 
+ReCiPe 2016 Particulate matter formation € 58.5 € 84.7 € 138.1 €/kg PM2,5-eq. 
+ReCiPe 2016 Acidification € 2.67 € 5.28 € 9.30 €/kg SO2-eq. 
+ReCiPe 2016 NO2-mortality € 4.02 € 5.94 € 8.90 €/kg NOx-eq. 
+PEF Oxidant formation (human health) € 0.98 € 1.30 € 2.03 €/kg NMVOC-eq. 
+PEF Particulate matter formation € 511,307 € 764,627 € 1,266,826 €/Disease 
+incidence 
+ 
+The values above, and therefore changes, are reported in the following tables in the 
+handbook: 
+• Table 2, Summary, page 8; 
+• Table 7, Section 2.4.1, page 35-36; 
+• Table 8, Section 2.4.2, page 37;  
+• Table 9, Section 2.6.3, page 40 (practical example, adjusted calculations); 
+• Table 41, Section 6.5.8, page 139; 
+• Table 62, Section 7.2.3, page 167 (practical example, adjusted calculations); 
+• Table 63, Section 7.3.2, page 171. 
+Pollutant level: old and new values 
+At pollutant level, the table below shows an overview of the old and new values of the 
+affected environmental prices.  
+ 
+Pollutant 
+Old values (€2021/kg) New values (€2021/kg) 
+Lower Central Upper Lower Central Upper 
+PM2.5 58.5 95 134 55.4 81 134 
+PM10 31.3 51.6 73.3 29.7 44.3 73.3 
+Black carbon 408 603 906 330 487 733 
+NOx 13.5 21.5 31.8 12.8 19.3 31.8 
+SO2 17.8 30.5 45.3 16.9 26.6 45.3 
+NH3 18.2 28.7 39.5 17.4 25.2 39.5 
+NMVOC 1.62 2.49 3.49 1.53 2.16 3.49 
+1.3 Butadiene 1.4 2.01 2.88 1.4 1.91 2.87 
+Benzene 0.278 0.405 0.593 0.275 0.394 0.593 
+2-ethoxyethanol 0.325 0.455 0.625 0.312 0.414 0.623 
+2-methoxyethanol 0.588 0.851 1.23 0.578 0.818 1.23 
+PDF page 3
+ 
+ 
+3 
+ 
+Erratum Environmental Prices Handbook: EU27 version, version 1.1   7 april 2025  
+ 
+  
+Pollutant 
+Old values (€2021/kg) New values (€2021/kg) 
+Lower Central Upper Lower Central Upper 
+Butane 0.23 0.319 0.43 0.22 0.285 0.43 
+Cumene 0.246 0.342 0.463 0.235 0.306 0.462 
+Ethanal 1.79 2.6 3.83 1.77 2.5 3.83 
+Formaldehyde 0.491 0.694 0.967 0.474 0.642 0.965 
+Isobutane 0.208 0.288 0.388 0.198 0.257 0.387 
+Isoprene 1.19 1.69 2.35 1.15 1.56 2.35 
+Trichloroethylene 0.62 0.896 1.3 0.61 0.864 1.3 
+ 
+These prices are reported in various parts of the handbook: 
+• Table 1, Summary, page 8; 
+• Table 3, Section 2.3.1, page 32; 
+• Section 6.4.8, in text, page 130 (black carbon); 
+• Table 46, Section 6.7.7, page 146 (valuation of acidification at pollutant level, NOx, 
+rounding error); 
+• Table 60, Section 7.2.1, page 164; 
+• Table 61, Section 7.2.2, page 166; 
+• Table 79, Section F.2, page 237-243. 
+ 
+Moreover, tables that demonstrate the elements that lead to the environmental prices at 
+pollutant level have been adjusted as well. These are given below (valuation of particulate 
+matter formation at pollutant level, valuation of oxidant formation and nitrogen dioxides at 
+pollutant level, and the differentiation for particulate matter at stack height and population 
+density). 
+Damage costs due to particulate matter formation at pollutant level: old and new 
+values 
+The average damage costs for emissions on the theme particulate matter formation was 
+adjusted. These are for reporting purposes mostly.  
+NB: this table contained an error for black carbon, where the price for PM10 was 
+mistakenly reported rather than the price for black carbon. These prices are reported in 
+Table 35, Section 6.4.10, page 131. 
+  
+PDF page 4
+ 
+ 
+4 
+ 
+Erratum Environmental Prices Handbook: EU27 version, version 1.1   7 april 2025  
+ 
+  
+Table 1 - Average damage costs for emissions in EU27 from an average emission source in 2015, in €2021/kg on 
+the theme particulate matter formation  
+  Old values (incorrect) New values (correct) 
+Lower Central Upper Lower Central Upper 
+PM2.5^ €  58.1 €  94.0 €  131.2 €  55.0 €  80.0 €  131.2 
+PM10^ €  30.5 €  49.3 €  68.8 €  28.9 €  42.0 €  68.8 
+SO2 €  16.3 €  26.3 €  36.8 €  15.4 €  22.4 €  36.7 
+NOx €  7.6 €  12.3 €  17.2 €  7.2 €  10.5 €  17.2 
+NH3 €  14.4 €  23.3 €  32.5 €  13.6 €  19.8 €  32.5 
+NVMOC^^ €  1.3 €  2.2 €  3.0 €  1.3 €  1.8 €  3.0 
+Black carbon (> 
+10% PM2.5)* 
+€  58.1 €  94.0 €  131.2 €  330 €  487 €  733 
+Midpoint price 
+PM2.5-eq. 
+€ 61.7 € 99.2 € 138.2 €  58.5 € 84.7 € 138.1 
+*  For the fraction of black carbon greater than 10% of PM2.5.  
+^ The harmfulness of PM10 is factored into the harmfulness of PM2.5 and vice versa. Both damage estimates 
+ can therefore never be included at the same time.  
+^^  Harmfulness of secondary organic aerosols from NMVOC are measured at the topic of oxidant formation.  
+Damage costs due to oxidant formation and nitrogen dioxides: old and new values 
+The average damage costs for emissions on the theme oxidant formation and nitrogen 
+dioxides were adjusted. These are for reporting purposes mostly. These prices are 
+reported in Table 40, Section 6.5.8, page 139. 
+ 
+Table 2 - Environmental prices of emissions on the topic of oxidant formation including mortality, in 
+€2021/kg 
+ Old values New values 
+Pollutant Lower Central Upper Lower Central Upper 
+NOx* € 4.77 € 6.85 € 10.7 € 4.46 € 6.40 € 10.0 
+NMVOC € 1.62 € 2.49 € 3.53 € 1.53 € 2.16 € 3.52 
+CO^ € 0.0122 € 0.0193 € 0.0265 € 0.0114 € 0.0165 € 0.0265 
+CH4^ € 0.0027 € 0.0043 € 0.0059 € 0.0025 € 0.0037 € 0.0059 
+Formaldehyde** € 0.34 € 0.47 € 0.64 € 0.33 € 0.42 € 0.64 
+*  Including the harmful effects of nitrogen dioxides. 
+**  Determined via valuation of the characterisation factor. 
+^  Only effects on human health. 
+Differentiation of particulate matter emissions: Old and new values 
+Due to the adjusted valuation of particulate matter, the differentiated values have also 
+been adjusted. These values are reported in Table 36, Section 6.4.11, page 133. 
+PDF page 5
+ 
+ 
+5 
+ 
+Erratum Environmental Prices Handbook: EU27 version, version 1.1   7 april 2025  
+ 
+  
+Table 3 – Environmental prices differentiated by emission level (for particulate matter emissions) and 
+population density, €2021/kg for the central value (old and values) 
+Pollutant Stack height 
+Old values 
+Type of area (population density) 
+New values 
+Type of area (population density) 
+Urban Rural Average Urban Rural Average 
+PM2.5 
+High €  59 €  52 €  49 €  50 €  44 €  42 
+Low €  76 €  62 €  64 €  65 €  53 €  54 
+Ambient € 217 € 116 € 182 € 185 €  99 € 155 
+Average € 114 €  75 €  95 €  97 €  64 €  81 
+PM10 
+High €  37 €  26 €  31 €  32 €  22 €  26 
+Low €  52 €  33 €  41 €  44 €  28 €  35 
+Ambient € 142 €  80 € 108 € 122 €  69 €  92 
+Average €  66 €  40 €  52 €  56 €  35 €  44 
+SO2 Average €  34 €  28 €  31 €  30 €  24 €  27 
+NOx Average €  23 €  21 €  22 €  21 €  19 €  19 
+NH3 Average €  29 €  29 €  29 €  25 €  25 €  25 
+ 
+Environmental prices for noise (the Netherlands only) 
+The estimations of the damage cost of noise exposure for the Netherlands, reported in the 
+Environmental Prices Handbook 2024: EU version in Annex D.7, have been corrected. 
+Here, it concerns the method to calculate the average damage cost per bin of 5 dB(A). 
+Before, a simple average was calculated of the total costs per 1 dB(A) bin to generate the 
+average per 5 dB(A) bin. In reality, the average noise exposure is closer to the lower side 
+of each 5 dB(A) bin (around 1.8 dB(A) above the lower value). The average values have 
+therefore been adjusted, in order to reflect this insight.   
+Old values 
+The values are reported in the handbook in Annex D.7, pages 230-231. 
+ 
+Table 4 - Old environmental prices for road traffic noise exposure, in €2021 per person per year for the 
+Netherlands 
+Noise class (dB(A) Lden) Lower value Central value Upper value 
+40-45 − − − 
+45-50 − € 51 € 68 
+50-55 € 93 € 201 € 248 
+55-60 € 313 € 439 € 517 
+60-65 € 620 € 765 € 875 
+PDF page 6
+ 
+ 
+6 
+ 
+Erratum Environmental Prices Handbook: EU27 version, version 1.1   7 april 2025  
+ 
+  
+Noise class (dB(A) Lden) Lower value Central value Upper value 
+65-70 € 1,015 € 1,180 € 1,323 
+70-75 € 1,498 € 1,683 € 1,861 
+75-80 € 2,069 € 2,276 € 2,489 
+80+ € 2,450 € 2,670 € 2,906 
+ 
+Table 5 - Old environmental prices for noise exposure from rail traffic, in €2021 per person per year for the 
+Netherlands 
+Noise class (dB(A) Lden) Lower value Central value Upper value 
+40-45 − − € 11 
+45-50 − € 52 € 78 
+50-55 € 93 € 188 € 215 
+55-60 € 298 € 393 € 420 
+60-65 € 572 € 667 € 694 
+65-70 € 914 € 1,009 € 1,036 
+70-75 € 1,325 € 1,421 € 1,447 
+75-80 € 1,805 € 1,900 € 1,927 
+80+ € 2,123 € 2,218 € 2,245 
+ 
+Table 6 - Old environmental prices for noise exposure from air traffic, in €2021 per person per year for the 
+Netherlands 
+Noise class (dB(A) Lden) Lower value Central value Upper value 
+40-45 − − 24 
+45-50 − € 121 € 183 
+50-55 € 220 € 445 € 506 
+55-60 € 708 € 933 € 994 
+60-65 € 1,361 € 1,585 € 1,647 
+65-70 € 2,179 € 2,403 € 2,465 
+70-75 € 3,161 € 3,386 € 3,447 
+75-80 € 4,309 € 4,533 € 4,595 
+80+ € 5,069 € 5,294 € 5,355 
+ 
+PDF page 7
+ 
+ 
+7 
+ 
+Erratum Environmental Prices Handbook: EU27 version, version 1.1   7 april 2025  
+ 
+  
+New values 
+Table 7 - New environmental prices for road traffic noise exposure, in €2021 per person per year for the 
+Netherlands 
+Noise class (dB(A) Lden) Lower value Central value Upper value 
+40-45 - - - 
+45-50 - € 25 € 35 
+50-55 € 50 € 153 € 193 
+55-60 € 249 € 370 € 441 
+60-65 € 535 € 675 € 777 
+65-70 € 909 € 1,069 € 1,204 
+70-75 € 1,371 € 1,551 € 1,721 
+75-80 € 1,921 € 2,122 € 2,327 
+80+ € 2,450 € 2,670 € 2,906 
+ 
+Table 8 - New environmental prices for noise exposure from rail traffic, in €2021 per person per year for the 
+Netherlands 
+Noise class (dB(A) Lden) Lower value Central value Upper value 
+40-45 - - € 2 
+45-50 - € 27 € 53 
+50-55 € 51 € 147 € 173 
+55-60 € 240 € 335 € 362 
+60-65 € 497 € 593 € 619 
+65-70 € 823 € 918 € 945 
+70-75 € 1,218 € 1,313 € 1,340 
+75-80 € 1,681 € 1,776 € 1,803 
+80+ € 2,123 € 2,218 € 2,245 
+ 
+Table 9 - New environmental prices for noise exposure from air traffic, in €2021 per person per year for the 
+Netherlands 
+Noise class (dB(A) Lden) Lower value Central value Upper value 
+40-45 - - € 4 
+45-50 - € 62 € 124 
+50-55 € 122 € 346 € 408 
+55-60 € 570 € 794 € 856 
+60-65 € 1,183 € 1,408 € 1,469 
+PDF page 8
+ 
+ 
+8 
+ 
+Erratum Environmental Prices Handbook: EU27 version, version 1.1   7 april 2025  
+ 
+  
+Noise class (dB(A) Lden) Lower value Central value Upper value 
+65-70 € 1,961 € 2,186 € 2,247 
+70-75 € 2,904 € 3,129 € 3,190 
+75-80 € 4,012 € 4,236 € 4,298 
+80+ € 5,069 € 5,294 € 5,355 
+ 

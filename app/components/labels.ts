@@ -22,8 +22,8 @@ import type { TagVariant } from "./tag-utils";
  * 投資可否は断定しない(「結論が変わるか」の言い回しに徹する)規律は維持。
  */
 export const VERDICT_LABEL: Record<DecisionVerdict, string> = {
-  crosses: "結論が変わる可能性",
-  does_not_cross: "結論は変わらない",
+  crosses: "承認ラインをまたぐ",
+  does_not_cross: "承認ラインをまたがない",
   pending: "保留",
 };
 
@@ -55,22 +55,22 @@ export const BINDING_OPTIONS: BindingOption[] = [
   {
     value: "weak_reference",
     label: "稟議書に参考値として記載する",
-    hint: "記録には残りますが、判断そのものへの影響は限定的です",
+    hint: "承認基準は変更せず、判断材料として共有する方針を記録します",
   },
   {
     value: "npv_formula_replacement",
     label: "投資判断の計算式そのものに組み込む",
-    hint: "投資判断プロセスの計算式自体を更新します",
+    hint: "自然コストを含むNPVを社内の判定式に使う方針を記録します",
   },
   {
     value: "budget_allocation",
     label: "拠点の予算に実際に反映する",
-    hint: "拠点の損益計画に金額として組み込みます",
+    hint: "損益計画に組み込む対象と金額を記録します",
   },
   {
     value: "procurement_contract_clause",
     label: "調達契約の更新条件に組み込む",
-    hint: "サプライヤーとの契約条項に反映します",
+    hint: "契約更新時に使う条項案を記録します",
   },
 ];
 

@@ -101,6 +101,10 @@ export default async function Home() {
   return (
     <div className="screen home-screen">
       <HomeOrientation />
+      <Card title="資源・生態系もまとめて管理">
+        <p>調達量・再生材割合・生息地の状態などを目標と比較し、拠点を横断して担当・対応期限を確認できます。</p>
+        <Link href="/portfolio" className="pill-btn pill-btn--accent">環境・資源の統合管理へ →</Link>
+      </Card>
 
       <div className="workspace-heading">
         <div><p className="section-eyebrow">WORKSPACE</p><h2>評価を進める</h2><p>入力から開示まで。未完了の操作から、作業を再開できます。</p></div>

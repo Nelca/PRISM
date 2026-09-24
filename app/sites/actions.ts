@@ -73,7 +73,7 @@ export async function updateSiteAction(_prevState: AddSiteFormState, formData: F
     return { error: "対象の拠点が見つかりません。すでに削除された可能性があります。" };
   }
 
-  // 未入力の詳細設定は既定値ではなく現在値を引き継ぐ。
+  // 必須数値は編集時も明示入力を求める。承認ラインの空欄は判定保留。
   const parsed = parseSiteForm(formData, existing.deepDive);
   if ("error" in parsed) {
     return parsed;

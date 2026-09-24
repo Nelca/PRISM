@@ -13,6 +13,14 @@ export type YenScale = "oku" | "million" | "none";
 const OKU = 100_000_000;
 const MILLION_YEN = 1_000_000;
 
+/** 共通単位で小額を表示しても、非ゼロを0と誤認させない。 */
+function scaledNumber(value: number, divisor: number): string {
+  const scaled = value / divisor;
+  if (value !== 0 && Math.abs(scaled) < 0.00000001) return scaled.toExponential(1);
+  const digits = value !== 0 && Math.abs(scaled) < 0.1 ? Math.min(8, Math.max(2, -Math.floor(Math.log10(Math.abs(scaled))))) : 1;
+  return new Intl.NumberFormat("ja-JP", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(scaled);
+}
+
 /** 金額の絶対値だけからスケールを自動判定する(|値|>=1億→億円、>=100万→百万円、それ未満→フル桁)。 */
 export function autoYenScale(value: number): YenScale {
   const abs = Math.abs(value);
@@ -38,8 +46,8 @@ export function pickYenScale(...values: number[]): YenScale {
  * ホームの発見サマリー(地の文)のような、Numコンポーネントを使わない箇所と表記を揃えるために使う。
  */
 export function formatYen(value: number, scale: YenScale = autoYenScale(value)): string {
-  if (scale === "oku") return `${(value / OKU).toFixed(1)}億円`;
-  if (scale === "million") return `${(value / MILLION_YEN).toFixed(1)}百万円`;
+  if (scale === "oku") return `${scaledNumber(value, OKU)}億円`;
+  if (scale === "million") return `${scaledNumber(value, MILLION_YEN)}百万円`;
   return `${new Intl.NumberFormat("ja-JP").format(Math.round(value))}円`;
 }
 
@@ -67,15 +75,7 @@ export function formatCompactYenRange(low: number, high: number): string {
   }
   const divisor = scale === "oku" ? OKU : MILLION_YEN;
   const label = scale === "oku" ? "億円" : "百万円";
-  const formatAt = (value: number, digits: number) =>
-    new Intl.NumberFormat("ja-JP", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(
-      value / divisor
-    );
-  const formatOne = (value: number) => {
-    // 小数1桁で0.0に潰れる(値そのものは0ではない)場合だけ小数2桁にする。
-    const digits = value !== 0 && Math.abs(value) / divisor < 0.05 ? 2 : 1;
-    return `${formatAt(value, digits)}${label}`;
-  };
+  const formatOne = (value: number) => `${scaledNumber(value, divisor)}${label}`;
   return `${formatOne(low)}〜${formatOne(high)}`;
 }
 
@@ -103,10 +103,7 @@ export function Num({
       const scaledLabel = resolvedScale === "oku" ? "億円" : "百万円";
       // unitが「円/年」のような場合、「/年」部分だけをスケール後の単位に付け足す。
       const suffix = unit === "円" ? "" : unit!.slice("円".length);
-      const formatted = new Intl.NumberFormat("ja-JP", {
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1,
-      }).format(value / divisor);
+      const formatted = scaledNumber(value, divisor);
 
       return (
         <span className="num" title={formatYenExact(value)}>

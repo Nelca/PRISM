@@ -103,16 +103,17 @@ function SiteFields({
                 type="number"
                 min="0"
                 step="any"
-                defaultValue={deepDive?.category === category ? deepDive.physicalQuantity : category === "climate" ? 8000 : 10000}
+                required
+                defaultValue={deepDive && (deepDive.category ?? "water") === category ? deepDive.physicalQuantity : ""}
               />
             </div>
             <div className="field">
               <label htmlFor={fieldId("unit")}>単位</label>
-              <input key={category} id={fieldId("unit")} name="unit" placeholder={defaultUnit} defaultValue={deepDive?.category === category ? deepDive.unit : defaultUnit} />
+              <input key={category} id={fieldId("unit")} name="unit" readOnly placeholder={defaultUnit} defaultValue={deepDive && (deepDive.category ?? "water") === category ? deepDive.unit : defaultUnit} />
             </div>
           </div>
           <div className="field">
-            <label htmlFor={fieldId("unitReplacementCost")}>{category === "climate" ? "内部炭素単価（円/tCO2e）" : "代替コスト単価（円/単位）"}</label>
+            <label htmlFor={fieldId("unitReplacementCost")}>{category === "climate" ? "対策の回避コストに使う内部炭素単価（円/tCO2e）" : "代替コスト単価（円/単位）"}</label>
             <input
               key={category}
               id={fieldId("unitReplacementCost")}
@@ -120,9 +121,11 @@ function SiteFields({
               type="number"
               min="0"
               step="any"
-              defaultValue={deepDive?.category === category ? deepDive.unitReplacementCost : category === "climate" ? 1700 : 500}
+              required
+              defaultValue={deepDive && (deepDive.category ?? "water") === category ? deepDive.unitReplacementCost : ""}
             />
           </div>
+          <p className="field-hint">この入力経路は日本向け係数・FY2027の試算です。水はm³、GHGはtCO2eで入力してください。{category === "climate" && "内部炭素単価は対策の回避コストに使います。価値算定のGX-ETSシナリオ単価とは別の前提です。"}</p>
           {!editing && (
             <p className="site-environment-fields__links">
               汚染物質・廃棄物・土地利用は、必要項目が異なるため<Link href="/sites">専用の取込画面</Link>から登録します。
@@ -130,36 +133,45 @@ function SiteFields({
           )}
         </fieldset>
 
-        <details className="site-form-details">
-          <summary>投資判断・開示の設定</summary>
+        <details className="site-form-details" open={editing || undefined}>
+          <summary>投資判断・開示の前提を追加する（後からでも可）</summary>
+          <p className="field-hint">環境データだけで登録・算定を始められます。NPV・初期投資額・年間継続費用が揃うと対策を比較できます。費用が発生しない場合は0を入力してください。未入力の金額は推定しません。</p>
           <div className="site-form-details__body">
             <div className="field-row">
               <div className="field">
                 <label htmlFor={fieldId("investmentCostInitial")}>対策投資額・初期（円）</label>
-                <input id={fieldId("investmentCostInitial")} name="investmentCostInitial" type="number" min="0" step="any" defaultValue={deepDive?.investmentCostInitial ?? 20000000} />
+                <input id={fieldId("investmentCostInitial")} name="investmentCostInitial" type="number" min="0" step="any" defaultValue={deepDive?.investmentCostInitial ?? ""} />
               </div>
               <div className="field">
-                <label htmlFor={fieldId("baselineNpvValue")}>投資価値NPV（円）</label>
-                <input id={fieldId("baselineNpvValue")} name="baselineNpvValue" type="number" step="any" defaultValue={deepDive?.baselineNpvValue ?? 500000000} />
+                <label htmlFor={fieldId("baselineNpvValue")}>自然コスト反映前のNPV（円）</label>
+                <input id={fieldId("baselineNpvValue")} name="baselineNpvValue" type="number" step="any" defaultValue={deepDive?.baselineNpvValue ?? ""} />
               </div>
             </div>
             <div className="field">
-              <label htmlFor={fieldId("approvalThresholdValue")}>投資の承認ライン（円）</label>
-              <input id={fieldId("approvalThresholdValue")} name="approvalThresholdValue" type="number" step="any" defaultValue={deepDive?.approvalThresholdValue ?? 510000000} />
+              <label htmlFor={fieldId("investmentCostRecurring")}>対策の年間継続費用（円/年）</label>
+              <input id={fieldId("investmentCostRecurring")} name="investmentCostRecurring" type="number" min="0" step="any" defaultValue={deepDive?.investmentCostRecurring ?? ""} />
+            </div>
+            <p className="field-hint">NPVは将来の収支を現在の価値に換算した金額です。登録直後は評価期間10年・割引率6%で試算します。「対策と判定」で変更できます。</p>
+            <div className="field">
+              <label htmlFor={fieldId("approvalThresholdValue")}>投資の承認ライン（円・任意）</label>
+              <input id={fieldId("approvalThresholdValue")} name="approvalThresholdValue" type="number" step="any" placeholder="未定の場合は空欄" defaultValue={deepDive?.approvalThresholdValue ?? ""} />
             </div>
             <div className="field">
               <label htmlFor={fieldId("disclosureClaimText")}>開示の記載文（任意）</label>
               <input id={fieldId("disclosureClaimText")} name="disclosureClaimText" placeholder="当社は2030年までに…" defaultValue={deepDive?.disclosureClaimText ?? ""} />
             </div>
-            <label className="site-form-checkbox">
-              <input name="forcePromote" type="checkbox" defaultChecked={deepDive?.forcePromote ?? true} />
-              詳細評価に進める
-            </label>
+            <p className="field-hint">開示文は空欄のままでも登録できます。手入力した文の分類・数値・期間は自動確定せず、要確認として扱います。</p>
+
           </div>
         </details>
 
+        <label className="site-form-checkbox">
+          <input name="forcePromote" type="checkbox" defaultChecked={deepDive?.forcePromote ?? true} />
+          登録後に詳細評価を行う
+        </label>
+        <p className="field-hint">投資判断の前提は、登録後に拠点一覧の「編集」から追加できます。</p>
         {state.error && <p className="form-error" role="alert">{state.error}</p>}
-        {state.success && <p className="form-success" role="status">{state.success}</p>}
+        {state.success && <div role="status"><p className="form-success">{state.success}</p><Link href="/assessment">登録した拠点の評価を確認する →</Link></div>}
       </div>
 
       <div className={variant === "inline" ? "site-form-actions" : "modal-foot"}>

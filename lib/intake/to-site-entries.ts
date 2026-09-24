@@ -52,7 +52,7 @@ export function toSiteEntries(dataset: CompanyDataset): SiteEntriesFromDataset {
         baselineNpvValue: config.baselineNpv.value,
         approvalThresholdValue:
           config.approvalThreshold === "pending"
-            ? DEFAULTS.approvalThresholdValue
+            ? null
             : (config.approvalThreshold.value),
         // 深掘り対象として明示された拠点は、優先度算定の結果によらず深掘りに進める
         forcePromote: true,
@@ -73,9 +73,6 @@ export function toSiteEntries(dataset: CompanyDataset): SiteEntriesFromDataset {
   }
   if (config.bindingMechanism) {
     unmappedFields.push("engagement-config.json の bindingMechanism(拘束方式。画面から選択してください)");
-  }
-  if (config.approvalThreshold === "pending") {
-    unmappedFields.push("engagement-config.json の approvalThreshold(未入力のため★判定は保留のままです)");
   }
   if (config.countermeasures.length > 1) {
     unmappedFields.push(`engagement-config.json の countermeasures(${config.countermeasures.length}件中1件目のみ反映)`);

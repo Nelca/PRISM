@@ -41,6 +41,19 @@ afterAll(async () => {
 });
 
 describe("run の永続化", () => {
+  it("環境データのみの拠点を保存・再読込しても、投資前提のnullと判定保留を保持する", async () => {
+    await addSiteEntry(TENANT,
+      { name: "投資前提未入力の検証拠点", siteType: "own_site", industrySector: "chemicals", lat: 35, lng: 139 },
+      { physicalQuantity: 1000, unit: "m3", unitReplacementCost: 300, investmentCostInitial: null, investmentCostRecurring: null, baselineNpvValue: null, approvalThresholdValue: null, forcePromote: true }
+    );
+    const [entry] = await listSiteEntries(TENANT);
+    expect(entry.deepDive.baselineNpvValue).toBeNull();
+    const result = await executeAndPersistRun(TENANT);
+    expect(result.deferredDecisions.some((item) => item.siteId === entry.row.id)).toBe(true);
+    expect(result.decisions.some((item) => item.siteId === entry.row.id)).toBe(false);
+    expect(result.valuation.valuationRecordsByMaterialIssue[`${entry.row.id}-mi-water`].length).toBeGreaterThan(0);
+    expect((await getLatestRun(TENANT))!.result.deferredDecisions).toEqual(result.deferredDecisions);
+  });
   it("保存した結果を読み戻すと同じオブジェクトになる", async () => {
     const result = runDemoPipeline({ userSites: [], interactions: emptyInteractionState(), rngSeed: DEFAULT_RNG_SEED });
 

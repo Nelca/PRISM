@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Nav } from "./nav";
 
 const ROUTE_TITLES = [
+  ["/portfolio", "環境・資源の統合管理"],
   ["/sites", "拠点とデータ"],
   ["/assessment", "評価対象"],
   ["/valuation", "価値算定"],
