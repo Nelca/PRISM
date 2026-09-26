@@ -98,3 +98,5 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - [資源拡張の追加実装・残件と必要な協力](docs/resource-expansion-handoff-2026-09-21.md)
 
 - [公開資料・合成データによる研究実装](docs/research-data-implementation-2026-09-21.md): `PRISM_RESEARCH_ENABLED=1` で `/research` を有効化。
+
+GVFD V2の取得・地域別影響算定と統合管理の値の引継ぎ：[実装・検証記録](docs/gvfd-implementation-2026-09-24.md)。研究モードで `/research/gvfd` を利用できます。

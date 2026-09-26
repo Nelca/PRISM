@@ -7,6 +7,8 @@ import { METRIC_BY_ID, TARGET_CATEGORIES, TARGET_STATUS, evaluateTarget, targetD
 import type { EnvironmentalTarget } from "@/lib/environment/metrics";
 import { Card, ScreenLead, Tag } from "../../components/ui";
 import { TargetForm } from "../target-form";
+import { researchEnabled } from "@/lib/research/access";
+import { GVFD_METRIC_TOPICS } from "@/lib/research/gvfd";
 export default async function TargetPage({ params }: { params: Promise<{ targetId: string }> }) {
   const { targetId } = await params;
   const { tenantId, result, interactions } = await loadInteractivePipelineView();
@@ -26,6 +28,7 @@ export default async function TargetPage({ params }: { params: Promise<{ targetI
       <p className="field-hint">入力された範囲・対象年の目標との比較です。生態系全体の健全性や、法令への適合、投資の可否を保証する判定ではありません。</p>
     </Card>
     <Card title="実測値・目標・対応"><p>担当: {record.owner || "未設定"} / 対応期限: {record.dueDate || "未設定"}</p><details className="foldout"><summary>実測値・目標・根拠を確認・更新する</summary><TargetForm key={record.revision} sites={site ? result.assessment.sites.map((item) => ({ id: item.id, name: item.name })) : [{ id: record.siteId, name: "削除済みの拠点（保管のみ可能）" }]} record={record} /></details></Card>
+    {researchEnabled() && !record.archived && GVFD_METRIC_TOPICS[record.metricId] && <Card title="地域別の環境影響を比較"><p>この指標の実測値・目標値を引き継ぎ、IFVI GVFDの研究用算定で社会への影響額を比較します。物質や処理方法、地域の対応を次の画面で確認してください。</p><Link className="pill-btn" href={`/research/gvfd?target=${encodeURIComponent(record.id)}`}>GVFDで実測値と目標を比較する →</Link></Card>}
     <TargetReviewPanels key={`review-${record.revision}`} record={record} siteName={site?.name ?? record.siteId} claims={result.disclosureClaims} decisions={result.decisions.filter((entry) => entry.siteId === record.siteId).map((entry) => entry.decision.decisionRecord)} />
     <Card title="この指標の更新履歴"><p className="field-hint">変更前の値と根拠は履歴に残ります。保管した指標も復帰できます。</p>{history.map((event) => {
       const snapshot = event.payload.record as EnvironmentalTarget;

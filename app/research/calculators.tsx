@@ -54,7 +54,7 @@ export function ResearchCalculators({ esvd }: { esvd: EsvdExample[] }) {
         {selected && <p>原研究: {selected.reference} / {selected.biome} / 原本レビュー欄: {selected.reviewed ? "あり" : "なし"}</p>}
         <div className="field"><label htmlFor="area">仮定する面積（ha）</label><input id="area" name="area" type="number" min="0" step="any" required defaultValue="10" /></div>
       </> : <>
-        <p>{kind === "ce" ? "EU27平均条件の架空排出源。係数はEUR2021/kg。日本の拠点への適用は行いません。" : "米国の元研究における視程低下だけの費用。係数はUSD2011/t。GVFD全体は未取得です。"}</p>
+        <p>{kind === "ce" ? "EU27平均条件の架空排出源。係数はEUR2021/kg。日本の拠点への適用は行いません。" : "米国の元研究における視程低下だけの費用。係数はUSD2011/t。地域別の算定は上のGVFD画面を利用してください。"}</p>
         <div className="field"><label htmlFor="pollutant">排出物質</label><select id="pollutant" name="pollutant">{(kind === "ce" ? CE_AIR : IFVI_VISIBILITY).map((row) => <option key={row.id}>{row.id}</option>)}</select></div>
         <div className="field"><label htmlFor="quantity">仮定排出量（{kind === "ce" ? "kg" : "t"}）</label><input id="quantity" name="quantity" type="number" required min="0" step="any" defaultValue="100" /></div>
       </>}

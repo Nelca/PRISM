@@ -28,5 +28,7 @@ for name,url in urls.items():
   # Extract only the relevant tables/erratum for reproducible verification.
   indexes=range(len(pages)) if 'erratum' in name else [32] if name.startswith('ce-') else [46]
   (base/(name+'.txt')).write_text('\n'.join(f'PDF page {i+1}\n'+pages[i].extract_text() for i in indexes))
+existing=json.loads((base/'manifest.json').read_text()) if (base/'manifest.json').exists() else []
+manifest.extend(item for item in existing if item['file'] not in urls)
 (base/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
 print('ESVD records:',len(records),'numeric:',sum(r['value'] is not None for r in records),'source files:',len(manifest))

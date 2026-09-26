@@ -1,0 +1,12 @@
+{
+  "version": "v2",
+  "versionDate": "2025-04-03",
+  "acquiredOn": "2026-09-24",
+  "url": "https://ifvi.org/wp-content/uploads/2024/10/IFVI_Environmental-Methodology_Global-Value-Factor-Database.xlsm.zip",
+  "workbookName": "IFVI_Environmental Methodology_Global Value Factor Database V2.xlsm",
+  "workbookSha256": "ddb71b145e581f04003396150c5d938978d6b7815e3ef19bc19a9cab3c931d5f",
+  "archiveSha256": "3eb9cee1fe29cc01d0515edb2385483464fd4d1543facd9c13350ae94f851307",
+  "sheet": "Global Value Factors",
+  "recordCount": 104832,
+  "missingCount": 22200
+}
