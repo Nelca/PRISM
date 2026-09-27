@@ -1,0 +1,44 @@
+{
+  "checked": "2026-09-27T02:44:34.493Z",
+  "checks": [
+    {
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "width": 1024,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "width": 320,
+      "overflow": false
+    }
+  ],
+  "scenarios": 3,
+  "faq": true,
+  "downloads": true,
+  "resources": 10,
+  "images": true,
+  "media": {
+    "duration": 45,
+    "width": 1920,
+    "height": 1080
+  },
+  "verticalMedia": {
+    "duration": 15,
+    "width": 1080,
+    "height": 1920
+  },
+  "playback": true,
+  "seeking": true,
+  "keyboard": true,
+  "errors": []
+}
