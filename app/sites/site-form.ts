@@ -41,6 +41,10 @@ export function parseSiteForm(
     investmentCostRecurring: parseOptionalNumber(formData.get("investmentCostRecurring"), { label: "年間の継続費用", min: 0 }),
     baselineNpvValue: parseOptionalNumber(formData.get("baselineNpvValue"), { label: "自然コスト反映前のNPV" }),
     approvalThresholdValue: parseOptionalNumber(formData.get("approvalThresholdValue"), { label: "投資の承認ライン" }),
+    // M6独自の割引率は設けない(m6-decision-record.md §4.3)。企業が通常NPVの算定に使った
+    // 値をそのまま入力してもらう。空欄はnull(未入力)のまま保持し、0.06/10で埋めない(D-15)。
+    discountRate: parseOptionalNumber(formData.get("discountRate"), { label: "NPVの割引率", min: 0, max: 1 }),
+    horizon: parseOptionalNumber(formData.get("horizon"), { label: "評価期間", integer: true, min: 1, max: 100 }),
   };
   if ("error" in fields.physicalQuantity) return fields.physicalQuantity;
   if ("error" in fields.unitReplacementCost) return fields.unitReplacementCost;
@@ -48,6 +52,8 @@ export function parseSiteForm(
   if ("error" in fields.investmentCostRecurring) return fields.investmentCostRecurring;
   if ("error" in fields.baselineNpvValue) return fields.baselineNpvValue;
   if ("error" in fields.approvalThresholdValue) return fields.approvalThresholdValue;
+  if ("error" in fields.discountRate) return fields.discountRate;
+  if ("error" in fields.horizon) return fields.horizon;
 
   const deepDive: UserSiteDeepDiveParams = {
     category: category as UserSiteDeepDiveParams["category"],
@@ -58,6 +64,8 @@ export function parseSiteForm(
     investmentCostRecurring: fields.investmentCostRecurring.value,
     baselineNpvValue: fields.baselineNpvValue.value,
     approvalThresholdValue: fields.approvalThresholdValue.value,
+    discountRate: fields.discountRate.value,
+    horizon: fields.horizon.value,
     forcePromote: formData.get("forcePromote") === "on",
     disclosureClaimText: String(formData.get("disclosureClaimText") ?? "").trim() || undefined,
   };

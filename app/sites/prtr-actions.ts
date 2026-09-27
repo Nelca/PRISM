@@ -2,12 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { SITE_ROWS } from "@/lib/demo/company";
-import { getDb, getTenantId } from "@/lib/db/client";
+import { getDb, getTenantId, lockTenantForWrite } from "@/lib/db/client";
 import { appendPhysicalInputBatch } from "@/lib/db/repositories/physical-inputs";
 import { listSiteEntries } from "@/lib/db/repositories/sites";
 import { loadPrtrDataset, type PrtrSourceFile } from "@/lib/intake/prtr";
 import { executeAndPersistRun } from "@/lib/pipeline/execute-run";
-import { sql } from "drizzle-orm";
 
 const ACTOR = "宮里";
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
@@ -75,7 +74,7 @@ export async function importPrtrDatasetAction(
   try {
     await getDb().transaction(async (tx) => {
       // 同じテナントの入力切替とrun保存を直列化し、算定されていない有効バッチを残さない。
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}))`);
+      await lockTenantForWrite(tx, tenantId);
       const currentSites = await listSiteEntries(tenantId, tx);
       const currentSiteIds = new Set([...SITE_ROWS.map((site) => site.id), ...currentSites.map((entry) => entry.row.id)]);
       const removedSiteIds = [...new Set(result.batch!.records.map((record) => record.siteId))].filter(

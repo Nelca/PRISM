@@ -135,7 +135,7 @@ function SiteFields({
 
         <details className="site-form-details" open={editing || undefined}>
           <summary>投資判断・開示の前提を追加する（後からでも可）</summary>
-          <p className="field-hint">環境データだけで登録・算定を始められます。NPV・初期投資額・年間継続費用が揃うと対策を比較できます。費用が発生しない場合は0を入力してください。未入力の金額は推定しません。</p>
+          <p className="field-hint">環境データだけで登録・算定を始められます。NPV・初期投資額・年間継続費用・割引率・評価期間が揃うと対策を比較できます。費用が発生しない場合は0を入力してください。未入力の金額は推定しません。</p>
           <div className="site-form-details__body">
             <div className="field-row">
               <div className="field">
@@ -151,7 +151,17 @@ function SiteFields({
               <label htmlFor={fieldId("investmentCostRecurring")}>対策の年間継続費用（円/年）</label>
               <input id={fieldId("investmentCostRecurring")} name="investmentCostRecurring" type="number" min="0" step="any" defaultValue={deepDive?.investmentCostRecurring ?? ""} />
             </div>
-            <p className="field-hint">NPVは将来の収支を現在の価値に換算した金額です。登録直後は評価期間10年・割引率6%で試算します。「対策と判定」で変更できます。</p>
+            <div className="field-row">
+              <div className="field">
+                <label htmlFor={fieldId("discountRate")}>NPVの算出に使った割引率（小数・例: 0.06）</label>
+                <input id={fieldId("discountRate")} name="discountRate" type="number" step="any" min="0" max="1" defaultValue={deepDive?.discountRate ?? ""} />
+              </div>
+              <div className="field">
+                <label htmlFor={fieldId("horizon")}>NPVの評価期間（年）</label>
+                <input id={fieldId("horizon")} name="horizon" type="number" step="1" min="1" defaultValue={deepDive?.horizon ?? ""} />
+              </div>
+            </div>
+            <p className="field-hint">NPVは、既存の投資評価プロセスで算出した金額です。PRISMは計算方法を検証しません。その算出に使った割引率・評価期間を、変えずにそのまま入力してください（未入力のまま既定値では試算しません）。</p>
             <div className="field">
               <label htmlFor={fieldId("approvalThresholdValue")}>投資の承認ライン（円・任意）</label>
               <input id={fieldId("approvalThresholdValue")} name="approvalThresholdValue" type="number" step="any" placeholder="未定の場合は空欄" defaultValue={deepDive?.approvalThresholdValue ?? ""} />

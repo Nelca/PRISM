@@ -17,6 +17,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { buildDisclosureClaimsFromExtraction } from "@core/disclosure/claim-extraction";
 import type { RawExtractedClaim } from "@core/disclosure/claim-extraction";
 import type { DisclosureClaim } from "@core/types/disclosure";
+import type { ImpactCategory } from "@core/types/common";
+
+/** Record にすることで、ImpactCategory に値が追加されたときに列挙漏れを型エラーで検出する。 */
+const CATEGORY_SET: Record<ImpactCategory, true> = { climate: true, water: true, pollution: true, waste: true, land_use: true };
+const IMPACT_CATEGORIES = Object.keys(CATEGORY_SET) as ImpactCategory[];
 
 const EXTRACTION_SCHEMA = {
   type: "object",
@@ -34,7 +39,9 @@ const EXTRACTION_SCHEMA = {
           },
           category: {
             type: ["string", "null"],
-            enum: ["climate", "water", "pollution", null],
+            // ImpactCategory の全値と揃える。欠けた値は null に落ち、カテゴリ不明の主張として
+            // 選択的開示の検出(G6)や表示が変わってしまうため、型の追加時はここも更新する。
+            enum: [...IMPACT_CATEGORIES, null],
             description: "本文から明確に読み取れない場合はnull。推測しない。",
           },
           quantityMentioned: {
@@ -79,7 +86,7 @@ const EXTRACTION_SCHEMA = {
 const SYSTEM_PROMPT = `あなたはTNFD/SSBJ開示レビューのための抽出専用アシスタントです。
 役割は抽出に限定されます。証拠の十分性やギャップの有無といった判定は行いません。判定は別のルールベースの処理が行います。
 
-入力された統合報告書等のテキストから、自然環境(気候・水・汚染)に関する定量的・定性的な主張(claim)をすべて抽出してください。
+入力された統合報告書等のテキストから、自然環境(気候・水・汚染・廃棄物・土地利用)に関する定量的・定性的な主張(claim)をすべて抽出してください。
 
 各主張について:
 - category・quantityMentioned・periodMentioned・scopeMentionedの4フィールドは、本文から明確に読み取れる場合のみ値を入れてください。読み取れない場合は必ずnullにしてください。推測で埋めないこと。
@@ -121,6 +128,10 @@ export async function extractDisclosureClaims(
 
   if (response.stop_reason === "refusal") {
     throw new Error("AIが抽出処理を拒否しました(安全性フィルタによる判定)。文書の内容を確認してください。");
+  }
+  // 出力上限で途切れたJSONを部分的に使わない(一部の主張だけを保存すると、残りが黙って欠落する)。
+  if (response.stop_reason === "max_tokens") {
+    throw new Error("抽出結果が出力上限に達しました。文書をページ範囲で分割して取り込んでください。");
   }
 
   const textBlock = response.content.find((block): block is Anthropic.TextBlock => block.type === "text");

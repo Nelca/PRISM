@@ -53,7 +53,7 @@ import type { CountermeasureCandidate } from "./company";
  * 分岐が複数箇所にあるため、定数化してハードコード文字列の重複を避ける。
  */
 const CLIMATE_SITE_ID = "site-070";
-import { hasDecisionInputs, type UserSiteEntry } from "./site-entry";
+import { hasDecisionInputs, withDecisionParameters, type UserSiteEntry } from "./site-entry";
 import {
   buildUserCountermeasureCandidates,
   buildUserDeepDiveConfig,
@@ -245,6 +245,23 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
 
   const promoted = assessment.depthDecisions.filter((d) => d.depth === "deep_dive");
 
+  // 詳細評価に進めたが、一括取込でスクリーニング用に登録しただけで数量・単価がない拠点。
+  // 算定しない理由を黙らずに画面へ出す(D-15・第4版 D-01-3)。
+  const screeningOnlyPromoted = promoted.filter(
+    ({ materialIssueId }) =>
+      !input.deepDiveConfigsByMaterialIssue?.[materialIssueId] &&
+      deepDiveParamsBySiteId.get(siteIdFromMaterialIssueId(materialIssueId))?.screeningOnly
+  );
+  if (screeningOnlyPromoted.length > 0) {
+    warnings.push({
+      id: "screening-only-promoted",
+      screen: "/valuation",
+      message:
+        `詳細評価に指定した課題のうち${screeningOnlyPromoted.length}件は、一括取込で優先度算定用に登録した拠点のもので、` +
+        "年間の環境データ量とコスト単価が未登録のため算定していません。engagement-config.json の詳細評価対象に指定して取り込み直してください。",
+    });
+  }
+
   /**
    * 保存済みの代表値選択が、現在の手法セットに存在しない手法を指している場合、
    * coreは `RepresentativeValueSelectionError` を投げる(representative-value.ts)。
@@ -298,8 +315,10 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
           fitnessTierThresholdVersion: "fitness-tier-v1",
         };
       }
-      const params = deepDiveParamsBySiteId.get(siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
-      return buildUserDeepDiveConfig(siteId, params);
+      const params = deepDiveParamsBySiteId.get(siteId);
+      // 一括取込でスクリーニング用に登録しただけの拠点は、数量・単価を受け取っていないため算定しない。
+      if (params?.screeningOnly) return { quantities: [] };
+      return buildUserDeepDiveConfig(siteId, params ?? DEFAULT_DEEP_DIVE_PARAMS);
     },
     /**
      * M4 §7.4:代表値の選択。**利用者が実際に選んだときだけ**渡す。
@@ -458,7 +477,13 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
   // 詳細評価に進んでいない拠点は、前提を入力しても判定が生まれないため含めない。
   const decisionTargetSiteIds = new Set(decisionTargets.map((target) => target.siteId));
   const deferredDecisions = userSiteEntries
-    .filter((entry) => decisionTargetSiteIds.has(entry.row.id) && !hasDecisionInputs(entry.deepDive))
+    .filter((entry) => {
+      if (!decisionTargetSiteIds.has(entry.row.id)) return false;
+      // 拠点登録の深掘り入力にNPV・割引率・評価期間が無くても、「投資判断の前提」画面で
+      // 保存済みならそれで判定できる(前提待ちとして重複案内しない)。
+      const effectiveParams = withDecisionParameters(entry.deepDive, interactions.decisionParameters.get(entry.row.id));
+      return !hasDecisionInputs(effectiveParams);
+    })
     .map((entry) => ({ siteId: entry.row.id, siteName: entry.row.name }));
   const decisions = decisionTargets.flatMap(({ siteId, materialIssueId, materialIssueIds }) => {
     const siteRecords = valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [];
@@ -525,7 +550,13 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     // いずれも常にwelfare概念を返す(monetization/plugins/lime3-water.ts・ghg-carbon-price-conversion.ts)。
     const welfareMethodId = isClimateCategory ? "ghg-carbon-price-conversion.ghg-social-cost" : "lime3-water";
     const lime3 = siteRecords.find((r) => r.methodId === welfareMethodId) as WelfareValuationRecord | undefined;
-    const deepDiveParams = deepDiveParamsBySiteId.get(siteId) ?? DEFAULT_DEEP_DIVE_PARAMS;
+    // flagship(site-042)・気候ショーケース(site-070)はユーザー拠点ではなくDEFAULT_DEEP_DIVE_PARAMS
+    // (常にhasDecisionInputsを満たす)を使うため、保存済み決定パラメータでの合成はユーザー拠点
+    // (deepDiveParamsBySiteIdに実体がある拠点)だけに行う(デモ挙動を変えない)。
+    const rawDeepDiveParams = deepDiveParamsBySiteId.get(siteId);
+    const deepDiveParams = rawDeepDiveParams
+      ? withDecisionParameters(rawDeepDiveParams, interactions.decisionParameters.get(siteId))
+      : DEFAULT_DEEP_DIVE_PARAMS;
     if (!hasDecisionInputs(deepDiveParams)) return [];
 
     /**
@@ -797,6 +828,8 @@ export const DEFAULT_RNG_SEED = 42;
 // 15: 年度引継ぎ元、資源費用の前提、物理指標の確認済み開示文案を保持する。
 // 16: 資源対策の複数年比較、既存主張・投資案件との確認済み対応を保持する。
 // 17: 「投資の前提待ち」を判定対象の拠点に限定する(詳細評価に進まない拠点を含めていた)。
-export const RESULT_SCHEMA_VERSION = 17;
+// 18: 影響経路がレビュー待ちの手法間ペアを確定分解から外す(recipe-registry-v3)、利用者拠点の割引率・評価期間を
+//     既定値で補完しない(M6 §4.3)、一括取込の優先度算定専用の拠点を架空の数量で算定しない。
+export const RESULT_SCHEMA_VERSION = 18;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

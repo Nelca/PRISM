@@ -8,6 +8,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 - [資源拡張の追加実装・残件と必要な協力](docs/resource-expansion-handoff-2026-09-21.md)
 - [公開資料・合成データによる研究実装](docs/research-data-implementation-2026-09-21.md): `PRISM_RESEARCH_ENABLED=1` で `/research` を有効化する。
 - [GVFD V2の取得・地域別影響算定](docs/gvfd-implementation-2026-09-24.md): 研究モードの `/research/gvfd`。統合管理の指標から実測値・目標値を引き継げる。
+- [プロダクト全体のコードレビューと修正（2026-09-26）](docs/code-review-2026-09-26.md): 要件から重要箇所を優先度付けしたレビュー、修正した不具合、記録のみの指摘。
 
 ## セットアップ(DBが必要です)
 

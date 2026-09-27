@@ -27,6 +27,30 @@ describe("site form", () => {
     for (const field of ["investmentCostInitial", "investmentCostRecurring", "baselineNpvValue"]) form.delete(field);
     expect(parseSiteForm(form, DEFAULT_DEEP_DIVE_PARAMS)).toMatchObject({ deepDive: { investmentCostInitial: null, investmentCostRecurring: null, baselineNpvValue: null } });
   });
+  it("割引率・評価期間の空欄はnullで保持し、業界標準値で埋めない(M6独自の割引率は設けない)", () => {
+    const parsed = parseSiteForm(baseForm(), DEFAULT_DEEP_DIVE_PARAMS);
+    expect(parsed).toMatchObject({ deepDive: { discountRate: null, horizon: null } });
+  });
+  it("割引率・評価期間の有効な入力を数値として保存する", () => {
+    const form = baseForm();
+    form.set("discountRate", "0.08");
+    form.set("horizon", "7");
+    const parsed = parseSiteForm(form, DEFAULT_DEEP_DIVE_PARAMS);
+    expect(parsed).toMatchObject({ deepDive: { discountRate: 0.08, horizon: 7 } });
+  });
+  it("割引率が1を超える値・評価期間が0または整数でない値を拒否する", () => {
+    const overRate = baseForm();
+    overRate.set("discountRate", "6");
+    expect(parseSiteForm(overRate, DEFAULT_DEEP_DIVE_PARAMS)).toHaveProperty("error");
+
+    const zeroHorizon = baseForm();
+    zeroHorizon.set("horizon", "0");
+    expect(parseSiteForm(zeroHorizon, DEFAULT_DEEP_DIVE_PARAMS)).toHaveProperty("error");
+
+    const fractionalHorizon = baseForm();
+    fractionalHorizon.set("horizon", "2.5");
+    expect(parseSiteForm(fractionalHorizon, DEFAULT_DEEP_DIVE_PARAMS)).toHaveProperty("error");
+  });
   it("承認ラインの空欄は未定、0は明示的な値として保存する", () => {
     const form = baseForm();
     expect(parseSiteForm(form, DEFAULT_DEEP_DIVE_PARAMS)).toMatchObject({ deepDive: { approvalThresholdValue: null, investmentCostRecurring: 0 } });

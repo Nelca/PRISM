@@ -14,7 +14,7 @@ import { listSiteEntries } from "@/lib/db/repositories/sites";
 import { loadInteractionState } from "@/lib/db/repositories/interactions";
 import { getLatestRun, persistRun } from "@/lib/db/repositories/runs";
 import { observedVersionsFromHashInputs, recordObservedVersions } from "@/lib/db/repositories/parameter-versions";
-import type { DbExecutor } from "@/lib/db/client";
+import { getDb, lockTenantForWrite, type DbExecutor } from "@/lib/db/client";
 import { listActiveInputBatches, listActivePhysicalInputRecords } from "@/lib/db/repositories/physical-inputs";
 import type { AppendCalculationLineItemInput } from "@/lib/db/repositories/physical-inputs";
 import { DEMO_CATEGORY_EXPANSION_BATCHES, DEMO_CATEGORY_EXPANSION_RECORDS } from "@/lib/demo/category-expansion-data";
@@ -35,8 +35,20 @@ export async function loadCategoryExpansion(tenantId: string, db?: DbExecutor) {
   return { ...expansion, calculationLineItems: usesDemoCategoryInputs ? [] : expansion.calculationLineItems };
 }
 
-/** 入力を読み直してパイプラインを実行し、新しいrunとして永続化する。 */
+/**
+ * 入力を読み直してパイプラインを実行し、新しいrunとして永続化する。
+ *
+ * `db` を渡す場合、呼び出し側がテナントのロック(`lockTenantForWrite`)を取ったトランザクションであること。
+ * 省略時は自前でロック付きトランザクションを開く(ロックなしで読んだ古い状態のrunが、
+ * 並行して保存された操作を追い越して最新になるのを防ぐため)。
+ */
 export async function executeAndPersistRun(tenantId: string, db?: DbExecutor): Promise<DemoPipelineResult> {
+  if (!db) {
+    return getDb().transaction(async (tx) => {
+      await lockTenantForWrite(tx, tenantId);
+      return executeAndPersistRun(tenantId, tx);
+    });
+  }
   // DbTransactionは単一clientなので、pg@9でも安全なよう同一tx内のqueryを並列実行しない。
   const userSites = await listSiteEntries(tenantId, db);
   const interactions = await loadInteractionState(tenantId, db);
@@ -109,7 +121,7 @@ export const getOrCreateLatestResult = cache(async function getOrCreateLatestRes
   tenantId: string
 ): Promise<DemoPipelineResult> {
   const latest = await getLatestRun(tenantId);
-  if (latest && latest.resultSchemaVersion === RESULT_SCHEMA_VERSION && !requiresLicenseRefresh(latest.result)) {
+  if (latest && isReusable(latest)) {
     // 保存済みrunを返す場合も、そのrunが使った版が台帳にあることを保証する。
     // 版管理を後から導入したため、既存runの分が台帳に載っていないことがある。
     // 追記は冪等(同じsetId・versionは無視される)なので、読み出しのたびに呼んでよい。
@@ -120,8 +132,19 @@ export const getOrCreateLatestResult = cache(async function getOrCreateLatestRes
     );
     return latest.result;
   }
-  return executeAndPersistRun(tenantId);
+  // 再計算は書込と同じロックの下で行う。ロック待ちの間に別のリクエストが再計算を
+  // 済ませていればそれを使い、同じ入力のrunを重ねて保存しない(デプロイ直後の同時アクセス等)。
+  return getDb().transaction(async (tx) => {
+    await lockTenantForWrite(tx, tenantId);
+    const current = await getLatestRun(tenantId, tx);
+    if (current && isReusable(current)) return current.result;
+    return executeAndPersistRun(tenantId, tx);
+  });
 });
+
+function isReusable(run: { resultSchemaVersion: number; result: DemoPipelineResult }): boolean {
+  return run.resultSchemaVersion === RESULT_SCHEMA_VERSION && !requiresLicenseRefresh(run.result);
+}
 
 /** 保存済みrunの計算後にライセンス期限を迎えた場合、期限前の金額を配信し続けない。 */
 export function requiresLicenseRefresh(result: DemoPipelineResult, now = new Date()): boolean {

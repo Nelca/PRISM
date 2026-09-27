@@ -122,6 +122,13 @@ export function parseEngagementConfig(jsonText: string): EngagementConfigParseRe
     errors.push("methodConfigが必須です。");
   } else if (!VALID_DEPTHS.includes(methodConfig.depth)) {
     errors.push(`methodConfig.depthが不正です("${methodConfig.depth}")。screening/deep_diveのいずれかです。`);
+  } else if (
+    typeof methodConfig.unitReplacementCost !== "number" ||
+    !Number.isFinite(methodConfig.unitReplacementCost) ||
+    methodConfig.unitReplacementCost < 0
+  ) {
+    // 1件追加フォームと同じく必須。未入力を既定の単価で補完しない(D-15)。
+    errors.push("methodConfig.unitReplacementCostが必須です(深掘り対象の代替コスト単価・0以上の数値)。");
   }
 
   if (!obj.calibration) {

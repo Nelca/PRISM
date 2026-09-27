@@ -12,13 +12,13 @@
  */
 
 import { afterAll, describe, expect, it } from "vitest";
-import { closeDb } from "@/lib/db/client";
+import { closeDb, getDb, lockTenantForWrite } from "@/lib/db/client";
 import { listInteractionEvents } from "@/lib/db/repositories/interactions";
 import { getLatestRun } from "@/lib/db/repositories/runs";
 import { addSiteEntry, listSiteEntries, replaceSiteEntries } from "@/lib/db/repositories/sites";
 import { projectInteractionState } from "@/lib/demo/interaction-state";
 import { runDemoPipeline, DEFAULT_RNG_SEED } from "@/lib/demo/run-demo-pipeline";
-import { loadCategoryExpansion } from "./execute-run";
+import { executeAndPersistRun, loadCategoryExpansion } from "./execute-run";
 import { tryRunAndPersist } from "./try-run-with-interaction";
 
 const TENANT = "try-run-with-interaction-test";
@@ -139,5 +139,32 @@ describe("検証してから永続化する(D-01-2)", () => {
       rngSeed: DEFAULT_RNG_SEED,
     });
     expect((await getLatestRun(TENANT))?.result.recalculationHash.hash).toBe(expected.recalculationHash.hash);
+  });
+
+  it("読み出し時の再計算も書込と同じロックを待ち、ロック解放後に保存したrunが最新になる", async () => {
+    let releaseLock!: () => void;
+    const lockReleased = new Promise<void>((resolve) => (releaseLock = resolve));
+    let lockAcquired!: () => void;
+    const lockHeld = new Promise<void>((resolve) => (lockAcquired = resolve));
+    // 別トランザクションでテナントのロックを保持し、その間に操作を1件保存する(書込中の状態を再現)。
+    const writer = getDb().transaction(async (tx) => {
+      await lockTenantForWrite(tx, TENANT);
+      lockAcquired();
+      await lockReleased;
+    });
+    await lockHeld;
+
+    let recomputed = false;
+    const recompute = executeAndPersistRun(TENANT).then((result) => {
+      recomputed = true;
+      return result;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(recomputed).toBe(false); // ロックを取れるまで読取も保存もしない
+
+    releaseLock();
+    await writer;
+    const result = await recompute;
+    expect((await getLatestRun(TENANT))?.result.recalculationHash.hash).toBe(result.recalculationHash.hash);
   });
 });

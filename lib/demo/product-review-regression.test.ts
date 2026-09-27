@@ -41,6 +41,24 @@ describe("初回利用レビューの回帰防止", () => {
     expect(result.deferredDecisions).toHaveLength(0);
     expect(deriveOpenTasks(result).some((task) => task.id === "decision-inputs")).toBe(false);
   });
+  it("一括取込の優先度算定専用の拠点は、詳細評価に進めても架空の数量で算定・判定しない", () => {
+    const interactions = emptyInteractionState();
+    const siteId = "site-user-screening";
+    interactions.depthOverrides.set(`${siteId}-mi-water`, "promote");
+    const result = runDemoPipeline({
+      rngSeed: 42,
+      interactions,
+      userSites: [{
+        row: { id: siteId, name: "一括取込の拠点", siteType: "own_site", industrySector: "chemicals", lat: 35, lng: 139 },
+        deepDive: { ...DEFAULT_DEEP_DIVE_PARAMS, physicalQuantity: 0, unitReplacementCost: 0, investmentCostInitial: null, investmentCostRecurring: null, baselineNpvValue: null, approvalThresholdValue: null, forcePromote: false, screeningOnly: true },
+      }],
+    });
+    expect(result.assessment.depthDecisions.find((d) => d.materialIssueId === `${siteId}-mi-water`)?.depth).toBe("deep_dive");
+    expect(result.valuation.valuationRecordsByMaterialIssue[`${siteId}-mi-water`] ?? []).toHaveLength(0);
+    expect(result.decisions.some((entry) => entry.siteId === siteId)).toBe(false);
+    expect(result.deferredDecisions).toHaveLength(0);
+    expect(result.warnings.some((warning) => warning.id === "screening-only-promoted")).toBe(true);
+  });
   it("GHG拠点に入力したNPVを使い、未入力の承認ラインと開示文を補完しない", () => {
     const result = runUser();
     const record = result.decisions.find((entry) => entry.siteId === "site-user-review")!.decision.decisionRecord;
@@ -67,5 +85,48 @@ describe("初回利用レビューの回帰防止", () => {
     expect(deriveStepProgress(result).find((step) => step.href === "/decision")?.done).toBe(true);
     expect(deriveOpenTasks(result).some((task) => task.id === "binding-mechanism")).toBe(false);
     expect(deriveOpenTasks(initial).some((task) => task.id === "binding-mechanism")).toBe(true);
+  });
+});
+
+describe("M6独自の割引率は設けない(docs/requirements/m6-decision-record.md §4.3)", () => {
+  const SITE_ID = "site-user-review";
+  function runWithDeepDive(deepDive: Partial<typeof DEFAULT_DEEP_DIVE_PARAMS>, interactions = emptyInteractionState()) {
+    return runDemoPipeline({
+      rngSeed: 42,
+      interactions,
+      userSites: [{
+        row: { id: SITE_ID, name: "検証用拠点", siteType: "own_site", industrySector: "chemicals", lat: 35, lng: 139 },
+        deepDive: { ...DEFAULT_DEEP_DIVE_PARAMS, ...deepDive },
+      }],
+    });
+  }
+
+  it("拠点登録に割引率・評価期間が無い場合は前提待ちとし、業界標準値で判定しない", () => {
+    const result = runWithDeepDive({ discountRate: undefined, horizon: undefined });
+    expect(result.decisions.some((entry) => entry.siteId === SITE_ID)).toBe(false);
+    expect(result.deferredDecisions).toContainEqual({ siteId: SITE_ID, siteName: "検証用拠点" });
+  });
+
+  it("拠点登録の割引率・評価期間をそのまま通常NPVに使う", () => {
+    const result = runWithDeepDive({ discountRate: 0.08, horizon: 7 });
+    const record = result.decisions.find((entry) => entry.siteId === SITE_ID)!.decision.decisionRecord;
+    expect(record.baselineNpv.discountRate).toBe(0.08);
+    expect(record.baselineNpv.horizon).toBe(7);
+  });
+
+  it("拠点登録に割引率・評価期間が無くても、投資判断の前提で保存済みなら判定できる", () => {
+    const interactions = emptyInteractionState();
+    interactions.decisionParameters.set(SITE_ID, {
+      baselineNpvValue: 400_000_000,
+      discountRate: 0.05,
+      horizon: 12,
+      approvalThresholdValue: null,
+    });
+    const result = runWithDeepDive({ discountRate: undefined, horizon: undefined }, interactions);
+    expect(result.deferredDecisions).toHaveLength(0);
+    const record = result.decisions.find((entry) => entry.siteId === SITE_ID)?.decision.decisionRecord;
+    expect(record).toBeDefined();
+    expect(record!.baselineNpv.discountRate).toBe(0.05);
+    expect(record!.baselineNpv.horizon).toBe(12);
   });
 });

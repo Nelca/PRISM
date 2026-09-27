@@ -66,7 +66,7 @@ describe("T-21 通し検証:M4 V2 分解 → 代表値選択 → M5/M6/M7 → �
   it("再計算ハッシュの入力に M4 V2 の版(レシピ・許容誤差・同一性規則・経路対応表・f3/f8 無効化)が含まれる", () => {
     const inputs = baseline.recalculationHash.inputs;
     expect(inputs.m4_decompositionAlgorithmVersion).toBe("shapley-subset-v2");
-    expect(inputs.m4_recipeRegistryVersion).toBe("recipe-registry-v2");
+    expect(inputs.m4_recipeRegistryVersion).toBe("recipe-registry-v3");
     expect(inputs.m4_toleranceVersion).toBe("tol-v1");
     expect(inputs.m4_subjectRuleVersion).toBe("subject-identity-v1");
     expect(inputs.m4_pathwayMappingVersion).toBe("pathway-mapping-v1");
@@ -82,10 +82,11 @@ describe("T-21 通し検証:M4 V2 分解 → 代表値選択 → M5/M6/M7 → �
     );
     expect(entries).toHaveLength(4);
     const payloads = entries.map((e) => e.payload).filter((p): p is Extract<typeof p, { kind: "decomposition" }> => p.kind === "decomposition");
-    expect(payloads.filter((p) => p.decompositionStatus === "decomposed")).toHaveLength(3);
+    expect(payloads.filter((p) => p.decompositionStatus === "decomposed")).toHaveLength(2);
     const stopped = payloads.filter((p) => p.decompositionStatus === "stopped");
-    expect(stopped).toHaveLength(1);
-    expect(stopped[0].stopReason).toBe("no_numerizable_factors");
+    expect(stopped).toHaveLength(2);
+    // 代替費用法 vs VFaccess は反実仮想を定義できない。LIME3 vs VFes は経路対応がレビュー待ち(H-01)で確定結果に混ぜない。
+    expect(stopped.map((p) => p.stopReason).sort()).toEqual(["no_numerizable_factors", "recipe_not_registrable"]);
     for (const p of payloads) {
       expect(p.f3ThresholdVersion).toBe(F3_THRESHOLD_DISABLED_VERSION);
       expect(p.toleranceVersion).toBe("tol-v1");

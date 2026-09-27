@@ -23,9 +23,8 @@ import { listSiteEntries } from "@/lib/db/repositories/sites";
 import { appendInteractionEvent, listInteractionEvents } from "@/lib/db/repositories/interactions";
 import type { AppendInteractionInput } from "@/lib/db/repositories/interactions";
 import { persistComputedRun, loadCategoryExpansion } from "./execute-run";
-import { getDb } from "@/lib/db/client";
+import { getDb, lockTenantForWrite } from "@/lib/db/client";
 import type { DbTransaction } from "@/lib/db/client";
-import { sql } from "drizzle-orm";
 import { allSiteRows } from "@/lib/demo/company";
 import type { CategoryExpansionRuntime } from "./category-expansion-runtime";
 
@@ -100,7 +99,7 @@ export async function tryRunAndPersist(tenantId: string, input: TryRunInput): Pr
   try {
     await getDb().transaction(async (tx) => {
       // 同じテナントの「読取→計算→追記」を直列化し、古い状態から作ったrunの後勝ちを防ぐ。
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}))`);
+      await lockTenantForWrite(tx, tenantId);
 
       // 1トランザクション=1 client。同一clientへのquery並列実行はpg@9で非対応になる。
       const currentSites = await listSiteEntries(tenantId, tx);

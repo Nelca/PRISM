@@ -38,6 +38,25 @@ function build(recordA: ValuationRecord, recordB: ValuationRecord, overrides: Pa
   return buildPairwiseDecompositionV2({ recordA, recordB, subject, registry, versions, ...overrides });
 }
 
+describe("buildPairwiseDecompositionV2:除外要因がある場合は完全分解に昇格しない(§5.9)", () => {
+  // 完全分解を宣言したレシピで ε が差し替え不能(除外)。β・γ の未宣言の差が偶然打ち消し合い、
+  // V* = 3×1×2 = 6 が V_A = 3×2×1 = 6 と一致しても、完全分解とは表示しない。
+  const fullRegistry = createTestRegistry();
+  const excludedFull = SYNTHETIC_RECIPES.find((recipe) => recipe.id === "synthetic-excluded-factor")!;
+  fullRegistry.register({ ...excludedFull, id: "synthetic-excluded-factor-full", decompositionKind: "full" });
+  const traceA = makeSyntheticTrace({ methodId: "synthetic-excl-a", shape: "product", quantity: 1, alpha: 3, beta: 2, gamma: 1 });
+  const traceB = makeSyntheticTrace({ methodId: "synthetic-excl-b", shape: "product", quantity: 1, alpha: 1, beta: 1, gamma: 2 });
+  const pair = build(record(traceA), record(traceB), { registry: fullRegistry });
+
+  it("除外した要因を定性差異に残し、分解区分は部分分解にする", () => {
+    expect(pair.status).toBe("decomposed");
+    if (pair.status !== "decomposed") return;
+    expect(pair.vStar).toBeCloseTo(pair.valueA, 12);
+    expect(pair.kind).toBe("partial");
+    expect(pair.qualitativeDifferences.length).toBeGreaterThan(0);
+  });
+});
+
 describe("buildPairwiseDecompositionV2:完全分解(乗法)", () => {
   // V_A = 1×3×2×1 = 6、V_B = 1×1×1×1 = 1。v({α})=3、v({β})=2、v(F)=6=V_A。
   const traceA = makeSyntheticTrace({ methodId: "synthetic-product-a", shape: "product", quantity: 1, alpha: 3, beta: 2, gamma: 1 });

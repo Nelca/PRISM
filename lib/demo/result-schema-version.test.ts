@@ -33,8 +33,8 @@ const BASE: DecompositionVersions = {
 };
 
 describe("T-14 保存・版管理・後方互換", () => {
-  it("結果構造の版は 17(保存済みrunを再計算させる変更のたびに上げる)", () => {
-    expect(RESULT_SCHEMA_VERSION).toBe(17);
+  it("結果構造の版は 18(保存済みrunを再計算させる変更のたびに上げる)", () => {
+    expect(RESULT_SCHEMA_VERSION).toBe(18);
   });
 
   it("同じ版からは同じ再計算ハッシュが出る", () => {
@@ -42,7 +42,7 @@ describe("T-14 保存・版管理・後方互換", () => {
   });
 
   it.each([
-    ["recipeRegistryVersion", { recipeRegistryVersion: "recipe-registry-v3" }],
+    ["recipeRegistryVersion", { recipeRegistryVersion: "recipe-registry-v4" }],
     ["toleranceVersion", { toleranceVersion: "tol-v2" }],
     ["subjectRuleVersion", { subjectRuleVersion: "subject-identity-v2" }],
     ["pathwayMappingVersion", { pathwayMappingVersion: "pathway-mapping-v2" }],

@@ -5,7 +5,7 @@
  * ページは常に最新 run の `result` を読むだけで、再計算しない(計画B-2)。
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "../client";
 import type { DbExecutor } from "../client";
 import { buildDecisionCountRows } from "./decision-counts";
@@ -45,6 +45,9 @@ export async function persistRun(input: PersistRunInput, db?: DbExecutor): Promi
       hashInputs: input.result.recalculationHash.inputs,
       result: input.result,
       resultSchemaVersion: RESULT_SCHEMA_VERSION,
+      // 既定の now() はトランザクション開始時刻で、ロック待ちの間に後から始まった書込に
+      // 追い越されうる。ロック取得後の挿入時刻にすることで「最新run」の順序を書込順と一致させる。
+      executedAt: sql`clock_timestamp()`,
     });
 
     // 索引側。run本体と同じトランザクションで書くため、両者が食い違うことはない。
@@ -86,8 +89,8 @@ export interface StoredRun {
   result: DemoPipelineResult;
 }
 
-export async function getLatestRun(tenantId: string): Promise<StoredRun | null> {
-  const rows = await getDb()
+export async function getLatestRun(tenantId: string, db: DbExecutor = getDb()): Promise<StoredRun | null> {
+  const rows = await db
     .select()
     .from(pipelineRun)
     .where(eq(pipelineRun.tenantId, tenantId))

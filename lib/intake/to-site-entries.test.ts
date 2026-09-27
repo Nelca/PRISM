@@ -35,7 +35,6 @@ describe("toSiteEntries", () => {
     expect(entries.length).toBeGreaterThan(0);
     for (const entry of entries) {
       expect(entry.row.id).toBeTruthy();
-      expect(entry.deepDive.physicalQuantity).toBeGreaterThan(0);
     }
   });
 
@@ -51,14 +50,37 @@ describe("toSiteEntries", () => {
     expect(target.deepDive.forcePromote).toBe(true);
   });
 
-  it("深掘り対象でない拠点は既定値になる(顧客の実値ではないことを区別できる)", () => {
+  it("深掘り対象の拠点は engagement-config.json の割引率・評価期間を保持する(M6独自の割引率は設けない)", () => {
+    const dataset = loadTemplates();
+    const { entries } = toSiteEntries(dataset);
+
+    const target = entries.find((e) => e.row.id === dataset.engagementConfig.deepDive.siteId)!;
+    expect(target.deepDive.discountRate).toBe(dataset.engagementConfig.baselineNpv.discountRate);
+    expect(target.deepDive.horizon).toBe(dataset.engagementConfig.baselineNpv.horizon);
+  });
+
+  it("深掘り対象でない拠点は優先度算定専用とし、架空の数量・投資前提を入れない(D-15)", () => {
     const dataset = loadTemplates();
     const { entries } = toSiteEntries(dataset);
 
     const others = entries.filter((e) => e.row.id !== dataset.engagementConfig.deepDive.siteId);
+    expect(others.length).toBeGreaterThan(0);
     for (const entry of others) {
-      expect(entry.deepDive.forcePromote).toBe(false);
+      expect(entry.deepDive).toMatchObject({
+        forcePromote: false,
+        screeningOnly: true,
+        discountRate: null,
+        horizon: null,
+        investmentCostInitial: null,
+        investmentCostRecurring: null,
+        baselineNpvValue: null,
+        approvalThresholdValue: null,
+      });
     }
+    const target = entries.find((e) => e.row.id === dataset.engagementConfig.deepDive.siteId)!;
+    expect(target.deepDive.screeningOnly).toBeUndefined();
+    expect(target.deepDive.physicalQuantity).toBeGreaterThan(0);
+    expect(target.deepDive.unitReplacementCost).toBe(dataset.engagementConfig.methodConfig.unitReplacementCost);
   });
 
   it("反映できなかった項目を列挙する(黙って捨てない)", () => {

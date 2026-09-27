@@ -7,7 +7,7 @@ export function DeferredDecisions({ sites }: { sites: { siteId: string; siteName
   return (
     <Card id="deferred-decisions" title="投資の前提を追加する" headExtra={<Tag variant="neutral">後から入力できます</Tag>}>
       <p>
-        次の拠点は、NPV・初期投資額・年間継続費用のいずれかが未入力です。価値算定は利用できます。財務・経営企画部門と確認できたら、拠点の「編集」から前提を追加してください。
+        次の拠点は、NPV・初期投資額・年間継続費用・割引率・評価期間のいずれかが未入力です。価値算定は利用できます。財務・経営企画部門と確認できたら、拠点の「編集」から前提を追加してください。
       </p>
       <ul className="task-list">
         {sites.map((site) => (

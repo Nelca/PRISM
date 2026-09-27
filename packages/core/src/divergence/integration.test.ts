@@ -122,7 +122,13 @@ describe("M4統合テスト:M3が生成する水カテゴリ6本のValuationReco
   it("LIME3 vs IFVI 厚生価値内訳は部分分解になり、地理較正は差が無いためゼロ寄与になる", () => {
     const { decomposition } = build();
     const welfareGroup = decomposition.groups.find((g) => g.valueConcept === "welfare")!;
-    for (const pair of welfareGroup.crossMethodPairs) {
+    // VFes は影響経路の対応付けがレビュー待ち(H-01)のため、本番では確定した分解に混ぜず停止する(§9.5)。
+    const vfes = welfareGroup.crossMethodPairs.filter((pair) => pair.methodIdA.endsWith(".VFes") || pair.methodIdB.endsWith(".VFes"));
+    expect(vfes).toHaveLength(1);
+    expect(vfes[0].status === "stopped" && vfes[0].reason).toBe("recipe_not_registrable");
+    const verified = welfareGroup.crossMethodPairs.filter((pair) => !vfes.includes(pair));
+    expect(verified.length).toBeGreaterThan(0);
+    for (const pair of verified) {
       expect(pair.status).toBe("decomposed");
       if (pair.status !== "decomposed") continue;
       expect(pair.recipe.id).toBe("lime3-vs-ifvi-welfare-water");

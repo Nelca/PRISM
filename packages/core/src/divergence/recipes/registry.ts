@@ -25,7 +25,8 @@ import { REPLACEMENT_COST_VS_VFACCESS_RECIPE } from "./replacement-cost-vs-vfacc
  * v2(2026-09-06、T-11/T-13):本番レジストリへ実データ比較レシピ4件を登録し、
  * `find` が同じ手法ペアに複数レシピが該当する場合に `supports` を通るものを優先するようにした。
  */
-export const RECIPE_REGISTRY_VERSION = "recipe-registry-v2";
+// v3: 影響経路の対応付けがレビュー待ちのトレースを本番では分解しない(§9.5)。分解結果が変わるため版を上げた。
+export const RECIPE_REGISTRY_VERSION = "recipe-registry-v3";
 
 export class RecipeRegistrationError extends Error {}
 
@@ -53,6 +54,8 @@ export interface RecipeMatch {
 export interface RecipeRegistryOptions {
   /** テスト専用レシピの登録・実行を許すか。本番は false。 */
   allowTestOnly?: boolean;
+  /** 影響経路の対応付けがレビュー待ち(pending_domain_review 等)のトレースも分解するか。本番は false。 */
+  allowPendingReview?: boolean;
 }
 
 function traceTarget(trace: MethodEvaluationTrace) {
@@ -62,10 +65,12 @@ function traceTarget(trace: MethodEvaluationTrace) {
 export class RecipeRegistry {
   readonly version = RECIPE_REGISTRY_VERSION;
   readonly allowTestOnly: boolean;
+  readonly allowPendingReview: boolean;
   private readonly recipes: MethodComparisonRecipe[] = [];
 
   constructor(options: RecipeRegistryOptions = {}) {
     this.allowTestOnly = options.allowTestOnly === true;
+    this.allowPendingReview = options.allowPendingReview === true;
   }
 
   /** ハッシュを埋めて登録する。既存の同一 id@version は登録できない(版管理の一意性)。 */
@@ -151,6 +156,16 @@ export const PRODUCTION_RECIPES: Omit<MethodComparisonRecipe, "hash">[] = [
  */
 export function createProductionRegistry(): RecipeRegistry {
   const registry = new RecipeRegistry({ allowTestOnly: false });
+  for (const recipe of PRODUCTION_RECIPES) registry.register(recipe);
+  return registry;
+}
+
+/**
+ * 隔離した検証用レジストリ(診断・成立性検証)。本番と同じレシピを登録し、影響経路の対応付けが
+ * レビュー待ちのトレースも分解する。結果を画面・台帳の確定結果に混ぜないこと(完成指示書 §9.5)。
+ */
+export function createVerificationRegistry(): RecipeRegistry {
+  const registry = new RecipeRegistry({ allowTestOnly: false, allowPendingReview: true });
   for (const recipe of PRODUCTION_RECIPES) registry.register(recipe);
   return registry;
 }

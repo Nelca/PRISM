@@ -17,15 +17,23 @@ export interface SiteEntriesFromDataset {
   unmappedFields: string[];
 }
 
-const DEFAULTS: UserSiteDeepDiveParams = {
-  physicalQuantity: 10_000,
+/**
+ * 深掘り対象でない拠点。engagement-config.json に個別のパラメータがないため、優先度算定だけに使う。
+ * 以前はデモ用の既定値(10,000m3・500円/m3・NPV1億円等)を入れていたが、後から詳細評価に
+ * 進めると架空の数値で算定・判定が表示されたため、算定に使わない印を付ける(D-15)。
+ */
+const SCREENING_ONLY: UserSiteDeepDiveParams = {
+  physicalQuantity: 0,
   unit: "m3",
-  unitReplacementCost: 500,
-  investmentCostInitial: 20_000_000,
-  investmentCostRecurring: 2_000_000,
-  baselineNpvValue: 100_000_000,
-  approvalThresholdValue: 120_000_000,
+  unitReplacementCost: 0,
+  investmentCostInitial: null,
+  investmentCostRecurring: null,
+  baselineNpvValue: null,
+  approvalThresholdValue: null,
+  discountRate: null,
+  horizon: null,
   forcePromote: false,
+  screeningOnly: true,
 };
 
 export function toSiteEntries(dataset: CompanyDataset): SiteEntriesFromDataset {
@@ -36,9 +44,7 @@ export function toSiteEntries(dataset: CompanyDataset): SiteEntriesFromDataset {
 
   const entries: UserSiteEntry[] = dataset.siteRows.map((row) => {
     if (row.id !== deepDiveSiteId) {
-      // 深掘り対象でない拠点は、engagement-config.jsonに個別のパラメータがない。
-      // 既定値を使う(この既定値はデモ用であり、顧客の実値ではない)。
-      return { row, deepDive: { ...DEFAULTS } };
+      return { row, deepDive: { ...SCREENING_ONLY } };
     }
 
     return {
@@ -46,10 +52,16 @@ export function toSiteEntries(dataset: CompanyDataset): SiteEntriesFromDataset {
       deepDive: {
         physicalQuantity: config.deepDive.physicalQuantity,
         unit: config.deepDive.unit,
-        unitReplacementCost: config.methodConfig.unitReplacementCost ?? DEFAULTS.unitReplacementCost,
-        investmentCostInitial: firstCountermeasure?.investmentCost.initial ?? DEFAULTS.investmentCostInitial,
-        investmentCostRecurring: firstCountermeasure?.investmentCost.recurring ?? DEFAULTS.investmentCostRecurring,
+        // 単価は取込時に必須(engagement-config.ts で検証済み)。推定値で補完しない。
+        unitReplacementCost: config.methodConfig.unitReplacementCost!,
+        // 対策は1件以上必須(同上)。無い場合も架空の投資額は入れず、投資前提待ちにする。
+        investmentCostInitial: firstCountermeasure?.investmentCost.initial ?? null,
+        investmentCostRecurring: firstCountermeasure?.investmentCost.recurring ?? null,
         baselineNpvValue: config.baselineNpv.value,
+        // M6独自の割引率は設けない(m6-decision-record.md §4.3)。顧客の通常NPVに使った
+        // 割引率・評価期間をそのまま引き継ぐ(0.06/10年で黙って埋めない)。
+        discountRate: config.baselineNpv.discountRate,
+        horizon: config.baselineNpv.horizon,
         approvalThresholdValue:
           config.approvalThreshold === "pending"
             ? null

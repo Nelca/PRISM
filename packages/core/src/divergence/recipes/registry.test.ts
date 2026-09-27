@@ -100,7 +100,7 @@ describe("RecipeRegistry(T-06)", () => {
   });
 
   it("レジストリ版を定数として公開する(再計算ハッシュに入れる)", () => {
-    expect(RECIPE_REGISTRY_VERSION).toBe("recipe-registry-v2");
+    expect(RECIPE_REGISTRY_VERSION).toBe("recipe-registry-v3");
     expect(createTestRegistry().version).toBe(RECIPE_REGISTRY_VERSION);
   });
 

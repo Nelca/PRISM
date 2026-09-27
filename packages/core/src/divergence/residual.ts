@@ -58,12 +58,24 @@ function dedupeActions(actions: DataAcquisitionAction[]): DataAcquisitionAction[
   return result;
 }
 
+/**
+ * 実際の分解区分。レシピが完全分解を宣言していても、反実仮想を定義できず除外した要因があれば
+ * 部分分解として扱う(§6.3-6)。到達値 V* が偶然 V_A と一致しても完全分解へ昇格させない(§5.9)。
+ */
+export function effectiveDecompositionKind(
+  recipe: Pick<MethodComparisonRecipe, "decompositionKind">,
+  excludedFactors: ExcludedFactor[]
+): "full" | "partial" {
+  return recipe.decompositionKind === "full" && excludedFactors.length === 0 ? "full" : "partial";
+}
+
 export function buildResidual(input: BuildResidualInput): BuildResidualResult {
   const { mode, valueA, valueB, vStar, contributions, recipe, excludedFactors } = input;
   const spec = mode === "multiplicative" ? TOLERANCE_POLICY.log : TOLERANCE_POLICY.money;
 
   const endpointScale = toleranceScale([valueA, vStar, valueB]);
-  if (recipe.decompositionKind === "full" && !withinTolerance(vStar, valueA, endpointScale, TOLERANCE_POLICY.money)) {
+  const kind = effectiveDecompositionKind(recipe, excludedFactors);
+  if (kind === "full" && !withinTolerance(vStar, valueA, endpointScale, TOLERANCE_POLICY.money)) {
     return {
       ok: false,
       reason: "full_decomposition_endpoint_mismatch",

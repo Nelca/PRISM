@@ -31,6 +31,8 @@ export const DEFAULT_DEEP_DIVE_PARAMS: DecisionReadySiteParams = {
   investmentCostRecurring: 1_000_000,
   baselineNpvValue: 500_000_000,
   approvalThresholdValue: 510_000_000,
+  discountRate: 0.06,
+  horizon: 10,
   forcePromote: true,
 };
 
@@ -101,7 +103,9 @@ export function buildUserDeepDiveConfig(siteId: string, params: UserSiteDeepDive
 }
 
 export function buildUserBaselineNpv(params: DecisionReadySiteParams): BaselineNpvInput {
-  return { value: params.baselineNpvValue, discountRate: 0.06, horizon: 10, source: "manual_entry" };
+  // M6独自の割引率は設けない(docs/requirements/m6-decision-record.md §4.3)。
+  // 通常NPVの算定に使った企業自身の割引率・評価期間をそのまま使う。業界標準値で仮置きしない。
+  return { value: params.baselineNpvValue, discountRate: params.discountRate, horizon: params.horizon, source: "manual_entry" };
 }
 
 /**

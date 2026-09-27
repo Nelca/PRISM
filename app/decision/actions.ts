@@ -56,6 +56,7 @@ export async function saveDecisionParametersAction(
     const parsed = parseRequiredNumber(formData.get(field.name), {
       label: field.label,
       ...(field.name === "horizon" ? { integer: true, min: 1 } : {}),
+      ...(field.name === "discountRate" ? { min: 0, max: 1 } : {}),
     });
     if ("error" in parsed) return parsed;
     values[field.name] = parsed.value;

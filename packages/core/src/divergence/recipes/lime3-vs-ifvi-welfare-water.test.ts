@@ -9,14 +9,15 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildPairwiseDecompositionV2 } from "../pairwise-decomposition-v2";
-import { createProductionRegistry } from "./registry";
+import { createProductionRegistry, createVerificationRegistry } from "./registry";
 import { DIAGNOSTIC_DECOMPOSITION_VERSIONS_V2 } from "../diagnostics/baseline-water-case";
 import { buildWaterRecords, buildWaterSubject } from "../diagnostics/water-case-fixtures";
 import { comparePathways } from "../comparability";
 import { LIME3_VS_IFVI_WELFARE_WATER_RECIPE_ID } from "./lime3-vs-ifvi-welfare-water";
 import type { ValuationRecord } from "../../types/valuation";
 
-const registry = createProductionRegistry();
+// レシピの計算内容の検証。VFes の経路対応はレビュー待ち(H-01)のため、隔離した検証用レジストリで分解する。
+const registry = createVerificationRegistry();
 const subject = buildWaterSubject();
 const records = buildWaterRecords();
 
@@ -30,17 +31,29 @@ function record(methodId: string): ValuationRecord {
   return found;
 }
 
-function decompose(ifviMethodId: string) {
+function decompose(ifviMethodId: string, target = registry) {
   return buildPairwiseDecompositionV2({
     recordA: record(ifviMethodId),
     recordB: record("lime3-water"),
     subject,
-    registry,
+    registry: target,
     versions: DIAGNOSTIC_DECOMPOSITION_VERSIONS_V2,
   });
 }
 
 describe("lime3-vs-ifvi-welfare-water(手法間・部分分解)", () => {
+  it("本番では、経路対応がレビュー待ちの VFes との比較を確定した分解に混ぜず停止する(§9.5)", () => {
+    const production = createProductionRegistry();
+    const vfes = decompose("ifvi-water-consumption.VFes", production);
+    expect(vfes.status).toBe("stopped");
+    if (vfes.status === "stopped") {
+      expect(vfes.reason).toBe("recipe_not_registrable");
+      expect(vfes.missingData.some((item) => item.candidateSource.includes("H-01"))).toBe(true);
+    }
+    // 経路対応が検証済みの内訳(VFnutrition)は本番でも分解する。
+    expect(decompose("ifvi-water-consumption.VFnutrition", production).status).toBe("decomposed");
+  });
+
   it("手計算値を再現する(LIME3 57,761.17 円 / VFes 12,624,579 円)", () => {
     expect(LIME3_JPY).toBeCloseTo(57_761.172113, 6);
     expect(VFES_JPY).toBe(12_624_579);

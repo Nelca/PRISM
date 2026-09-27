@@ -18,7 +18,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildDivergenceDecompositionV2 } from "../build-divergence-decomposition-v2";
-import { createProductionRegistry } from "../recipes/registry";
+import { createVerificationRegistry } from "../recipes/registry";
 import { buildDefaultBreakdownSpecs } from "../../monetization/breakdown-specs";
 import { summarizeBaseline, WATER_CASE_VERSIONS, DIAGNOSTIC_DECOMPOSITION_VERSIONS_V2 } from "./baseline-water-case";
 import { buildWaterRecords, buildWaterSubject, WATER_PHYSICAL_QUANTITY_ID } from "./water-case-fixtures";
@@ -36,7 +36,8 @@ const decomposition = buildDivergenceDecompositionV2({
   siteId: "site-042",
   subject,
   records,
-  registry: createProductionRegistry(),
+  // 診断は隔離した検証用途のため、レビュー待ちの経路対応も分解する(完成指示書 §9.5)。
+  registry: createVerificationRegistry(),
   versions: DIAGNOSTIC_DECOMPOSITION_VERSIONS_V2,
   breakdownSpecs: buildDefaultBreakdownSpecs(records),
 });

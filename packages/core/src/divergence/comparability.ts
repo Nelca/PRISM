@@ -273,6 +273,11 @@ export interface ComparabilityInput {
   recipe?: MethodComparisonRecipe;
   /** テスト専用レシピを実行してよいか(レジストリの設定と同じ値を渡す)。 */
   allowTestOnly?: boolean;
+  /**
+   * 影響経路の対応付けがレビュー待ちのトレースも分解するか(レジストリの設定と同じ値を渡す)。
+   * 隔離した検証用途(診断・成立性検証)だけが true。本番は false(完成指示書 §9.5)。
+   */
+  allowPendingReview?: boolean;
 }
 
 export type ComparabilityResult =
@@ -499,6 +504,29 @@ export function checkComparability(input: ComparabilityInput): ComparabilityResu
         reason: "trace_insufficient",
         detail: `${side}側(${record.methodId})のゼロ意味が "missing"(必要値が未取得)です。0として計算に入れません(§5.6)。`,
         missingData: [zeroMeaningAction(record.methodId)],
+        subjectIdentity,
+      };
+    }
+    // 影響経路の対応付けに合理的な別解釈が残る(pending_domain_review 等)トレースは、
+    // レシピ自体が検証済みでも確定した分解に混ぜない(完成指示書 §9.5・H-01)。
+    const pathwayStatus = trace.pathway.review.status;
+    if (
+      input.allowPendingReview !== true &&
+      !REGISTRABLE_REVIEW_STATUSES.includes(pathwayStatus as (typeof REGISTRABLE_REVIEW_STATUSES)[number])
+    ) {
+      return {
+        ok: false,
+        reason: "recipe_not_registrable",
+        detail:
+          `${side}側(${record.methodId})の影響経路の対応付けが、専門家の確認待ちなどで確定していません。` +
+          "確認が済むまで、分解結果として扱いません。",
+        missingData: [
+          {
+            item: `${record.methodId} の影響経路・保護対象(AoP)の対応付けの専門家確認`,
+            candidateSource: "ドメイン専門家によるレビュー(H-01)",
+            enablesRecalculation: true,
+          },
+        ],
         subjectIdentity,
       };
     }

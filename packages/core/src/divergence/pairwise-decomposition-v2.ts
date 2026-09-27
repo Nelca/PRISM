@@ -28,7 +28,7 @@ import { checkComparability, parentMethodIdOf } from "./comparability";
 import { evaluateSubsets, type ExcludedFactor } from "./counterfactual";
 import { buildNarrativeV2 } from "./narrative-v2";
 import { buildPairDiagnostics, selectDecompositionMode, type DecompositionModeV2 } from "./mode-selection";
-import { buildResidual, excludedFactorsAsKnownDifferences } from "./residual";
+import { buildResidual, effectiveDecompositionKind, excludedFactorsAsKnownDifferences } from "./residual";
 import type { RecipeRegistry } from "./recipes/registry";
 import { computeShapleyValues } from "./shapley";
 import { TOLERANCE_POLICY, isZeroWithinTolerance, toleranceScale } from "./tolerance";
@@ -344,6 +344,7 @@ export function buildPairwiseDecompositionV2(options: BuildPairwiseDecomposition
     subjectB: orientedSubjectB,
     recipe,
     allowTestOnly: registry.allowTestOnly,
+    allowPendingReview: registry.allowPendingReview,
   });
   if (!comparability.ok) {
     return buildStopped(context, comparability, { subjectIdentity: comparability.subjectIdentity });
@@ -473,7 +474,7 @@ export function buildPairwiseDecompositionV2(options: BuildPairwiseDecomposition
     diagnostics: modeSelection.diagnostics,
     implication,
     mode,
-    kind: recipe.decompositionKind,
+    kind: effectiveDecompositionKind(recipe, counterfactual.excludedFactors),
     baseline: "B",
     direction: "B_to_A",
     vStar,

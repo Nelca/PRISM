@@ -70,6 +70,14 @@ describe("parseEngagementConfig", () => {
     expect(errors.some((e) => e.includes("category"))).toBe(true);
   });
 
+  it("代替コスト単価が未入力・不正な場合は既定値で補完せずエラーを返す(D-15)", () => {
+    for (const methodConfig of [{ depth: "deep_dive" }, { depth: "deep_dive", unitReplacementCost: -1 }, { depth: "deep_dive", unitReplacementCost: "620" }]) {
+      const { errors } = parseEngagementConfig(validConfigJson({ methodConfig }));
+      expect(errors.some((e) => e.includes("unitReplacementCost"))).toBe(true);
+    }
+    expect(parseEngagementConfig(validConfigJson({ methodConfig: { depth: "deep_dive", unitReplacementCost: 0 } })).errors).toEqual([]);
+  });
+
   it("bindingMechanism.kindが不正な場合はエラーを返す", () => {
     const { errors } = parseEngagementConfig(validConfigJson({ bindingMechanism: { kind: "invalid_kind" } }));
     expect(errors.some((e) => e.includes("bindingMechanism"))).toBe(true);

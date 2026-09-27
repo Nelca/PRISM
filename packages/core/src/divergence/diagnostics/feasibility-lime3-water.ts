@@ -19,7 +19,7 @@
 import type { DataAcquisitionAction } from "../../types/recipe";
 import type { PairwiseDecompositionV2 } from "../../types/divergence";
 import { buildPairwiseDecompositionV2 } from "../pairwise-decomposition-v2";
-import { createProductionRegistry } from "../recipes/registry";
+import { createVerificationRegistry } from "../recipes/registry";
 import { NOT_COMPARABLE_STOP_REASONS } from "../metrics";
 import { DIAGNOSTIC_DECOMPOSITION_VERSIONS_V2, WATER_CASE_VERSIONS } from "./baseline-water-case";
 import {
@@ -184,7 +184,8 @@ function summarize(options: {
 
 /** T-10a の4候補を評価し、転記できる形の JSON を返す。 */
 export function buildFeasibilityReport(): FeasibilityReport {
-  const registry = createProductionRegistry();
+  // 成立性検証は隔離した検証用途のため、レビュー待ちの経路対応も分解して記録する(§9.5)。
+  const registry = createVerificationRegistry();
   const versions = DIAGNOSTIC_DECOMPOSITION_VERSIONS_V2;
   const subject = buildWaterSubject();
   const records = buildWaterRecords();

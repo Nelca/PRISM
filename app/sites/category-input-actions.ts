@@ -1,10 +1,9 @@
 "use server";
 
 import { createHash, randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { PhysicalQuantityInput, WasteQuantityInput } from "@core/types/valuation";
-import { getDb, getTenantId } from "@/lib/db/client";
+import { getDb, getTenantId, lockTenantForWrite } from "@/lib/db/client";
 import {
   appendCustomerCategoryInputBatch,
   listActivePhysicalInputRecords,
@@ -121,7 +120,7 @@ async function importCategoryCsv(
 
   try {
     await getDb().transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}))`);
+      await lockTenantForWrite(tx, tenantId);
       const sites = await listSiteEntries(tenantId, tx);
       const pollutionRecords = await listActivePhysicalInputRecords(tenantId, "pollution", tx);
       const validSiteIds = new Set([...SITE_ROWS.map((site) => site.id), ...sites.map((entry) => entry.row.id)]);
