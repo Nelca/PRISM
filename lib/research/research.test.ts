@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { ceAirImpact, esvdAreaIllustration, ifviVisibility, observationRate, pollinationScenario } from "./calculations";
+import { ceAirImpact, esvdAreaIllustration, observationRate, pollinationScenario } from "./calculations";
 import { DEFAULT_POLLINATION, syntheticTargets } from "./samples";
 import { editableTargetCsv, parseTargetCsv } from "@/lib/environment/csv";
 import { researchEnabled } from "./access";
@@ -16,7 +16,7 @@ describe("研究データの出典と計算", () => {
     expect(new Set(esvd.map((row) => row.row)).size).toBe(esvd.length);
     expect(esvd.find((row) => row.id === "2560009")?.value).toBe(21811.7405774258);
   });
-  it("CEのkgとIFVI部分試算のt、価格年・地域を混ぜない", () => {
+  it("CEのkg・価格年・地域を混ぜない", () => {
     const impact = ceAirImpact("SO2", 100, "EU27");
     expect(impact.lower).toBeCloseTo(1690);
     expect(impact.central).toBe(2660);
@@ -24,8 +24,7 @@ describe("研究データの出典と計算", () => {
     expect(impact.unit).toBe("EUR2021");
     expect(() => ceAirImpact("SO2", 100, "JP")).toThrow();
     expect(() => ceAirImpact("PM2.5", 100, "EU27")).toThrow();
-    expect(ifviVisibility("SO2", 1)).toBe(10.43);
-    expect(() => ifviVisibility("SO2", -1)).toThrow();
+    expect(() => ceAirImpact("SO2", -1, "EU27")).toThrow();
   });
   it("送粉売上減少の仮説と追加費用・開始時支出を分ける", () => {
     const result = pollinationScenario(DEFAULT_POLLINATION);

@@ -1,5 +1,3 @@
-import { applyTargetUpdate } from "@/lib/environment/projection";
-import type { EnvironmentalTarget } from "@/lib/environment/metrics";
 /**
  * ユーザー操作の「現在値」。追記されたイベント列(interaction_event)を畳み込んで得る射影であり、
  * それ自体を保存しない(承認済み計画のB-1)。
@@ -11,6 +9,8 @@ import type { EnvironmentalTarget } from "@/lib/environment/metrics";
 import type { BindingMechanism, BindingMechanismChangeEntry, CountermeasureType } from "@core/types/decision";
 import type { ValueConcept } from "@core/types/common";
 import type { DisclosureClaim } from "@core/types/disclosure";
+import { applyTargetUpdate } from "@/lib/environment/projection";
+import type { EnvironmentalTarget } from "@/lib/environment/metrics";
 
 export interface BindingMechanismState {
   mechanism: BindingMechanism;

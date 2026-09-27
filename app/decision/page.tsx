@@ -1,4 +1,3 @@
-import { ResourceDecisions } from "./resource-decisions";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { listConfirmedDecisionSnapshots } from "@/lib/db/repositories/decision-counts";
@@ -16,6 +15,7 @@ import { BindingForm } from "./binding-form";
 import { DecisionParametersForm } from "./parameters-form";
 import { PipelineWarnings } from "../components/pipeline-warnings";
 import { DeferredDecisions } from "./deferred-decisions";
+import { ResourceDecisions } from "./resource-decisions";
 import { SectionNav } from "../components/section-nav";
 
 export const metadata: Metadata = {
@@ -70,7 +70,7 @@ export default async function DecisionPage({
           </div>
           <ScreenLead>拠点ごとに対策と投資の承認ラインを設定し、自然コストを織り込むと結論が変わるか確認します。</ScreenLead>
         </div>
-        <ResourceDecisions records={[...interactions.environmentalTargets.values()]} siteNames={siteNameById} decisions={decisions.map((entry) => entry.decision.decisionRecord)} />
+        <ResourceDecisions records={[...interactions.environmentalTargets.values()]} siteNames={siteNameById} decisions={[]} />
         <DeferredDecisions sites={result.deferredDecisions} />
         {/* 空状態の3点セット(指示11):いま何がない/なぜないか/どこで何をするか+リンク */}
         <Card title="対策案を比較する対象がまだありません">
@@ -102,7 +102,7 @@ export default async function DecisionPage({
     const alerts = reassessmentAlerts.filter((alert) => alert.decisionRecordId === record.id);
     const remaining: string[] = [];
     if (record.verdict === "pending") remaining.push("承認ラインの入力");
-    if (!interactions.bindingMechanismState.has(entry.siteId)) remaining.push("反映先の決定");
+    if (!entry.bindingConfirmed) remaining.push("反映先の決定");
     if (alerts.some((alert) => alert.level === "verdict_changed")) remaining.push("判定の見直し");
     return {
       ...entry,
@@ -137,7 +137,11 @@ export default async function DecisionPage({
         </GuideBox>}
       </div>
 
-      <ResourceDecisions records={[...interactions.environmentalTargets.values()].filter((record) => !detailOnly || record.siteId === openSiteId)} siteNames={siteNameById} decisions={decisions.map((entry) => entry.decision.decisionRecord)} />
+      <ResourceDecisions
+        records={[...interactions.environmentalTargets.values()].filter((record) => !detailOnly || record.siteId === openSiteId)}
+        siteNames={siteNameById}
+        decisions={decisions.map((entry) => entry.decision.decisionRecord)}
+      />
 
       {!detailOnly && <DeferredDecisions sites={result.deferredDecisions} />}
 
@@ -162,8 +166,6 @@ export default async function DecisionPage({
       )}
 
       {!detailOnly && <>
-
-      {/* D-01-3:保存済みの操作のうち、今回の計算に反映できなかったものを黙って捨てない。 */}
 
       {/* D-11-1:残タスクの頭出し(最下部までスクロールしなくても見える)。 */}
       <TaskBanner current="/decision" result={result} />
@@ -220,7 +222,7 @@ export default async function DecisionPage({
                   </Tag>
                 </td>
                 <td>{row.selectedLabel}</td>
-                <td style={{ fontSize: 12 }}>{interactions.bindingMechanismState.has(row.siteId) ? bindingLabel(row.record.bindingMechanism.kind) : "未選択"}</td>
+                <td style={{ fontSize: 12 }}>{row.bindingConfirmed ? bindingLabel(row.record.bindingMechanism.kind) : "未選択"}</td>
                 <td style={{ fontSize: 12 }}>{row.remaining.length > 0 ? row.remaining.join("・") : "—"}</td>
                 <td>
                   <Link
@@ -237,6 +239,7 @@ export default async function DecisionPage({
       </Card>
       </>}
 
+      {/* D-01-3:保存済みの操作のうち、今回の計算に反映できなかったものを黙って捨てない(拠点別詳細でも表示する)。 */}
       <PipelineWarnings warnings={result.warnings} screen="/decision" />
 
       {/*
@@ -247,7 +250,7 @@ export default async function DecisionPage({
       */}
       {detailOnly && siteRows
         .filter((row) => row.siteId === openSiteId)
-        .map(({ siteId, decision, countermeasureCandidates, selectedCountermeasureKey, alerts }) => {
+        .map(({ siteId, decision, countermeasureCandidates, selectedCountermeasureKey, alerts, bindingConfirmed }) => {
         const record = decision.decisionRecord;
         const threshold = record.approvalThreshold === "pending" ? null : (record.approvalThreshold.value);
         const meaningSentence = verdictMeaningSentence(record);
@@ -320,7 +323,7 @@ export default async function DecisionPage({
                       // 生値(weak_reference 等)ではなくBindingFormと同じ日本語ラベルを出す(指示06)。
                       // 文なので、数値用の等幅20pxではなく本文サイズで表示する。
                       <span style={{ fontFamily: "var(--font-body)", fontSize: 13.5, lineHeight: 1.5 }}>
-                        {interactions.bindingMechanismState.has(siteId) ? bindingLabel(record.bindingMechanism.kind) : "未選択"}
+                        {bindingConfirmed ? bindingLabel(record.bindingMechanism.kind) : "未選択"}
                       </span>
                     }
                   />

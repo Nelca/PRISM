@@ -71,6 +71,8 @@ export function countProgress(result: DemoPipelineResult): ProgressCounts {
 
 export function deriveStepProgress(result: DemoPipelineResult): StepProgress[] {
   const counts = countProgress(result);
+  const bindingRecorded = result.decisions.filter((entry) => entry.bindingConfirmed).length;
+  const deferred = result.deferredDecisions.length;
   return [
     { order: 1, href: "/sites", label: "拠点データの登録", note: `拠点${counts.siteCount}件`, done: counts.siteCount > 0 },
     {
@@ -105,9 +107,11 @@ export function deriveStepProgress(result: DemoPipelineResult): StepProgress[] {
       label: "対策と判定",
       note:
         counts.decisionCount > 0
-          ? `判定確定 ${counts.confirmed}/${counts.decisionCount}件・反映先記録 ${result.decisions.filter((entry) => entry.bindingConfirmed).length}/${counts.decisionCount}件${result.deferredDecisions.length > 0 ? `・投資前提待ち${result.deferredDecisions.length}拠点` : ""}`
+          ? `判定確定 ${counts.confirmed}/${counts.decisionCount}件・反映先記録 ${bindingRecorded}/${counts.decisionCount}件` +
+            (deferred > 0 ? `・投資前提待ち${deferred}拠点` : "")
           : "判定対象がまだありません",
-      done: counts.decisionCount > 0 && counts.confirmed === counts.decisionCount && result.deferredDecisions.length === 0 && result.decisions.every((entry) => entry.bindingConfirmed),
+      // 判定の確定に加え、反映先の明示選択と投資前提の入力が揃って完了とする。
+      done: counts.decisionCount > 0 && counts.confirmed === counts.decisionCount && bindingRecorded === counts.decisionCount && deferred === 0,
     },
     {
       order: 6,

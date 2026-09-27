@@ -26,7 +26,7 @@ import { persistComputedRun, loadCategoryExpansion } from "./execute-run";
 import { getDb } from "@/lib/db/client";
 import type { DbTransaction } from "@/lib/db/client";
 import { sql } from "drizzle-orm";
-import { SITE_ROWS } from "@/lib/demo/company";
+import { allSiteRows } from "@/lib/demo/company";
 import type { CategoryExpansionRuntime } from "./category-expansion-runtime";
 
 export interface TryRunInput {
@@ -48,7 +48,10 @@ export interface TryRunInput {
    * 内部IDや例外文言を含めない、利用者の言葉で書く。
    */
   label: string;
-  /** Validate cross-record references against the locked, recomputed result before writing. */
+  /**
+   * 書込直前に、ロック下で再計算した結果に対して追加の整合性を検証する(例外で保存を中止)。
+   * 画面で確認した投資案件・開示主張が、確認後に変わっていないかの照合などに使う。
+   */
   validateResult?: (result: ReturnType<typeof runDemoPipeline>) => void;
 }
 
@@ -71,7 +74,7 @@ function runWithExpansion(
   interactions: ReturnType<typeof projectInteractionState>,
   expansion: CategoryExpansionRuntime
 ) {
-  const validSiteIds = new Set([...SITE_ROWS.map((site) => site.id), ...userSites.map((entry) => entry.row.id)]);
+  const validSiteIds = new Set(allSiteRows(userSites).map((site) => site.id));
   const orphan = expansion.activeMaterialIssueTargets.find((target) => !validSiteIds.has(target.siteId));
   if (orphan) throw new Error(`有効な物理入力が存在しない拠点を参照しています: ${orphan.siteId}`);
   return runDemoPipeline({

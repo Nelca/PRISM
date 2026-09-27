@@ -1,28 +1,156 @@
 "use client";
+
 import { useState } from "react";
-import { applicableFactors, allowedInputUnits, calculateGvfd, commonLocation, GVFD_GUIDANCE, GVFD_TOPICS, locationsFor, quantityUnit, type GvfdDataset, type GvfdFactor, type GvfdTopic } from "@/lib/research/gvfd";
+import {
+  GVFD_GUIDANCE,
+  GVFD_TOPICS,
+  allowedInputUnits,
+  applicableFactors,
+  calculateGvfd,
+  commonLocation,
+  locationsFor,
+  quantityUnit,
+  type GvfdDataset,
+  type GvfdFactor,
+  type GvfdTopic,
+} from "@/lib/research/gvfd";
+import { formatExactNumber } from "../../components/numeric";
 import { TextExport } from "../../components/text-export";
-type SourceTarget = { id: string; revision: string; site: string; label: string; unit: string; current: number | null; target: number | null; year: number; boundary: string; evidence: string };
-const fmt = (value: number) => new Intl.NumberFormat("ja-JP", { maximumSignificantDigits: 10 }).format(value);
-const labels: Record<string, string> = { Urban: "都市", "Peri-Urban": "都市近郊", Rural: "農村", Transport: "輸送", Landfill: "埋立", Incineration: "焼却", Unspecified: "不明（原本の既定条件）", Freshwater: "淡水", Seawater: "海水", Hazardous: "有害廃棄物", "Non-Hazardous": "非有害廃棄物", "Primary Health": "一次健康影響", "Secondary Health": "二次健康影響", Visibility: "視程低下", Agriculture: "農業", Leachate: "浸出水", "Waste GHGs": "廃棄物由来GHG", Disamenity: "不快影響", "Waste Air pollution": "廃棄物由来大気汚染", "Heavy metals and dioxins": "重金属・ダイオキシン", Malnutrition: "栄養失調", "Water-borne disease": "水系感染症", "Resource cost": "資源費用", "Ecosystem services": "生態系サービス", "Lost Ecosystem Services": "生態系サービスの損失", Eutrophication: "富栄養化", Health: "健康影響" };
-const label = (value: string) => commonLocation(value) ? "共通（追加条件なし）" : labels[value] ? `${labels[value]}（${value}）` : value;
-export function GvfdCalculator({ factors, topic, geography, source, target }: { factors: GvfdFactor[]; topic: GvfdTopic; geography: string; source: GvfdDataset["source"]; target: SourceTarget | null }) {
+
+/** 統合管理から引き継いだ指標(計算記録に管理ID・版・根拠を残す)。 */
+export interface SourceTarget {
+  id: string;
+  revision: string;
+  site: string;
+  label: string;
+  unit: string;
+  current: number | null;
+  target: number | null;
+  year: number;
+  boundary: string;
+  evidence: string;
+}
+
+type GvfdResult = ReturnType<typeof calculateGvfd>;
+
+/** 原本の英語の条件名・成分名に日本語を添える。 */
+const LABELS: Record<string, string> = {
+  Urban: "都市",
+  "Peri-Urban": "都市近郊",
+  Rural: "農村",
+  Transport: "輸送",
+  Landfill: "埋立",
+  Incineration: "焼却",
+  Unspecified: "不明（原本の既定条件）",
+  Freshwater: "淡水",
+  Seawater: "海水",
+  Hazardous: "有害廃棄物",
+  "Non-Hazardous": "非有害廃棄物",
+  "Primary Health": "一次健康影響",
+  "Secondary Health": "二次健康影響",
+  Visibility: "視程低下",
+  Agriculture: "農業",
+  Leachate: "浸出水",
+  "Waste GHGs": "廃棄物由来GHG",
+  Disamenity: "不快影響",
+  "Waste Air pollution": "廃棄物由来大気汚染",
+  "Heavy metals and dioxins": "重金属・ダイオキシン",
+  Malnutrition: "栄養失調",
+  "Water-borne disease": "水系感染症",
+  "Resource cost": "資源費用",
+  "Ecosystem services": "生態系サービス",
+  "Lost Ecosystem Services": "生態系サービスの損失",
+  Eutrophication: "富栄養化",
+  Health: "健康影響",
+};
+
+function label(value: string): string {
+  if (commonLocation(value)) return "共通（追加条件なし）";
+  return LABELS[value] ? `${LABELS[value]}（${value}）` : value;
+}
+
+/** 選択肢が1つだけなら最初から選んでおく。 */
+function onlyOption(options: string[]): string {
+  return options.length === 1 ? options[0] : "";
+}
+
+function exportText(input: {
+  result: GvfdResult;
+  after: GvfdResult | null;
+  source: GvfdDataset["source"];
+  topic: GvfdTopic;
+  geography: string;
+  category: string;
+  location: string;
+  year: number;
+  unit: string;
+  current: string;
+  alternative: string;
+  evidence: string;
+  target: SourceTarget | null;
+}): string {
+  const { result, after, source, topic, target } = input;
+  const comparison = after
+    ? `比較入力: ${input.alternative} ${input.unit} / 影響額: ${after.total} ${after.currency}${after.priceYear}\n` +
+      `現状−比較（正なら減少）: ${result.total - after.total} ${result.currency}${result.priceYear}`
+    : "比較数量: 未入力";
+  const origin = target
+    ? `引継ぎ元: ${target.site} / ${target.label} / ${target.year}年 / ${target.boundary}\n` +
+      `管理ID: ${target.id} / 版: ${target.revision}\n` +
+      `元の実測: ${target.current ?? "未入力"} ${target.unit} / 元の目標: ${target.target ?? "未入力"} ${target.unit}\n` +
+      `元の根拠: ${target.evidence}`
+    : "引継ぎ元: 手入力";
+  return [
+    `研究用環境影響算定 / IFVI GVFD ${source.version} (${source.versionDate})`,
+    `対象年: ${input.year} / 対象: ${GVFD_TOPICS[topic]} (${topic}) / 地域: ${input.geography}`,
+    `物質・用途: ${input.category} / 条件: ${input.location}`,
+    `現状入力: ${input.current} ${input.unit} / 係数単位への換算後: ${result.convertedQuantity} ${result.unit}`,
+    `収録成分の影響額: ${result.total} ${result.currency}${result.priceYear}`,
+    comparison,
+    "影響成分と係数:",
+    ...result.components.map(
+      (row) =>
+        `${row.impact}: 係数 ${row.value} ${row.sourceUnit} / 現状影響 ${row.amount} ${row.currency}${row.priceYear} / '${source.sheet}'!${row.cell} / ${row.status} / 更新 ${row.updatedOn}`
+    ),
+    origin,
+    `今回の入力・適用根拠: ${input.evidence || "未記入"}`,
+    GVFD_GUIDANCE[topic],
+    "原本に収録された成分の合計であり、環境影響の全てを網羅するとは限りません。社会への影響額であり、企業の現金支出・利益や投資NPVではありません。他の算定へ自動合算しません。",
+    `原本: ${source.workbookName}\n${source.url}\n取得日: ${source.acquiredOn}\nSHA-256: ${source.workbookSha256}`,
+  ].join("\n");
+}
+
+export function GvfdCalculator({
+  factors,
+  topic,
+  geography,
+  source,
+  target,
+}: {
+  factors: GvfdFactor[];
+  topic: GvfdTopic;
+  geography: string;
+  source: GvfdDataset["source"];
+  target: SourceTarget | null;
+}) {
   const categories = [...new Set(factors.map((factor) => factor.category))];
-  const initialCategory = categories.length === 1 ? categories[0] : "";
-  const initialLocations = locationsFor(factors, initialCategory);
-  const [category, setCategory] = useState(initialCategory);
-  const [location, setLocation] = useState(initialLocations.length === 1 ? initialLocations[0] : "");
+  const [category, setCategory] = useState(onlyOption(categories));
+  const [location, setLocation] = useState(onlyOption(locationsFor(factors, onlyOption(categories))));
   const locations = locationsFor(factors, category);
   const selected = category && location ? applicableFactors(factors, category, location) : [];
+  const missingFactor = selected.some((row) => row.value === null);
   const units = allowedInputUnits(factors[0].sourceUnit);
   const [unit, setUnit] = useState(target && units.includes(target.unit) ? target.unit : units[0]);
   const [current, setCurrent] = useState(target?.current?.toString() ?? "");
   const [alternative, setAlternative] = useState(target?.target?.toString() ?? "");
-  const [output, setOutput] = useState<ReturnType<typeof calculateGvfd> | null>(null);
-  const [comparison, setComparison] = useState<ReturnType<typeof calculateGvfd> | null>(null);
-  const [exportText, setExportText] = useState("");
+  const [output, setOutput] = useState<{ result: GvfdResult; after: GvfdResult | null; text: string } | null>(null);
   const [error, setError] = useState("");
-  const reset = () => { setOutput(null); setComparison(null); setExportText(""); setError(""); };
+  // 入力を変えたら古い結果を消し、再計算を求める。
+  const reset = () => {
+    setOutput(null);
+    setError("");
+  };
+
   function calculate(form: FormData) {
     reset();
     try {
@@ -31,42 +159,148 @@ export function GvfdCalculator({ factors, topic, geography, source, target }: { 
       const year = Number(form.get("year"));
       if (!Number.isInteger(year) || year < 1900 || year > 2200) throw new Error("対象年を1900〜2200で入力してください。");
       const result = calculateGvfd(factors, category, location, Number(current), unit);
+      // 比較の空欄は「比較なし」、0は数量ゼロとして計算する。
       const after = alternative.trim() ? calculateGvfd(factors, category, location, Number(alternative), unit) : null;
-      const text = [
-        `研究用環境影響算定 / IFVI GVFD ${source.version} (${source.versionDate})`,
-        `対象年: ${year} / 対象: ${GVFD_TOPICS[topic]} (${topic}) / 地域: ${geography}`,
-        `物質・用途: ${category} / 条件: ${location}`,
-        `現状入力: ${current} ${unit} / 係数単位への換算後: ${result.convertedQuantity} ${result.unit}`,
-        `収録成分の影響額: ${result.total} ${result.currency}${result.priceYear}`,
-        after ? `比較入力: ${alternative} ${unit} / 影響額: ${after.total} ${after.currency}${after.priceYear}\n現状−比較（正なら減少）: ${result.total - after.total} USD2023` : "比較数量: 未入力",
-        "影響成分と係数:", ...result.components.map((row) => `${row.impact}: 係数 ${row.value} ${row.sourceUnit} / 現状影響 ${row.amount} USD2023 / '${source.sheet}'!${row.cell} / ${row.status} / 更新 ${row.updatedOn}`),
-        target ? `引継ぎ元: ${target.site} / ${target.label} / ${target.year}年 / ${target.boundary}\n管理ID: ${target.id} / 版: ${target.revision}\n元の実測: ${target.current ?? "未入力"} ${target.unit} / 元の目標: ${target.target ?? "未入力"} ${target.unit}\n元の根拠: ${target.evidence}` : "引継ぎ元: 手入力",
-        `今回の入力・適用根拠: ${String(form.get("evidence") ?? "").trim() || "未記入"}`,
-        GVFD_GUIDANCE[topic],
-        "原本に収録された成分の合計であり、環境影響の全てを網羅するとは限りません。社会への影響額であり、企業の現金支出・利益や投資NPVではありません。他の算定へ自動合算しません。",
-        `原本: ${source.workbookName}\n${source.url}\n取得日: ${source.acquiredOn}\nSHA-256: ${source.workbookSha256}`,
-      ].join("\n");
-      setOutput(result); setComparison(after); setExportText(text);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "入力を確認してください。"); }
+      const evidence = String(form.get("evidence") ?? "").trim();
+      const text = exportText({ result, after, source, topic, geography, category, location, year, unit, current, alternative, evidence, target });
+      setOutput({ result, after, text });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "入力を確認してください。");
+    }
   }
-  return <>
-    <p>{GVFD_GUIDANCE[topic]}</p>
-    {target && <p>統合管理の「{target.site} · {target.label} · {target.year}年」から実測値と目標値を引き継ぎました。範囲：{target.boundary}。ここで数量を変えても、元の指標は更新されません。</p>}
-    <form className="target-form" onSubmit={(event) => { event.preventDefault(); calculate(new FormData(event.currentTarget)); }} onChange={reset}>
-      <div className="field-row"><div className="field"><label htmlFor="gvfd-category">物質・用途・廃棄物の種類</label><select id="gvfd-category" required value={category} onChange={(event) => { const next = event.target.value; setCategory(next); const nextLocations = locationsFor(factors, next); setLocation(nextLocations.length === 1 ? nextLocations[0] : ""); }}><option value="">対象を選択</option>{categories.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></div>
-      <div className="field"><label htmlFor="gvfd-location">排出先・処理方法・適用条件</label><select id="gvfd-location" required value={location} disabled={!category} onChange={(event) => setLocation(event.target.value)}><option value="">条件を選択</option>{locations.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></div></div>
-      {selected.length > 0 && <div className="portfolio-table-scroll"><table className="data-table"><caption>使用する係数（2023年USD / {quantityUnit(selected[0].sourceUnit)}）</caption><thead><tr><th>影響成分</th><th>係数</th><th>原本セル</th></tr></thead><tbody>{selected.map((factor) => <tr key={factor.cell}><td>{label(factor.impact)}</td><td>{factor.value === null ? "未収録" : fmt(factor.value)}</td><td>{factor.cell}</td></tr>)}</tbody></table></div>}
-      {selected.some((row) => row.value === null) && <p role="status">この条件には未収録の係数があります。算定できません。</p>}
-      <div className="field-row"><div className="field"><label htmlFor="gvfd-year">対象年</label><input id="gvfd-year" name="year" type="number" required min="1900" max="2200" step="1" defaultValue={target?.year ?? ""} /></div>
-      <div className="field"><label htmlFor="gvfd-unit">入力する数量の単位</label><select id="gvfd-unit" value={unit} onChange={(event) => { setUnit(event.target.value); setCurrent(""); setAlternative(""); }}>{units.map((value) => <option key={value}>{value}</option>)}</select><p className="field-hint">単位を変更した場合は数量を入れ直してください。</p></div>
-      <div className="field"><label htmlFor="gvfd-current">実測値・現状の数量</label><input id="gvfd-current" type="number" min="0" step="any" required value={current} onChange={(event) => setCurrent(event.target.value)} /></div>
-      <div className="field"><label htmlFor="gvfd-alternative">目標・比較する数量（任意）</label><input id="gvfd-alternative" type="number" min="0" step="any" value={alternative} onChange={(event) => setAlternative(event.target.value)} /></div></div>
-      <p className="field-hint">比較には同じ地域・物質・条件の係数を使用します。0は数量ゼロ、空欄は比較なしとして扱います。</p>
-      <div className="field"><label htmlFor="gvfd-evidence">数量と適用条件の根拠（任意）</label><textarea id="gvfd-evidence" name="evidence" rows={2} maxLength={4000} placeholder="対象期間、測定方法、排出先や処理方法を確認した資料など" /></div>
-      <label><input name="confirmed" type="checkbox" required /> 表示された国・地域、物質・用途、適用条件と数量の対応を確認しました</label>
-      {error && <p role="alert" className="form-error">{error}</p>}
-      <button className="pill-btn pill-btn--accent" disabled={!selected.length || selected.some((row) => row.value === null)}>環境影響を算定する</button>
-    </form>
-    {output && <section aria-label="GVFD算定結果"><h3>収録成分の影響額</h3><div className="portfolio-detail-values"><div><span>現状</span><strong>{fmt(output.total)} USD2023</strong></div>{comparison && <><div><span>目標・比較</span><strong>{fmt(comparison.total)} USD2023</strong></div><div><span>{output.total >= comparison.total ? "影響額の減少" : "影響額の増加"}</span><strong>{fmt(Math.abs(output.total - comparison.total))} USD2023</strong></div></>}</div><p>社会への影響を2023年価格の米ドルで表示しています。企業の支払額・利益ではありません。</p><TextExport text={exportText} filename="prism-gvfd-result.txt" /><details className="foldout"><summary>計算の内訳・入力・出典</summary><pre className="draft-text">{exportText}</pre></details></section>}
-  </>;
+
+  return (
+    <>
+      <p>{GVFD_GUIDANCE[topic]}</p>
+      {target && (
+        <p>
+          統合管理の「{target.site} · {target.label} · {target.year}年」から実測値と目標値を引き継ぎました。範囲：{target.boundary}。ここで数量を変えても、元の指標は更新されません。
+        </p>
+      )}
+      <form
+        className="target-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          calculate(new FormData(event.currentTarget));
+        }}
+        onChange={reset}
+      >
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor="gvfd-category">物質・用途・廃棄物の種類</label>
+            <select
+              id="gvfd-category"
+              required
+              value={category}
+              onChange={(event) => {
+                setCategory(event.target.value);
+                setLocation(onlyOption(locationsFor(factors, event.target.value)));
+              }}
+            >
+              <option value="">対象を選択</option>
+              {categories.map((value) => <option key={value} value={value}>{label(value)}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="gvfd-location">排出先・処理方法・適用条件</label>
+            <select id="gvfd-location" required value={location} disabled={!category} onChange={(event) => setLocation(event.target.value)}>
+              <option value="">条件を選択</option>
+              {locations.map((value) => <option key={value} value={value}>{label(value)}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {selected.length > 0 && (
+          <div className="portfolio-table-scroll">
+            <table className="data-table">
+              <caption>使用する係数（2023年USD / {quantityUnit(selected[0].sourceUnit)}）</caption>
+              <thead>
+                <tr><th>影響成分</th><th>係数</th><th>原本セル</th></tr>
+              </thead>
+              <tbody>
+                {selected.map((factor) => (
+                  <tr key={factor.cell}>
+                    <td>{label(factor.impact)}</td>
+                    <td>{factor.value === null ? "未収録" : formatExactNumber(factor.value)}</td>
+                    <td>{factor.cell}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {missingFactor && <p role="status">この条件には未収録の係数があります。算定できません。</p>}
+
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor="gvfd-year">対象年</label>
+            <input id="gvfd-year" name="year" type="number" required min="1900" max="2200" step="1" defaultValue={target?.year ?? ""} />
+          </div>
+          <div className="field">
+            <label htmlFor="gvfd-unit">入力する数量の単位</label>
+            <select
+              id="gvfd-unit"
+              value={unit}
+              onChange={(event) => {
+                // t↔kg の1000倍の読み違いを防ぐため、単位を変えたら数量を入れ直してもらう。
+                setUnit(event.target.value);
+                setCurrent("");
+                setAlternative("");
+              }}
+            >
+              {units.map((value) => <option key={value}>{value}</option>)}
+            </select>
+            <p className="field-hint">単位を変更した場合は数量を入れ直してください。</p>
+          </div>
+          <div className="field">
+            <label htmlFor="gvfd-current">実測値・現状の数量</label>
+            <input id="gvfd-current" type="number" min="0" step="any" required value={current} onChange={(event) => setCurrent(event.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="gvfd-alternative">目標・比較する数量（任意）</label>
+            <input id="gvfd-alternative" type="number" min="0" step="any" value={alternative} onChange={(event) => setAlternative(event.target.value)} />
+          </div>
+        </div>
+        <p className="field-hint">比較には同じ地域・物質・条件の係数を使用します。0は数量ゼロ、空欄は比較なしとして扱います。</p>
+        <div className="field">
+          <label htmlFor="gvfd-evidence">数量と適用条件の根拠（任意）</label>
+          <textarea id="gvfd-evidence" name="evidence" rows={2} maxLength={4000} placeholder="対象期間、測定方法、排出先や処理方法を確認した資料など" />
+        </div>
+        <label>
+          <input name="confirmed" type="checkbox" required /> 表示された国・地域、物質・用途、適用条件と数量の対応を確認しました
+        </label>
+        {error && <p role="alert" className="form-error">{error}</p>}
+        <button className="pill-btn pill-btn--accent" disabled={!selected.length || missingFactor}>環境影響を算定する</button>
+      </form>
+
+      {output && <GvfdResultView result={output.result} after={output.after} text={output.text} />}
+    </>
+  );
+}
+
+function GvfdResultView({ result, after, text }: { result: GvfdResult; after: GvfdResult | null; text: string }) {
+  const unit = `${result.currency}${result.priceYear}`;
+  return (
+    <section aria-label="GVFD算定結果">
+      <h3>収録成分の影響額</h3>
+      <div className="portfolio-detail-values">
+        <div><span>現状</span><strong>{formatExactNumber(result.total)} {unit}</strong></div>
+        {after && (
+          <>
+            <div><span>目標・比較</span><strong>{formatExactNumber(after.total)} {unit}</strong></div>
+            <div>
+              <span>{result.total >= after.total ? "影響額の減少" : "影響額の増加"}</span>
+              <strong>{formatExactNumber(Math.abs(result.total - after.total))} {unit}</strong>
+            </div>
+          </>
+        )}
+      </div>
+      <p>社会への影響を2023年価格の米ドルで表示しています。企業の支払額・利益ではありません。</p>
+      <TextExport text={text} filename="prism-gvfd-result.txt" copyLabel="計算記録をコピー" />
+      <details className="foldout">
+        <summary>計算の内訳・入力・出典</summary>
+        <pre className="draft-text">{text}</pre>
+      </details>
+    </section>
+  );
 }

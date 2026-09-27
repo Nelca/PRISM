@@ -1,5 +1,5 @@
 import type { UserSiteDeepDiveParams } from "@/lib/demo/site-entry";
-import { parseRequiredNumber } from "@/lib/forms/number";
+import { parseOptionalNumber, parseRequiredNumber } from "@/lib/forms/number";
 import type { SiteRow } from "@core/site/ingest";
 import type { SiteType } from "@core/types/site";
 import { industrySectorLabel, siteTypeLabel } from "../components/labels";
@@ -11,10 +11,6 @@ export interface ParsedSiteForm {
 
 const VALID_SITE_TYPES: SiteType[] = ["own_site", "supplier_site"];
 const VALID_DIRECT_CATEGORIES = ["water", "climate"] as const;
-
-function optionalNumber(raw: FormDataEntryValue | null, label: string, min?: number) {
-  return String(raw ?? "").trim() === "" ? { value: null } : parseRequiredNumber(raw, { label, min });
-}
 
 export function parseSiteForm(
   formData: FormData,
@@ -32,18 +28,19 @@ export function parseSiteForm(
     return { error: "評価する環境データを選択してください。" };
   }
 
-  const unit = String(formData.get("unit") ?? "").trim() || (category === "climate" ? "tCO2e" : "m3");
-  if (unit !== (category === "climate" ? "tCO2e" : "m3")) return { error: "単位は水がm3、GHGがtCO2eです。換算して入力してください。" };
+  // 単位の自動換算はしない。水はm3、GHGはtCO2eに限る。
+  const expectedUnit = category === "climate" ? "tCO2e" : "m3";
+  const unit = String(formData.get("unit") ?? "").trim() || expectedUnit;
+  if (unit !== expectedUnit) return { error: "単位は水がm3、GHGがtCO2eです。換算して入力してください。" };
 
   const fields = {
     physicalQuantity: parseRequiredNumber(formData.get("physicalQuantity"), { label: "年間の環境データ量", min: 0 }),
     unitReplacementCost: parseRequiredNumber(formData.get("unitReplacementCost"), { label: "コスト単価", min: 0 }),
-    investmentCostInitial: optionalNumber(formData.get("investmentCostInitial"), "初期投資額", 0),
-    investmentCostRecurring: optionalNumber(formData.get("investmentCostRecurring"), "年間の継続費用", 0),
-    baselineNpvValue: optionalNumber(formData.get("baselineNpvValue"), "自然コスト反映前のNPV"),
-    approvalThresholdValue: String(formData.get("approvalThresholdValue") ?? "").trim() === ""
-      ? { value: null }
-      : parseRequiredNumber(formData.get("approvalThresholdValue"), { label: "投資の承認ライン" }),
+    // 投資の前提は後から追加できる。空欄は推定せず null(未入力)、0は明示的なゼロとして保存する。
+    investmentCostInitial: parseOptionalNumber(formData.get("investmentCostInitial"), { label: "初期投資額", min: 0 }),
+    investmentCostRecurring: parseOptionalNumber(formData.get("investmentCostRecurring"), { label: "年間の継続費用", min: 0 }),
+    baselineNpvValue: parseOptionalNumber(formData.get("baselineNpvValue"), { label: "自然コスト反映前のNPV" }),
+    approvalThresholdValue: parseOptionalNumber(formData.get("approvalThresholdValue"), { label: "投資の承認ライン" }),
   };
   if ("error" in fields.physicalQuantity) return fields.physicalQuantity;
   if ("error" in fields.unitReplacementCost) return fields.unitReplacementCost;

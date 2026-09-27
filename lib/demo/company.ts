@@ -53,6 +53,11 @@ import type { DisclosureClaim } from "@core/types/disclosure";
 
 export const COMPANY_NAME = "東海化成株式会社(架空)";
 
+/** デモ既定の拠点と、利用者が登録した拠点を合わせた一覧(パイプラインが評価する全拠点)。 */
+export function allSiteRows(userSites: { row: SiteRow }[]): SiteRow[] {
+  return [...SITE_ROWS, ...userSites.map((entry) => entry.row)];
+}
+
 export const SITE_ROWS: SiteRow[] = [
   { id: "site-042", name: "本社工場", siteType: "own_site", industrySector: "chemicals", lat: 35.1, lng: 136.9 },
   { id: "site-050", name: "金属加工工場", siteType: "own_site", industrySector: "steel", lat: 34.7, lng: 135.5 },

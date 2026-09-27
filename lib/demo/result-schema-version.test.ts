@@ -33,8 +33,8 @@ const BASE: DecompositionVersions = {
 };
 
 describe("T-14 保存・版管理・後方互換", () => {
-  it("結果構造の版は 11(M4を新エンジンへ切り替えたため上げた)", () => {
-    expect(RESULT_SCHEMA_VERSION).toBe(16);
+  it("結果構造の版は 17(保存済みrunを再計算させる変更のたびに上げる)", () => {
+    expect(RESULT_SCHEMA_VERSION).toBe(17);
   });
 
   it("同じ版からは同じ再計算ハッシュが出る", () => {

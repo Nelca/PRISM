@@ -56,6 +56,16 @@ function formatYenExact(value: number): string {
   return `${new Intl.NumberFormat("ja-JP").format(Math.round(value))}円`;
 }
 
+/** 利用者が入力した物理量・金額を丸めずに(有効数字10桁まで)桁区切りで表示する。 */
+export function formatExactNumber(value: number): string {
+  return new Intl.NumberFormat("ja-JP", { maximumSignificantDigits: 10 }).format(value);
+}
+
+/** 未入力(null)をゼロと区別して表示する。 */
+export function formatQuantity(value: number | null, unit: string): string {
+  return value === null ? "未入力" : `${formatExactNumber(value)} ${unit}`;
+}
+
 /**
  * 金額レンジの表示(2026-08-23レビュー第3回:単位混在の解消)。
  *

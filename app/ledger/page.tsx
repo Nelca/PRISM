@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { formatJstDateTime } from "@/lib/datetime";
 import { loadLedgerView } from "@/lib/views/pipeline";
 import { recalculateWithPriorParameters } from "@core/ledger/recalculate-with-prior-parameters";
 import { Mono, Num, pickYenScale } from "../components/numeric";
@@ -177,7 +178,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
                 result.actionLog.map((entry, i) => (
                   <tr key={i}>
                     <td className="num" style={{ fontSize: 11 }}>
-                      {new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", dateStyle: "short", timeStyle: "short" }).format(new Date(entry.date))}
+                      {formatJstDateTime(entry.date)}
                     </td>
                     <td>{entry.who}</td>
                     {/* 第4版 D-03:古い記録に残る手法IDは、記録を書き換えず表示時だけ読める名前にする。 */}

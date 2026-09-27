@@ -454,7 +454,11 @@ export function runDemoPipeline(input: RunPipelineInput = defaultRunPipelineInpu
     return primaryMaterialIssueId ? [{ siteId, materialIssueId: primaryMaterialIssueId, materialIssueIds }] : [];
   });
 
-  const deferredDecisions = userSiteEntries.filter((entry) => !hasDecisionInputs(entry.deepDive))
+  // 投資の前提を入力すれば判定できる拠点(=判定対象)だけを「前提待ち」として示す。
+  // 詳細評価に進んでいない拠点は、前提を入力しても判定が生まれないため含めない。
+  const decisionTargetSiteIds = new Set(decisionTargets.map((target) => target.siteId));
+  const deferredDecisions = userSiteEntries
+    .filter((entry) => decisionTargetSiteIds.has(entry.row.id) && !hasDecisionInputs(entry.deepDive))
     .map((entry) => ({ siteId: entry.row.id, siteName: entry.row.name }));
   const decisions = decisionTargets.flatMap(({ siteId, materialIssueId, materialIssueIds }) => {
     const siteRecords = valuation.valuationRecordsByMaterialIssue[materialIssueId] ?? [];
@@ -792,6 +796,7 @@ export const DEFAULT_RNG_SEED = 42;
 // 14: 物理指標の目標・担当・期限を保存結果に含め、統合管理へ表示する。
 // 15: 年度引継ぎ元、資源費用の前提、物理指標の確認済み開示文案を保持する。
 // 16: 資源対策の複数年比較、既存主張・投資案件との確認済み対応を保持する。
-export const RESULT_SCHEMA_VERSION = 16;
+// 17: 「投資の前提待ち」を判定対象の拠点に限定する(詳細評価に進まない拠点を含めていた)。
+export const RESULT_SCHEMA_VERSION = 17;
 
 export type DemoPipelineResult = ReturnType<typeof runDemoPipeline>;

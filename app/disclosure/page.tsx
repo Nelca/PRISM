@@ -1,7 +1,7 @@
-import { claimLinkCurrent, targetFingerprint } from "@/lib/environment/review";
-import { METRIC_BY_ID } from "@/lib/environment/metrics";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { METRIC_BY_ID } from "@/lib/environment/metrics";
+import { disclosureNoteCurrent } from "@/lib/environment/review";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { Card, GuideBox, GuideButton, KV, ScreenLead, Tag } from "../components/ui";
 import { categoryLabel, formatDepthReason, gapTypeLabel, materialIssueLabel } from "../components/labels";
@@ -223,7 +223,21 @@ export default async function DisclosurePage({
               </>
             }
           >
-            {result.environmentalTargets.filter((target) => !target.archived && target.disclosureNote?.linkedClaim?.id === finding.claimId).map((target) => <p key={target.id}>確認記録のある物理指標: <Link href={`/portfolio/${encodeURIComponent(target.id)}`}>{METRIC_BY_ID.get(target.metricId)?.label} · {target.reportingYear}年 · {target.boundary}</Link> — {target.disclosureNote!.sourceFingerprint === targetFingerprint(target) && claimLinkCurrent(target.disclosureNote, result.disclosureClaims) && result.assessment.sites.some((site) => site.id === target.siteId && site.name === target.disclosureNote!.siteName) ? "対応の確認済み（自動指摘の解消とは別）" : "再確認が必要"}</p>)}
+            {/* 統合管理で、この主張との対応を人が確認した物理指標(自動指摘の解消とは別に示す)。 */}
+            {result.environmentalTargets
+              .filter((target) => !target.archived && target.disclosureNote?.linkedClaim?.id === finding.claimId)
+              .map((target) => (
+                <p key={target.id}>
+                  確認記録のある物理指標:{" "}
+                  <Link href={`/portfolio/${encodeURIComponent(target.id)}`}>
+                    {METRIC_BY_ID.get(target.metricId)?.label} · {target.reportingYear}年 · {target.boundary}
+                  </Link>
+                  {" — "}
+                  {disclosureNoteCurrent(target, siteNameById.get(target.siteId), result.disclosureClaims)
+                    ? "対応の確認済み（自動指摘の解消とは別）"
+                    : "再確認が必要"}
+                </p>
+              ))}
             {/*
               照合用のGapFinding IDは本文から外した(指示06)。監査で辿る必要がある場合は
               記録(監査証跡)画面から参照できれば足りる。

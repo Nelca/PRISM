@@ -165,29 +165,31 @@ export async function recordDecisionAction(
   const previousMechanism = current?.mechanism ?? { kind: "weak_reference" };
   const mechanismChanged = JSON.stringify(previousMechanism) !== JSON.stringify(mechanism);
 
-  // 変更時は理由を必須にする(M6 D-9:デフォルト値を設けず、明示選択と変更履歴の記録を必須とする)。
-  if ((mechanismChanged || !current) && !reason) {
-    return { error: "反映先を変更する場合は理由を入力してください。" };
+  // 同じ内容の再送信は記録しない。
+  if (current && !mechanismChanged) {
+    return { success: "反映先に変更はありません。" };
   }
-  if ((mechanismChanged || !current) && reason.length < 8) {
-    return { error: "変更理由が短すぎます。監査証跡として第三者が選択の根拠を理解できるように記入してください(8文字以上)。" };
+  // 初回の選択・変更時は理由を必須にする(M6 D-9:デフォルト値を設けず、明示選択と変更履歴の記録を必須とする)。
+  if (!reason) {
+    return { error: current ? "反映先を変更する場合は理由を入力してください。" : "この反映先を選ぶ理由を入力してください。" };
+  }
+  if (reason.length < 8) {
+    return { error: "理由が短すぎます。監査証跡として第三者が選択の根拠を理解できるように記入してください(8文字以上)。" };
   }
 
-  if (mechanismChanged || !current) {
-    const outcome = await tryRunAndPersist(tenantId, {
-      label: "反映先の記録",
-      events: [
-        {
-          actor: ACTOR,
-          kind: "binding_mechanism_change",
-          subjectId: siteId,
-          payload: { mechanism, reason, logMessage: `対策の判定結果を「${BINDING_LABELS[kind]}」で選択・記録` },
-        },
-      ],
-    });
-    if (!outcome.ok) {
-      return { error: outcome.message };
-    }
+  const outcome = await tryRunAndPersist(tenantId, {
+    label: "反映先の記録",
+    events: [
+      {
+        actor: ACTOR,
+        kind: "binding_mechanism_change",
+        subjectId: siteId,
+        payload: { mechanism, reason, logMessage: `対策の判定結果を「${BINDING_LABELS[kind]}」で選択・記録` },
+      },
+    ],
+  });
+  if (!outcome.ok) {
+    return { error: outcome.message };
   }
 
   revalidatePath("/", "layout");

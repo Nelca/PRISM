@@ -3034,8 +3034,7 @@ strong {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.home-orientation__flow,
-.home-orientation__benefits {
+.home-orientation__flow {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 0;
@@ -3301,37 +3300,6 @@ strong {
   font-size: 11px;
   white-space: nowrap;
 }
-.home-orientation__benefits {
-  gap: 0;
-  margin-top: 14px;
-}
-.home-orientation__benefits li {
-  min-width: 0;
-  padding: 0 16px;
-  border-left: 1px solid var(--line-soft);
-}
-.home-orientation__benefits li:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-.home-orientation__benefits li:last-child {
-  padding-right: 0;
-}
-.home-orientation__benefits strong,
-.home-orientation__benefits span {
-  display: block;
-}
-.home-orientation__benefits strong {
-  color: var(--ink);
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.home-orientation__benefits span {
-  margin-top: 2px;
-  color: var(--ink-faint);
-  font-size: 11.5px;
-  line-height: 1.5;
-}
 
 @media (max-width: 767px) {
   .home-orientation {
@@ -3348,8 +3316,7 @@ strong {
   .home-orientation__guide {
     white-space: normal;
   }
-  .home-orientation__flow,
-  .home-orientation__benefits {
+  .home-orientation__flow {
     grid-template-columns: 1fr;
   }
   .home-orientation__flow {
@@ -3360,15 +3327,6 @@ strong {
     right: 14px;
     bottom: -13px;
     transform: rotate(90deg);
-  }
-  .home-orientation__benefits {
-    gap: 10px;
-  }
-  .home-orientation__benefits li,
-  .home-orientation__benefits li:first-child,
-  .home-orientation__benefits li:last-child {
-    padding: 0;
-    border-left: 0;
   }
   .home-workflow__row {
     grid-template-columns: 1fr;
@@ -3460,9 +3418,6 @@ table.data-table td { padding: 14px 16px; }
 .home-orientation__flow li::before { left: 0; }
 .home-orientation__flow li small { display: block; margin-top: 5px; font-size: 11px; line-height: 1.6; color: var(--ink-soft); font-weight: 400; }
 .home-orientation__arrow { background: transparent; color: #8290a6; }
-.home-orientation__benefits { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e0e7f1; }
-.home-orientation__benefits strong { font-size: 12px; }
-.home-orientation__benefits span { color: var(--ink-soft); }
 .workspace-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .section-eyebrow { font-size: 10px; letter-spacing: .12em; color: var(--accent-ink); font-weight: 600; margin: 0 0 5px; }
 .workspace-heading h2 { font-size: 23px; letter-spacing: -.025em; }
@@ -3497,7 +3452,6 @@ table.data-table td { padding: 14px 16px; }
   .welcome-actions .home-orientation__guide { margin-left: 0; }
   .home-orientation__flow { gap: 8px; }
   .home-orientation__arrow { display: none; }
-  .home-orientation__benefits { gap: 12px; }
   .workspace-heading { align-items: flex-start; }
   .workspace-heading h2 { font-size: 21px; }
   .next-action { flex-direction: column; align-items: flex-start; gap: 14px; padding: 16px; }

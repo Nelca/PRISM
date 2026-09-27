@@ -41,8 +41,15 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
   const tasks: OpenTask[] = [];
   const { decisions, disclosure, valuation } = result;
 
+  // 投資の前提(NPV・投資額)が未入力で判定を保留している拠点。価値算定はそのまま使える。
   if (result.deferredDecisions.length > 0) {
-    tasks.push({ id: "decision-inputs", section: "/decision", href: "/decision#deferred-decisions", text: `投資の前提が未入力:${result.deferredDecisions.length}拠点（価値算定は利用できます）`, linkLabel: "投資の前提を追加" });
+    tasks.push({
+      id: "decision-inputs",
+      section: "/decision",
+      href: "/decision#deferred-decisions",
+      text: `投資の前提が未入力:${result.deferredDecisions.length}拠点（価値算定は利用できます）`,
+      linkLabel: "投資の前提を追加",
+    });
   }
 
   // ③ 手法間の乖離:実際の分解結果から最大倍率を取る
@@ -168,6 +175,21 @@ export function deriveOpenTasks(result: DemoPipelineResult): OpenTask[] {
   }
 
   // 解消できる未入力を先に案内する。算定差や減損の参考情報で入力を遮らない。
-  const order = ["representative-value", "decision-inputs", "approval-threshold", "binding-mechanism", "degenerate-representative", "disclosure-gap", "divergence", "impairment"];
-  return tasks.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  // 一覧にないタスクは末尾に置く(追加したタスクが先頭に割り込まないように)。
+  const rank = (id: string) => {
+    const index = TASK_ORDER.indexOf(id);
+    return index < 0 ? TASK_ORDER.length : index;
+  };
+  return tasks.sort((a, b) => rank(a.id) - rank(b.id));
 }
+
+const TASK_ORDER = [
+  "representative-value",
+  "decision-inputs",
+  "approval-threshold",
+  "binding-mechanism",
+  "degenerate-representative",
+  "disclosure-gap",
+  "divergence",
+  "impairment",
+];

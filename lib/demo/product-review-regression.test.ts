@@ -27,6 +27,20 @@ describe("初回利用レビューの回帰防止", () => {
     expect(ready.deferredDecisions).toHaveLength(0);
     expect(ready.decisions.some((entry) => entry.siteId === "site-user-review")).toBe(true);
   });
+  it("詳細評価に進まない拠点は、投資の前提待ちとして案内しない", () => {
+    const result = runDemoPipeline({
+      rngSeed: 42,
+      interactions: emptyInteractionState(),
+      userSites: [{
+        row: { id: "site-user-review", name: "検証用拠点", siteType: "own_site", industrySector: "chemicals", lat: 35, lng: 139 },
+        deepDive: { ...DEFAULT_DEEP_DIVE_PARAMS, forcePromote: false, baselineNpvValue: null, investmentCostInitial: null, investmentCostRecurring: null },
+      }],
+    });
+    // 前提: 優先度算定で詳細評価に昇格していない(前提を入力しても判定は生まれない)。
+    expect(result.valuation.valuationRecordsByMaterialIssue["site-user-review-mi-water"] ?? []).toHaveLength(0);
+    expect(result.deferredDecisions).toHaveLength(0);
+    expect(deriveOpenTasks(result).some((task) => task.id === "decision-inputs")).toBe(false);
+  });
   it("GHG拠点に入力したNPVを使い、未入力の承認ラインと開示文を補完しない", () => {
     const result = runUser();
     const record = result.decisions.find((entry) => entry.siteId === "site-user-review")!.decision.decisionRecord;

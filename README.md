@@ -1,12 +1,13 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## プロダクトレビュー
+## 2026-09の機能追加と記録
 
-[判定対象の拡充・統合管理（2026-09-21）](docs/resource-ecosystem-expansion-2026-09-21.md): 生物資源・鉱物資源・生態系を含む8領域の目標・担当・期限・履歴を `/portfolio` で管理できます。
-
-[CSV一括取込・年度引継ぎ・費用試算・開示連携](docs/environment-continuity-2026-09-21.md) を追加しました。統合管理の「CSVで一括取込・更新」と、各指標の詳細画面から利用できます。
-
-[初回利用レビューと改善内容（2026-09-20〜21）](docs/product-review-2026-09-20.md) に、利用体験と要件の照合、今回の修正、残る課題をまとめています。
+- [初回利用レビューと改善内容（2026-09-20〜21）](docs/product-review-2026-09-20.md): 利用体験と要件の照合、修正内容、残る課題。
+- [判定対象の拡充・統合管理（2026-09-21）](docs/resource-ecosystem-expansion-2026-09-21.md): 生物資源・鉱物資源・生態系を含む8領域の目標・担当・期限・履歴を `/portfolio` で管理する。
+- [CSV一括取込・年度引継ぎ・費用試算・開示連携](docs/environment-continuity-2026-09-21.md): 統合管理の「CSVで一括取込・更新」と各指標の詳細画面から利用する。
+- [資源拡張の追加実装・残件と必要な協力](docs/resource-expansion-handoff-2026-09-21.md)
+- [公開資料・合成データによる研究実装](docs/research-data-implementation-2026-09-21.md): `PRISM_RESEARCH_ENABLED=1` で `/research` を有効化する。
+- [GVFD V2の取得・地域別影響算定](docs/gvfd-implementation-2026-09-24.md): 研究モードの `/research/gvfd`。統合管理の指標から実測値・目標値を引き継げる。
 
 ## セットアップ(DBが必要です)
 
@@ -94,9 +95,3 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-- [資源拡張の追加実装・残件と必要な協力](docs/resource-expansion-handoff-2026-09-21.md)
-
-- [公開資料・合成データによる研究実装](docs/research-data-implementation-2026-09-21.md): `PRISM_RESEARCH_ENABLED=1` で `/research` を有効化。
-
-GVFD V2の取得・地域別影響算定と統合管理の値の引継ぎ：[実装・検証記録](docs/gvfd-implementation-2026-09-24.md)。研究モードで `/research/gvfd` を利用できます。
