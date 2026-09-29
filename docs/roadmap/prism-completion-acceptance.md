@@ -2,8 +2,11 @@
 
 **対象:** M1〜M8 全モジュールの完成判定と、M4「乖離原因分解」変更の下流統合  
 **実施:** 2026-09-06  
-**完成実装指示書:** `docs/roadmap/divergence-decomposition-completion-directive.md` §3.5、§21  
-**状態:** T-21 初版(実装中・1社実データ受入未完了)
+**完成実装指示書:** `docs/roadmap/divergence-decomposition-completion-directive.md` §3.5、T-21
+
+**最終照合:** 2026-09-07、HEAD `4032238`(コード差分なし)
+
+**状態:** T-21 技術通し・受入表更新完了。状態B・1社実データ受入・人間判定は未完了
 
 ---
 
@@ -13,7 +16,7 @@
 
 | 状態 | 判定者 | 通過条件 | 本表での扱い |
 |---|---|---|---|
-| **A. 技術実装完了** | AI判定可能 | 比較意味論・計算トレース・反実仮想・加法/乗法分解・残差理由・監査証跡・UI実装・テスト完了 | ✓ 実装中 |
+| **A. 技術実装完了** | AI判定可能 | 比較意味論・計算トレース・反実仮想・加法/乗法分解・残差理由・監査証跡・UI実装・テスト完了 | ✓ 技術実装完了(2026-09-06、作業台帳 §5) |
 | **B. 実データ実証完了** | AI判定可能 | 実係数・実物理量で非ゼロ寄与を示す実証レポート。最低1件で寄与合計≠0 | ⏳ 資料待ち(H-02) |
 | **C. 業務価値確認** | **人間GATE(H-04)** | 利用者が代表値選択・追加調査・説明・投資判断のいずれかを変えた事例 | ⏳ 実利用者判定待ち |
 | **D. 商用利用条件確認** | **人間GATE(H-05)** | 本番で有効化する全データ・手法の利用条件確認・法務確認完了 | ⏳ H-03/H-05 照合中 |
@@ -37,7 +40,7 @@
 | 受入対象 | 必要な証拠 | 既存実装の参照 | 状態 | 未完了事項 |
 |---|---|---|---|---|
 | **M1+M2+M3 通しパイプライン** | 同一物理入力IDと版で M1(拠点特定)→M2(優先度評価)→M3(複数手法貨幣化)が最後まで通る | `packages/core/src/pipeline/integration.test.ts` M1→M2→M3通し / `lib/demo/gate-verification.test.ts` 架空企業東海化成1社 / `lib/demo/run-demo-pipeline.ts` 5拠点デモ実行 | ✓ 技術通し完了 | 1社実データ(待機中) |
-| **M4 乖離分解の下流: 代表値選択→M5接続** | 選択理由の保存→新run生成→M5の再計算で、選択変更が下流の財務指標に整合的に反映される | `packages/core/src/pipeline/valuation-pipeline.ts` M4→M5。T-21で追加実装予定(M4変更に必要な修正)。選択理由の保存→新run→台帳の通し検証は T-21 で確認予定(現時点で技術通しのみ) | ⏳ 実装中 | M4 A 完成後に統合検証 |
+| **M4 乖離分解の下流: 代表値選択→M5接続** | 選択理由の保存→新run生成→M5の再計算で、選択変更が下流の財務指標に整合的に反映される | `lib/demo/divergence-end-to-end.test.ts` 6件。交換価値の選択変更で財務接続が変化し、厚生価値は投資判断へ流れない。DB保存・旧run保持は `lib/db/persistence.db.test.ts` | ✓ 技術通し完了 | 1社実データ受入は未実施。通しテストの入力はデモ既定値 |
 | **M5 財務接続(自然調整後利益・社会的費用ビュー)** | 2つのブリッジが独立に動き、誤って合算できない型構造 | `packages/core/src/financial-bridge/` ブリッジ1/2。`packages/core/src/pipeline/integration.test.ts` 型テスト | ✓ 技術通し完了 | 1社実データ受入 |
 | **M6 意思決定判定(閾値・稟議判定)** | 代表値と理由から、「超過」「未満」「境界」の判定が決定論的に返される | `packages/core/src/decision/` 判定ロジック。`packages/core/src/pipeline/integration.test.ts` M5→M6 | ✓ 技術通し完了 | 1社実データ受入 |
 | **M7 開示生成(根拠充足度検証)** | 構造化 DisclosureClaim[] から G1〜G4 優先順位を判定し、推奨アクションを出力 | `packages/core/src/disclosure/` G1〜G4判定。`packages/core/src/pipeline/integration.test.ts` 3拠点×根拠充足検証 | ✓ 技術通し完了 | 1社実データ受入 |
@@ -51,11 +54,11 @@
 
 | 受入対象 | 必要な証拠 | 既存実装の参照 | 状態 | 未完了事項 |
 |---|---|---|---|---|
-| **M4 技術実装の通し検証** | 比較意味論・計算トレース・反実仮想・加法/乗法分解・残差理由・監査証跡・停止条件が実装・テスト済み。205ファイル / 1181テスト通過、tsc空、eslint空、build成功 | `packages/core/src/divergence/*.test.ts` 122件新規テスト / `pipeline/valuation-pipeline.test.ts` / `lib/demo/result-schema-version.test.ts` / `npm run test:db` 未実行(docker未起動) | ✓ 技術通し完了 | DB テスト未実行(docker 未起動・別担当) |
+| **M4 技術実装の通し検証** | 比較意味論・計算トレース・反実仮想・加法/乗法分解・残差理由・監査証跡・停止条件が実装・テスト済み | 作業台帳 §5 の全体検証。2026-09-07に通し・版管理・診断32件、DB統合47件を再確認(本書 §6.1) | ✓ 技術通し完了 | 実物理量での非ゼロ手法間寄与は状態Bの残件 |
 | **T-03: 比較対象型と同一性検証** | 取水/消費水、表層/地下水、排出/移動が型またはvalidatorで止まる | `packages/core/src/types/comparison.ts` ComparisonSubject / `packages/core/src/divergence/comparability.ts` validator | ✓ 完了 | — |
-| **T-04: 因果経路・被覆プロファイル** | IFVI VFnutrition/VFdisease が「同じ human_health だから被覆一致」と誤判定されない | `packages/core/src/types/comparison.ts` CausalPathway / `packages/core/src/divergence/pathway-mapping.ts`(H-01 pending_domain_review で隔離) | ✓ 完了 | H-01 未回答でも候補リスト+根拠まで完成 |
+| **T-04: 因果経路・被覆プロファイル** | IFVI VFnutrition/VFdisease が「同じ human_health だから被覆一致」と誤判定されない | `packages/core/src/types/comparison.ts` CausalPathway / `packages/core/src/monetization/trace/pathway-mapping.ts` | ✓ 技術対応完了 | VFes のマッピング承認は H-01。候補・根拠は判断資料へ記録済み |
 | **T-05: 再生可能な計算トレース** | 保存済み最終値を、トレースだけから同じ値に復元。LIME3統合化係数で実データケース検証 | `packages/core/src/types/trace.ts` MethodEvaluationTrace / `packages/core/src/monetization/trace/*` | ✓ 完了 | IFVI Eq.3-5 未実装は注記(H-02-1 待ち)。他は動作検証完了 |
-| **T-06: 比較レシピレジストリ** | 汎用エンジンがメタデータだけから自動推定で比較せず、登録済みレシピのみを安全に実行 | `packages/core/src/divergence/recipes/*.ts` + RecipeRegistry(水用3レシピ登録済み) | ✓ 完了 | 本番レジストリは T-12 までデモレシピのみ |
+| **T-06: 比較レシピレジストリ** | 汎用エンジンがメタデータだけから自動推定で比較せず、登録済みレシピのみを安全に実行 | `packages/core/src/divergence/recipes/registry.ts`。水関連4レシピを登録、合成用 `testOnly` は本番登録不可 | ✓ 完了 | 登録は商用許諾を意味しない。LIME3内部変種は状態Bに算入しない |
 | **T-07: 真正なShapley評価器** | 相互作用がある実式で、全順序平均と一致するShapley寄与を返す | `packages/core/src/divergence/shapley.ts` / `packages/core/src/divergence/counterfactual.ts` | ✓ 完了 | テスト 27 件通過 |
 | **T-08: 加法分解と停止条件** | IFVI日本水の0を含む手法間ペアが、空表ではなく加法寄与または停止理由を返す | `packages/core/src/divergence/mode-selection.ts` | ✓ 完了 | 実データで加法2件・乗法1件・停止1件の動作確認 |
 | **T-09: 残差の構造化** | 既知だが数値化不能な差異を区別。未分類残差と次のアクションを出力 | `packages/core/src/divergence/residual.ts` / `narrative-v2.ts` | ✓ 完了 | テスト 9 件通過。実データで定性差異5件を記録 |
@@ -79,7 +82,7 @@
 
 | 受入対象 | 必要な証拠 | 状態 | 未完了事項 |
 |---|---|---|---|
-| **H-04: 実利用者による業務価値検証** | 代表手法・追加調査・説明・投資判断の変更が、最低1件確認される | ⏳ H-04 判定待ち | シナリオ・質問票・非誘導的資料は T-18 後に準備 |
+| **H-04: 実利用者による業務価値検証** | 代表手法・追加調査・説明・投資判断の変更が、最低1件確認される | ⏳ H-04 判定待ち | シナリオ・質問票・記録様式は `divergence-human-gates.md` §4 に準備済み。実施・回答は未完了 |
 
 #### D. 商用利用条件確認(T-20/T-21 付属)
 
@@ -97,17 +100,17 @@
 
 | 修正箇所 | 内容 | 状態 |
 |---|---|---|
-| `packages/core/src/pipeline/valuation-pipeline.ts` | M4出力の selectedDecompositionId + selectedMethodIdReason → M5へ代表値として流す | ⏳ 実装中(T-21で追加) |
-| `packages/core/src/financial-bridge/bridge-*.ts` | 代表値変更時の再計算トリガー | ✓ 既実装(型は準備済み) |
-| `packages/core/src/ledger/derive-m4-*-payload.ts` | M4の選択理由→AssumptionEntry へ | ⏳ 実装中 |
-| `lib/db/serialize.ts` | DivergenceDecompositionV2 の JSON保存(スキーマ版10→11) | ⏳ 実装中 |
+| `packages/core/src/pipeline/valuation-pipeline.ts` | 代表値選択と理由を分解結果へ保存 | ✓ 完了(通しテストで確認) |
+| `lib/demo/build-financial-bridge.ts` | 選択後の代表値を財務接続へ反映 | ✓ 完了(交換価値の選択変更で指標が変わることを確認) |
+| `packages/core/src/ledger/assumption-entry.ts` | M4の選択理由→AssumptionEntry へ | ✓ 完了(選択理由・参照IDを通しテストで確認) |
+| `lib/db/serialize.ts` | DivergenceDecompositionV2 の JSON保存(スキーマ版10→11) | ✓ 完了(DB往復・旧版runの再実行と保持を確認) |
 
 ### 2.2 M4トレース↔M3トレースの整合
 
 | 修正箇所 | 内容 | 状態 |
 |---|---|---|
-| `packages/core/src/monetization/trace/*` | MethodEvaluationTrace へエンドポイント・時間列・ゼロ意味を追記 | ⏳ 実装中(T-05) |
-| `packages/core/src/pipeline/build-valuation-records.ts` | トレース生成時に要因交換可能性を記録 | ⏳ 実装中(T-05) |
+| `packages/core/src/monetization/trace/build-trace.ts` | MethodEvaluationTrace へエンドポイント・時間列の可用性・ゼロ意味を記録 | ✓ 技術対応完了。IFVI Eq.3-5 は H-02-1 待ち |
+| `packages/core/src/monetization/build-valuation-records.ts` | トレース生成と再計算可能性のメタデータを接続 | ✓ 完了(T-05、詳細は作業台帳) |
 
 ---
 
@@ -125,7 +128,7 @@
 
 | サービス | 用途 | ライセンス | 管理 | 状態 |
 |---|---|---|---|---|
-| **WDPA** | 保護地域照会 | CC BY 4.0(帰属表示のみ) | H-02 | ✓ 実装済み(照会API外出し) |
+| **WDPA** | 保護地域照会 | 商用契約待ち(既存の `docs/data/licensing.md` の記録を参照) | H-02/H-05 | ⏳ 照会APIは外出し、商用契約未完了 |
 | **Aqueduct** | 水ストレス・気候リスク | CC BY 4.0 | H-02 | ✓ 実装済み(API外出し) |
 | **ENCORE** | 自然資本依存度 | CC BY-SA 4.0(帰属+派生物同一ライセンス) | H-02 | ✓ 実装済み(帰属表示実装済み) |
 | **LIME3** | 貨幣化係数 | アスエネ社 標準版 ユーザーライセンス(2027-06-30) | H-03 | ✓ 2026-08 入手済み |
@@ -136,11 +139,11 @@
 
 ## 4. 状態ごとの完成判定
 
-### 4.1 状態A: 技術実装(実装中)
+### 4.1 状態A: 技術実装(完了)
 
 **通過条件:** T-03〜T-09、T-13〜T-17 実装・テスト完成。§6.2 の端点検証・公理検証・効率性検証すべて実施。
 
-**通過時期:** 2026-11月中旬(予定、指示書実施予定)
+**通過時期:** 2026-09-06(作業台帳 §5)。2026-09-07に下流統合・保存の検証を再実行。
 
 **1社実データ準備:** A 通過と並行して、GAP-04(ジオコーディング・空間レイヤ)解消と許可済み顧客データの投入準備
 
@@ -166,7 +169,7 @@
 
 **現在:** H-03/H-05 で個別照会中(LIME3・IFVI・CE Delft・ESVD)
 
-**記録:** `docs/roadmap/divergence-human-gates.md` §2(未完成)
+**記録:** `docs/roadmap/divergence-human-gates.md` §5(資料準備済み、判定待ち)
 
 ---
 
@@ -175,7 +178,7 @@
 | 前提 | 状態 | 責任 |
 |---|---|---|
 | **GAP-04 解消:** ジオコーディング・空間レイヤ実装 | ⏳ 未実装・本表スコープ外 | M1 下流・全体受入は H-07 の判断対象 |
-| **状態A 完成:** M4技術実装テスト合格 | ⏳ 実装中(~11月中旬予定) | 本タスク(T-21) |
+| **状態A 完成:** M4技術実装テスト合格 | ✓ 完了(2026-09-06) | 本タスク(T-21) |
 | **状態B の1件実証:** 非ゼロ寄与例 | ⏳ 資料入手後に成立性検証(T-10a) | T-10a / T-11 / T-12 |
 | **許可済み顧客データ:** 拠点・NatureInterface・財務入力 | ⏳ 準備中(GAP-04と並行) | ユーザー・H-04(実利用者) |
 | **PRISM全体の通し実行:** M1→M8 まで同一run·版で最後まで通る | ⏳ 1社データでの通し検証は未実施 | 本セッション(T-21.3) |
@@ -184,9 +187,9 @@
 
 ---
 
-## 6. M4 実装外の範囲外項目
+## 5.1 M4 実装外の項目と外部入力待ち
 
-以下は本セッション・M4変更範囲の**外**。未完了のまま全体受入へ記載:
+範囲外項目と、M4の範囲内だが外部入力を待つ項目を以下に記載する。IFVI Eq.3-5 は T-05.6 の残件であり、範囲外ではない。
 
 | 項目 | 現状 | 対応 |
 |---|---|---|
@@ -204,6 +207,13 @@
 
 ### 6.1 実装完了の根拠
 
+下表は2026-09-06の履歴。最新の全体検証記録は作業台帳 §5 の15:10の行を参照。今回の再開時はコード変更がないため、T-21の照合に必要な検証を実行した。
+
+| 再確認日時 | コマンド | 結果 | 実行時点 |
+|---|---|---|---|
+| 2026-09-07 23:46 JST | `npm test -- lib/demo/divergence-end-to-end.test.ts lib/demo/result-schema-version.test.ts packages/core/src/divergence/diagnostics` | 4 files / 32 tests 通過 | HEAD `4032238`、コード差分なし |
+| 2026-09-07 23:46 JST | `npm run test:db` | 8 files / 47 tests 通過。保存往復・旧run保持・追記制約を含む | 同上。既存 `prism-db` が healthy |
+
 | 対象 | テスト実行 | 結果 | コマンド参照 |
 |---|---|---|---|
 | **計算コア(T-03〜T-09)** | 2026-09-06 14:40 | 59 files / 269 tests 通過 | `npx vitest run packages/core/src/divergence packages/core/src/monetization packages/core/src/pipeline` |
@@ -216,11 +226,11 @@
 | **Lint** | 2026-09-06 14:40 | エラーなし | `npx eslint packages/core/src lib app` |
 | **ビルド** | 2026-09-06 14:40 | 成功 | `npm run build` |
 
-### 6.2 未実行テスト
+### 6.2 DB検証と残る受入
 
 | テスト | 理由 | 状態 | 責任 | 影響 |
 |---|---|---|---|---|
-| **DB統合テスト** | docker 未起動 | ⏳ 未実行 | 別担当(M3 下流) | 全体受入表の「1社実データ受入」完了前に必須実行(T-21.3) |
+| **DB統合テスト** | 既存DBで再実行 | ✓ 2026-09-07、47件通過 | T-21 | 技術検証完了。顧客実データ・実利用者判定を代替しない |
 
 ### 6.3 既存M1〜M3受入の保守
 
@@ -229,7 +239,7 @@
 | **M1 拠点特定** | ✓ 既実装(拠点スキーマ version 保存) | `lib/demo/gate-verification.test.ts`(M1→M3通し) |
 | **M2 優先度評価** | ✓ 既実装(基本レーティング) | 同上 |
 | **M3 複数手法貨幣化** | ✓ 既実装(M4との接続point で検証) | 同上 |
-| **M4 新規実装** | ⏳ 本セッション | `pipeline/valuation-pipeline.test.ts` + `divergence/diagnostics/*.test.ts` |
+| **M4 新規実装** | ✓ 技術対応完了 | `pipeline/valuation-pipeline.test.ts` + `divergence/diagnostics/*.test.ts` |
 
 ### 6.4 外部サービス・ライセンス利用条件
 
@@ -253,10 +263,11 @@
 - [ ] H-02-1/H-02-2/H-02-4 資料請求(T-10 に記載)
 - [ ] H-03/H-05 ライセンス照会フォローアップ
 - [ ] 許可済み顧客データの内容確認・スキーマ設計(GAP-04 と並行)
-- [ ] T-03〜T-09 実装(T-02 決定に基づき)
+- [x] T-03〜T-09 技術実装(T-02 決定に基づき、外部入力待ちは個別記載)
+- [x] T-21 技術通し・DB検証と受入表の照合(2026-09-07)
 
 ### ~2026-11月
-- [ ] 状態A 実装・テスト完成
+- [x] 状態A 実装・テスト完成(2026-09-06)
 - [ ] 資料入手→T-10a 実行
 - [ ] 1社データの通し検証準備
 
@@ -266,4 +277,4 @@
 
 ---
 
-**本初版は T-02 決定・M4設計確定時点での完成イメージ。実装進行中の発見により更新される。各セッションで progress を §7 へ追記する。**
+**再開位置:** T-12 は H-02-1(IFVI方法論の原本または式) / H-02-2(汚染の第2手法原本)の提供待ち。提供後に成立性を確認し、T-12→T-13実データ通過→T-18→本表の順に更新する。今回の照合は状態B・C・Dおよび1社実データ受入の通過を意味しない。

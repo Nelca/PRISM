@@ -3,7 +3,7 @@
 **対象:** PRISM完成に必要なM4 乖離原因分解を、合成データ上で動く状態から、実データ上で意思決定価値を説明できる状態まで完成させ、M1〜M8の全体受入へ接続する
 **作成日:** 2026-09-06
 **最終更新:** 2026-09-06（レビュー反映 第2版：既知の実装障害4点の事前決着、状態A用の取得済み実データの固定、評価回数の予算、既存コード体系との接続、ゼロ意味の付与規則）
-**状態:** 指示書改訂済み・本書に基づく実装未着手
+**状態:** 状態A 技術実装完了、状態B 実データ実証は H-02 の原本待ち、C/D は人間判定待ち。最新のタスク状態・検証記録は `divergence-decomposition-work-log.md` を参照(本書の各タスク内「未着手」は指示書作成時点の記録)
 **最上位要件:** `docs/concept-v2.md`
 **現行要件:** `docs/requirements/m4-divergence-decomposition.md`
 **関連実装:** `packages/core/src/divergence/`、`packages/core/src/monetization/`、`packages/core/src/pipeline/valuation-pipeline.ts`、`app/valuation/`、`app/analysis/`
