@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
+import { FeatureGrid, FeatureCard } from "./viz";
+import { STAGE_ICON } from "./icons";
 
 const STORAGE_KEY = "prism:home-orientation-dismissed:v1";
 type OrientationStoreListener = () => void;
@@ -100,21 +102,17 @@ export function HomeOrientation() {
       </div>
       <p className="welcome-note">まずは登録済みのデモデータで、金額の比較から判断までの流れを確認できます。</p>
 
-      <ol className="home-orientation__flow" aria-label="環境データから成果物までの流れ" role="list">
-        <li>
-          手元の環境データを登録
-          <small>既存の取水量・排出量から始められます</small>
-          <span className="home-orientation__arrow" aria-hidden="true">→</span>
-        </li>
-        <li>
-          金額の幅と差の理由を確認
-          <small>算定方法の違いを、根拠から説明できます</small>
-          <span className="home-orientation__arrow" aria-hidden="true">→</span>
-        </li>
-        <li>投資判断と開示に活用<small>同じ結果を稟議・開示・監査対応に使えます</small></li>
-      </ol>
-
-
+      <FeatureGrid>
+        <FeatureCard icon={STAGE_ICON.sites} title="手元の環境データを登録" href="/sites" tone="neutral">
+          既存の取水量・排出量から始められます
+        </FeatureCard>
+        <FeatureCard icon={STAGE_ICON.valuation} title="金額の幅と差の理由を確認" href="/valuation" tone="neutral">
+          算定方法の違いを、根拠から説明できます
+        </FeatureCard>
+        <FeatureCard icon={STAGE_ICON.decision} title="投資判断と開示に活用" href="/decision" tone="neutral">
+          同じ結果を稟議・開示・監査対応に使えます
+        </FeatureCard>
+      </FeatureGrid>
     </section>
   );
 }

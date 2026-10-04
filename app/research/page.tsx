@@ -10,6 +10,7 @@ import { loadPipelineView } from "@/lib/views/pipeline";
 import { Card, ScreenLead } from "../components/ui";
 import { ImportForm } from "../portfolio/import/import-form";
 import { ResearchCalculators } from "./calculators";
+import { ActionRow, StatGrid, StatTile } from "../components/viz";
 
 export const metadata: Metadata = { title: "公開データで検証 | PRISM" };
 
@@ -33,7 +34,9 @@ export default async function ResearchPage({ searchParams }: { searchParams: Pro
 
       <Card title="IFVIの地域別係数で算定する">
         <p>GHG、水消費、大気汚染、廃棄物、土地利用・転換、水質汚染について、GVFD V2の地域別係数で現状と目標の影響額を比較できます。</p>
-        <Link className="pill-btn pill-btn--accent" href="/research/gvfd">GVFDで環境影響を算定する →</Link>
+        <ActionRow>
+          <Link className="pill-btn pill-btn--accent" href="/research/gvfd">GVFDで環境影響を算定する →</Link>
+        </ActionRow>
       </Card>
 
       <Card title="数値を変えて影響を確かめる">
@@ -66,6 +69,11 @@ export default async function ResearchPage({ searchParams }: { searchParams: Pro
           <p key={source.url}><a href={source.url}>{source.label}</a>：{source.use}</p>
         ))}
         <p>送粉の依存度65%、機能低下20%、回避率50%は感度分析用の仮定です。観察回数からこれらを推定していません。</p>
+        <StatGrid columns={3}>
+          <StatTile label="送粉への依存度" value={65} unit="%" note="仮定" tone="neutral" />
+          <StatTile label="送粉機能の低下率" value={20} unit="%" note="仮定" tone="neutral" />
+          <StatTile label="対策による減収回避率" value={50} unit="%" note="仮定" tone="neutral" />
+        </StatGrid>
       </Card>
 
       <Card title="取得した資料とデータ">

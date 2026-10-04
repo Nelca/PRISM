@@ -8,9 +8,9 @@ const INITIAL_STATE: PrtrImportFormState = {};
 function PrtrFileField({ id, name, label, accept, onSelectedChange }: { id: string; name: string; label: string; accept: string; onSelectedChange: (selected: boolean) => void }) {
   const [fileName, setFileName] = useState<string | null>(null);
   return (
-    <div className="field">
+    <div className="field rec-prtr-field">
       <label htmlFor={id}>{label}</label>
-      <div className="file-input">
+      <div className="file-input rec-prtr-file-input">
         <input
           id={id}
           name={name}
@@ -27,7 +27,7 @@ function PrtrFileField({ id, name, label, accept, onSelectedChange }: { id: stri
         <label htmlFor={id} className="pill-btn pill-btn--sm file-input__label">
           ファイルを選ぶ
         </label>
-        <span className={`file-input__name${fileName ? " file-input__name--set" : ""}`}>{fileName ?? "未選択"}</span>
+        <span className={`file-input__name${fileName ? " file-input__name--set" : ""} rec-prtr-filename`}>{fileName ?? "未選択"}</span>
       </div>
     </div>
   );
@@ -46,28 +46,30 @@ export function PrtrImportForm() {
   };
 
   return (
-    <form action={formAction}>
+    <form action={formAction} className="rec-prtr-form">
       <p className="tooltip-note" style={{ marginTop: 0 }}>
         環境省の2023年度以降の公式列定義に対応します。全国原本はブラウザの上限を超えるため、運用者が対象施設行へ絞った
         CP932形式の3ファイルを使用してください。原本は保存せず、SHA-256と正規化行だけを保存します。
       </p>
-      <p className="tooltip-note">
-        架空データの動作確認用: {" "}
+      <p className="tooltip-note rec-prtr-samples-note">架空データの動作確認用:</p>
+      <div className="rec-prtr-samples">
         <a href="/api/intake-template?name=prtr-honshi-sample" download className="pill-btn pill-btn--sm" style={{ textDecoration: "none" }}>
           本紙.txt
-        </a>{" "}
+        </a>
         <a href="/api/intake-template?name=prtr-besshi-sample" download className="pill-btn pill-btn--sm" style={{ textDecoration: "none" }}>
           別紙.txt
-        </a>{" "}
+        </a>
         <a href="/api/intake-template?name=prtr-other-industries-sample" download className="pill-btn pill-btn--sm" style={{ textDecoration: "none" }}>
           他業種.txt
-        </a>{" "}
+        </a>
         <a href="/api/intake-template?name=prtr-crosswalk-sample" download className="pill-btn pill-btn--sm" style={{ textDecoration: "none" }}>
           crosswalk.csv
         </a>
-        。排出年度・対象物質リスト版はどちらも2023のまま、4ファイルを同時に選択してください。
+      </div>
+      <p className="tooltip-note">
+        排出年度・対象物質リスト版はどちらも2023のまま、4ファイルを同時に選択してください。
       </p>
-      <div className="grid-2" style={{ gap: 10 }}>
+      <div className="grid-2 rec-prtr-grid" style={{ gap: 10 }}>
         <div className="field">
           <label htmlFor="prtrReportingYear">排出年度</label>
           <input id="prtrReportingYear" name="reportingYear" inputMode="numeric" pattern="[0-9]{4}" defaultValue="2023" required />
@@ -88,7 +90,7 @@ export function PrtrImportForm() {
         onSelectedChange={trackFile("facilityCrosswalkFile")}
       />
       <p className="tooltip-note">
-        crosswalkの列順: <code>reporting_year,facility_id,site_id</code>。指定されていない全国事業所は取り込みません。
+        crosswalkの列順: <code style={{ overflowWrap: "anywhere" }}>reporting_year,facility_id,site_id</code>。指定されていない全国事業所は取り込みません。
       </p>
       <button type="submit" className="pill-btn pill-btn--primary" disabled={pending || selectedFiles.size < 4}>
         {pending ? "全件を検証しています…" : "検証してPRTRを取り込む"}

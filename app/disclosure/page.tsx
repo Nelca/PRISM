@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { METRIC_BY_ID } from "@/lib/environment/metrics";
 import { disclosureNoteCurrent } from "@/lib/environment/review";
 import { loadPipelineView } from "@/lib/views/pipeline";
-import { Card, GuideBox, GuideButton, KV, ScreenLead, Tag } from "../components/ui";
+import { Card, GuideBox, GuideButton, KV, ScreenLead } from "../components/ui";
 import { categoryLabel, formatDepthReason, gapTypeLabel, materialIssueLabel } from "../components/labels";
 import { Num } from "../components/numeric";
 import { StepNav } from "../components/step-nav";
@@ -11,6 +11,8 @@ import { SectionNav } from "../components/section-nav";
 import { AcquireEvidenceAction, RecordIntentionalDecisionAction, WeakenClaimAction } from "./actions-ui";
 import { TaskBanner } from "../components/task-banner";
 import { inputSourceLabel } from "../valuation/category-expansion";
+import { EmptyState, FeatureCard, FeatureGrid, ProgressRing, StatGrid, StatTile, StatusBadge } from "../components/viz";
+import { ACTION_ICON, STAGE_ICON } from "../components/icons";
 
 export const metadata: Metadata = {
   title: "開示への反映 | PRISM",
@@ -56,6 +58,10 @@ export default async function DisclosurePage({
   const selectedFindingId = findings.some((f) => f.id === findingParam) ? findingParam : defaultFindingId;
   const selectedFinding = findings.find((f) => f.id === selectedFindingId);
 
+  // 対応が必要な指摘(gapType!==null)のうち、理由記録済みの件数(ProgressRing用)。
+  const actionableFindings = findings.filter((f) => f.gapType !== null);
+  const handledCount = actionableFindings.filter((f) => handledFindingIds.has(f.id)).length;
+
   return (
     <div className="screen">
       <div className="screen__head">
@@ -71,19 +77,46 @@ export default async function DisclosurePage({
         </GuideBox>}
       </div>
 
-      <SectionNav
-        label="開示内の画面"
-        items={[
-          { href: "/disclosure", label: "指摘", description: "根拠との不一致に対応", active: true },
-          { href: "/disclosure/intake", label: "PDF取込", description: "開示文から主張を抽出", active: false },
-          { href: "/disclosure/draft", label: "下書き", description: "登録済みレコードから作成", active: false },
-        ]}
-      />
+      {detailOnly ? (
+        <SectionNav
+          label="開示内の画面"
+          items={[
+            { href: "/disclosure", label: "指摘", description: "根拠との不一致に対応", active: true },
+            { href: "/disclosure/intake", label: "PDF取込", description: "開示文から主張を抽出", active: false },
+            { href: "/disclosure/draft", label: "下書き", description: "登録済みレコードから作成", active: false },
+          ]}
+        />
+      ) : (
+        <FeatureGrid>
+          <FeatureCard icon={STAGE_ICON.disclosure} title="指摘" href="/disclosure" linkLabel="開く">
+            根拠との不一致に対応します
+          </FeatureCard>
+          <FeatureCard icon={ACTION_ICON.upload} title="PDF取込" href="/disclosure/intake" linkLabel="開く">
+            開示文から主張を抽出します
+          </FeatureCard>
+          <FeatureCard icon={ACTION_ICON.inbox} title="下書き" href="/disclosure/draft" linkLabel="開く">
+            登録済みレコードから作成します
+          </FeatureCard>
+        </FeatureGrid>
+      )}
 
       {!detailOnly && <>
 
       {/* D-11-1:残タスクの頭出しバナー(全6画面共通。残タスクがある時だけ出る)。 */}
       <TaskBanner current="/disclosure" result={result} />
+
+      {actionableFindings.length > 0 && (
+        <StatGrid columns={1}>
+          <StatTile
+            label="根拠確認の進捗"
+            value={`${handledCount}/${actionableFindings.length}`}
+            unit="件"
+            tone={handledCount === actionableFindings.length ? "ok" : "warn"}
+            note="対応が必要な指摘のうち、理由記録済みの件数"
+            visual={<ProgressRing value={handledCount} total={actionableFindings.length} label="根拠確認の進捗" tone={handledCount === actionableFindings.length ? "ok" : "accent"} showText={false} />}
+          />
+        </StatGrid>
+      )}
 
       {coverageSummaries.length > 0 && (
         <Card
@@ -145,9 +178,9 @@ export default async function DisclosurePage({
             <thead>
               <tr>
                 <th>記載</th>
-                <th>種別</th>
-                <th>一致した根拠</th>
-                <th>対応状況</th>
+                <th style={{ minWidth: 110 }}>種別</th>
+                <th style={{ minWidth: 90 }}>一致した根拠</th>
+                <th style={{ minWidth: 110 }}>対応状況</th>
                 <th></th>
               </tr>
             </thead>
@@ -166,9 +199,9 @@ export default async function DisclosurePage({
                     </td>
                     <td>
                       {finding.gapType ? (
-                        <Tag variant="warn">{gapTypeLabel(finding.gapType)}</Tag>
+                        <StatusBadge variant="warn">{gapTypeLabel(finding.gapType)}</StatusBadge>
                       ) : (
-                        <Tag variant="ok">根拠充足</Tag>
+                        <StatusBadge variant="ok">根拠充足</StatusBadge>
                       )}
                       {claim?.extractionConfidence === "low" && (
                         <span className="id-note">主張の分類・抽出内容を要確認</span>
@@ -179,9 +212,9 @@ export default async function DisclosurePage({
                       {finding.gapType === null ? (
                         "—"
                       ) : handledFindingIds.has(finding.id) ? (
-                        <Tag variant="ok">理由記録済み</Tag>
+                        <StatusBadge variant="ok">理由記録済み</StatusBadge>
                       ) : (
-                        <Tag variant="warn">未対応</Tag>
+                        <StatusBadge variant="warn">未対応</StatusBadge>
                       )}
                     </td>
                     <td>
@@ -198,6 +231,12 @@ export default async function DisclosurePage({
             </tbody>
           </table>
         </Card>
+      )}
+
+      {findings.length === 0 && (
+        <EmptyState icon={STAGE_ICON.disclosure} title="指摘はまだありません">
+          開示PDFを取り込むか、算定結果が揃うと根拠との不一致が自動で検出されます。
+        </EmptyState>
       )}
       </>}
 
@@ -218,8 +257,8 @@ export default async function DisclosurePage({
             subtitle={claim ? `${claim.sourceDocument} ${claim.sourcePageOrSection}` : undefined}
             headExtra={
               <>
-                {finding.gapType ? <Tag variant="warn">{gapTypeLabel(finding.gapType)}</Tag> : <Tag variant="ok">根拠充足</Tag>}
-                {claim?.extractionConfidence === "low" && <Tag variant="warn">主張の分類・抽出内容を要確認</Tag>}
+                {finding.gapType ? <StatusBadge variant="warn">{gapTypeLabel(finding.gapType)}</StatusBadge> : <StatusBadge variant="ok">根拠充足</StatusBadge>}
+                {claim?.extractionConfidence === "low" && <StatusBadge variant="warn">主張の分類・抽出内容を要確認</StatusBadge>}
               </>
             }
           >

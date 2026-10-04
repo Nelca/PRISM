@@ -5,6 +5,7 @@ import { buildPortfolioRows } from "@/lib/environment/portfolio";
 import { researchEnabled } from "@/lib/research/access";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { ScreenLead } from "../components/ui";
+import { ActionRow } from "../components/viz";
 import { PortfolioDashboard } from "./portfolio-dashboard";
 
 export const metadata: Metadata = { title: "環境・資源の統合管理 | PRISM" };
@@ -30,10 +31,10 @@ export default async function PortfolioPage() {
         <p className="field-hint">物理指標は入力した目標との比較です。貨幣化・投資承認判定・法令適合判定とは区別して表示します。</p>
       </div>
       {researchEnabled() && (
-        <p className="portfolio-detail-actions">
+        <ActionRow>
           <Link href="/research" className="pill-btn">公開データ・合成データで検証する</Link>
           <Link href="/research/gvfd" className="pill-btn">GVFDで環境影響を算定する</Link>
-        </p>
+        </ActionRow>
       )}
       <PortfolioDashboard
         rows={buildPortfolioRows(result, todayInJst())}

@@ -1,0 +1,9 @@
+/* valuation 画面固有のスタイル(2026-10 視覚化リデザイン)。共通部品は app/styles/viz.css。 */
+
+/* 評価対象: 「評価の深さ」列は現在値のバッジと切替を縦に並べ、間隔を空ける。 */
+.val-depth {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}

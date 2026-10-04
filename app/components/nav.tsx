@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Icon, iconForHref } from "./icons";
 
 /**
  * サイドナビ(指示01)。
@@ -60,7 +61,10 @@ export function Nav({ needsAttentionHrefs }: NavProps) {
       className={`nav__item${isActive(entry.href) ? " active" : ""}`}
       aria-current={isActive(entry.href) ? "page" : undefined}
     >
-      <div className="nav__label">{entry.label}</div>
+      <span className="nav__label">
+        <Icon icon={iconForHref(entry.href)} size={16} className="nav__icon" />
+        <span>{entry.label}</span>
+      </span>
       {needsAttention.has(entry.href) && (
         <span className="nav__dot" role="img" aria-label="未完了の判断があります" title="未完了の判断があります" />
       )}

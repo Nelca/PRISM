@@ -75,25 +75,25 @@ def landscape(t):
     txt(d,(1420,77),'ENVIRONMENTAL DECISIONS',18,(206,210,216) if dark else MUTED,latin=True)
     shift=int((1-ease)*24)
     if idx==0:
-        txt(d,(110,275+shift),'節水設備への投資。\nその費用は、見合うか。',85,PAPER,serif=True,spacing=142)
-        txt(d,(115,780),'環境対策の費用対効果を試算する、PRISM。',29,HIGHLIGHT)
+        txt(d,(110,275+shift),'算出方法で、\n変わる金額。',85,PAPER,serif=True,spacing=142)
+        txt(d,(115,780),'環境財務評価プラットフォーム PRISM',29,HIGHLIGHT)
     elif idx==1:
-        txt(d,(110,270+shift),'取水量と対策費用から、\n投資効果を試算。',80,INK,serif=True,spacing=160)
+        txt(d,(110,270+shift),'評価額を比較し、\n金額が違う理由を確認。',76,INK,serif=True,spacing=160)
         d.line((117,748,740,748),fill=(219,226,236),width=2)
-        txt(d,(117,794),'回避できる環境関連コストも考慮して、比較します。',32,MUTED)
+        txt(d,(117,794),'評価の対象範囲と前提を確認し、財務影響の算定へ。',32,MUTED)
         txt(d,(1560,700),'?',210,(219,226,236),serif=True)
     elif idx==2:
         txt(d,(110,212+shift),'試算結果が、赤字にも黒字にも。',68,INK,serif=True)
         txt(d,(110,347),'例：節水設備のNPVが、−800万円〜＋1,800万円。',36,MUTED)
         chart(d,190,500,1490,330,progress=ease)
     elif idx==3:
-        txt(d,(110,240+shift),'水利用量や\nコストの前提を',76,INK,serif=True,spacing=122)
+        txt(d,(110,240+shift),'算定方法や\n評価の前提を',76,INK,serif=True,spacing=122)
         txt(d,(115,568),'確かめてから、\n投資を判断。',48,BLUE,serif=True,spacing=82)
         chart(d,950,275,760,390,progress=1)
         txt(d,(955,840),'投資効果が、承認基準の0をまたぐ場合。',26,INK)
     elif idx==4:
         txt(d,(110,215+shift),'試算を、稟議・開示の説明に使う。',68,INK,serif=True)
-        labels=[('01','金額に換算','複数の方法で、環境データを金額に換算。'),('02','投資基準と比較','試算したNPVと社内の承認基準を比較。'),('03','根拠を記録','計算方法と前提を記録し、説明に使う。')]
+        labels=[('01','金額に換算','複数の方法で、環境データを金額に換算。'),('02','基準と照合','財務影響と重要性を、判断基準と照合。'),('03','根拠を記録','計算方法と前提を記録し、説明に使う。')]
         for i,(n,title,body) in enumerate(labels):
             x=115+i*585
             d.line((x,456,x+510,456),fill=(219,226,236),width=2)
@@ -104,14 +104,15 @@ def landscape(t):
             txt(d,(x,693),'\n'.join(lines),25,MUTED,spacing=47)
         txt(d,(115,920),'適用範囲・比較可能性・利用条件は、対象ごとに確認します。',20,MUTED)
     elif idx==5:
-        txt(d,(110,280+shift),'CO₂削減・節水を、\n費用と効果で比較。',84,PAPER,serif=True,spacing=148)
-        txt(d,(116,785),'排出量・取水量と対策費用を、投資の検討に使う。',29,HIGHLIGHT)
+        txt(d,(110,280+shift),'環境の財務影響を、\n算定・評価・判定。',84,PAPER,serif=True,spacing=148)
+        txt(d,(116,785),'環境情報と事業・財務データを、経営判断の根拠に。',29,HIGHLIGHT)
     else:
-        txt(d,(110,245+shift),'環境対策の費用対効果を、\n投資判断の根拠に。',72,PAPER,serif=True,spacing=136)
-        txt(d,(115,647),'まずは、ひとつの投資案件から。',34,HIGHLIGHT)
+        txt(d,(110,245+shift),'正解のない環境の評価額を、\n投資の根拠に変える。',65,PAPER,serif=True,spacing=136)
+        txt(d,(115,180),'算出方法で、変わる金額。',29,HIGHLIGHT)
+        txt(d,(115,647),'環境財務評価プラットフォーム',34,HIGHLIGHT)
         d.line((115,756,800,756),fill=(130,138,150),width=2)
         txt(d,(115,804),'デザインパートナー向け紹介',26,PAPER)
-        txt(d,(115,859),'LPで、節水設備の試算例を見る  ↗',25,HIGHLIGHT)
+        txt(d,(115,859),'LPで、評価・判定の具体例を見る  ↗',25,HIGHLIGHT)
     d.line((100,1007,1820,1007),fill=(130,138,150) if dark else (219,226,236),width=1)
     d.line((100,1007,100+1720*t/45,1007),fill=HIGHLIGHT if dark else BLUE,width=3)
     txt(d,(100,1027),'PRISM / BRAND FILM',13,col,latin=True)
@@ -127,19 +128,20 @@ def vertical(t):
     idx=min(2,int(t/5)); p=min(1,(t-idx*5)/.8); shift=int((1-(1-(1-p)**3))*20)
     im=bg(1080,1920,idx!=1,t); d=ImageDraw.Draw(im); col=PAPER if idx!=1 else INK
     logo(d,85,210,col,53)
-    txt(d,(88,323),'ENVIRONMENTAL DECISIONS',18,col,latin=True)
+    txt(d,(88,323),'環境財務評価プラットフォーム',24,col)
     if idx==0:
-        txt(d,(80,535+shift),'節水設備の\n投資効果を\n試算・比較。',87,PAPER,serif=True,spacing=160)
-        txt(d,(86,1210),'取水量・対策費用から、\n費用対効果を試算。',37,HIGHLIGHT,spacing=73)
+        txt(d,(80,535+shift),'算出方法で、\n変わる金額。',87,PAPER,serif=True,spacing=160)
+        txt(d,(86,1210),'複数の方法で算出した\n評価額と、その違いを比較。',37,HIGHLIGHT,spacing=73)
     elif idx==1:
         txt(d,(80,455+shift),'試算は赤字か、\n黒字か。\n基準と比較。',80,INK,serif=True,spacing=140)
         chart(d,105,985,850,345,progress=min(1,(t-5)/1.1),compact=True)
-        txt(d,(100,1530),'水利用量やコストの前提を確認。',31,INK)
+        txt(d,(100,1530),'算定方法や評価の前提を確認。',31,INK)
     else:
-        txt(d,(80,490+shift),'環境対策の\n費用対効果を、\n投資判断の根拠に。',66,PAPER,serif=True,spacing=137)
-        txt(d,(86,1140),'まずは、ひとつの\n投資案件から。',41,HIGHLIGHT,serif=True,spacing=78)
+        txt(d,(86,412),'算出方法で、変わる金額。',32,HIGHLIGHT)
+        txt(d,(80,490+shift),'正解のない\n環境の評価額を、\n投資の根拠に変える。',66,PAPER,serif=True,spacing=137)
+        txt(d,(86,1140),'環境財務評価\nプラットフォーム',41,HIGHLIGHT,serif=True,spacing=78)
         d.line((86,1370,994,1370),fill=(130,138,150),width=2)
-        txt(d,(86,1430),'LPで、節水設備の試算例を見る ↗',32,PAPER)
+        txt(d,(86,1430),'LPで、評価・判定の具体例を見る ↗',32,PAPER)
         txt(d,(86,1510),'デザインパートナー向け紹介',24,HIGHLIGHT)
     txt(d,(86,1640),'PRISM / ENVIRONMENTAL DECISION INTELLIGENCE',16,col,latin=True)
     return im
@@ -185,10 +187,11 @@ def movie(ffmpeg,mode,duration,w,h,name):
 def stills():
     landscape(42).save(OUT/'assets/film-poster.jpg',quality=95)
     # Social cards carry their own message, rather than a cropped website screenshot.
-    for w,h,name,headline,sub in [(1200,630,'social-landscape.png','環境対策の費用対効果を、\n投資判断の根拠に。','排出量・取水量と対策費用から、投資効果を試算。'),(1080,1080,'social-square.png','節水設備への投資。\n費用に見合うか。','取水量と対策費用から試算し、承認基準と比較。')]:
-        im=bg(w,h,True); d=ImageDraw.Draw(im); logo(d,60,50,PAPER,35)
-        txt(d,(62,200 if h==630 else 310),headline,50 if h==630 else 61,PAPER,serif=True,spacing=100 if h==630 else 118)
-        txt(d,(65,470 if h==630 else 680),sub,22 if h==630 else 25,HIGHLIGHT)
+    for w,h,name in [(1200,630,'social-landscape.png'),(1080,1080,'social-square.png')]:
+        im=bg(w,h,True); d=ImageDraw.Draw(im); logo(d,60,45,PAPER,35)
+        txt(d,(64,135 if h==630 else 235),'算出方法で、変わる金額。',26 if h==630 else 34,HIGHLIGHT)
+        txt(d,(62,205 if h==630 else 350),'正解のない環境の評価額を、\n投資の根拠に変える。',44 if h==630 else 57,PAPER,serif=True,spacing=90 if h==630 else 120)
+        txt(d,(65,470 if h==630 else 720),'環境財務評価プラットフォーム',24 if h==630 else 30,HIGHLIGHT)
         txt(d,(65,h-70),'PRISM / デザインパートナー向け紹介',18,PAPER)
         im.save(OUT/'assets'/name)
     vertical(12).save(OUT/'assets/social-vertical.png')

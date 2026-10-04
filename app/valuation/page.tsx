@@ -8,13 +8,15 @@ import type { ValuationRecord } from "@core/types/valuation";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import {
   decompositionForMaterialIssue,
+  materialIssueIdsRequiringRepresentativeSelection,
   materialIssueIdsWithoutRepresentativeSelection,
   maxDivergenceRatio,
   pairDivergenceRatio,
 } from "@/lib/pipeline/open-tasks";
-import { Num, pickYenScale } from "../components/numeric";
+import { Num, formatYen, pickYenScale } from "../components/numeric";
 import { Card, GuideBox, GuideButton, KV, ScreenLead, Stat, Tag } from "../components/ui";
 import { tierLabel, tierTagVariant } from "../components/tag-utils";
+import { StatGrid, StatTile, StatusBadge, ProgressRing, RangeBar, ActionRow } from "../components/viz";
 import { methodLabel, methodShortLabel, withMethodLabelsInText } from "../components/method-labels";
 import { categoryLabel, materialIssueLabel } from "../components/labels";
 import { StepNav } from "../components/step-nav";
@@ -79,9 +81,11 @@ export default async function ValuationPage({
           <p style={{ color: "var(--ink-faint)" }}>
             評価対象の絞り込みで課題を「詳細評価」に切り替えると、ここに算定結果が表示されます。
           </p>
-          <Link href="/assessment" className="pill-btn pill-btn--sm">
-            評価対象の絞り込みへ →
-          </Link>
+          <ActionRow>
+            <Link href="/assessment" className="pill-btn pill-btn--sm">
+              評価対象の絞り込みへ →
+            </Link>
+          </ActionRow>
         </Card>
       </div>
     );
@@ -104,6 +108,8 @@ export default async function ValuationPage({
    * ホーム・④の未完了タスク(`deriveOpenTasks`)と二重実装になっていた。
    */
   const unselectedIssueIds = materialIssueIdsWithoutRepresentativeSelection(result);
+  const requiredSelectionIssueIds = materialIssueIdsRequiringRepresentativeSelection(result);
+  const selectedSelectionCount = requiredSelectionIssueIds.length - unselectedIssueIds.length;
 
   const selectedIssueId = issueParam && materialIssueIds.includes(issueParam) ? issueParam : materialIssueIds[0];
   const records = valuationRecordsByMaterialIssue[selectedIssueId];
@@ -128,6 +134,8 @@ export default async function ValuationPage({
       r.quantileRange ? [r.centralValue, r.quantileRange.p5, r.quantileRange.p95] : [r.centralValue]
     )
   );
+  // RangeBarは同じ表の行でmin/maxを揃える(揃えないと行同士を比べられない)。この対象に出てくる手法のP95の最大値を軸の上限にする。
+  const rangeMaxP95 = Math.max(0, ...records.filter((r) => r.quantileRange).map((r) => r.quantileRange!.p95));
 
   // 中心値が0円の手法(D-08:0の行も非表示にせず、理由を添えて出す)。同じ理由はまとめて1文にする。
   // 完成実装 §5.6:methodIdの文字列判定ではなく、手法アダプターが確定した trace.zeroMeaning を読む。
@@ -339,6 +347,24 @@ export default async function ValuationPage({
       {/* D-11-1:残タスクの頭出し(最下部までスクロールしなくても見える)。 */}
       <TaskBanner current="/valuation" result={result} />
 
+      <StatGrid columns={2}>
+        <StatTile label="詳細評価の対象" value={materialIssueIds.length} unit="件" />
+        <StatTile
+          label="代表値の選択"
+          value={`${selectedSelectionCount}/${requiredSelectionIssueIds.length}`}
+          tone={unselectedIssueIds.length > 0 ? "pending" : "ok"}
+          visual={
+            <ProgressRing
+              value={selectedSelectionCount}
+              total={requiredSelectionIssueIds.length}
+              label="代表値の選択"
+              tone={unselectedIssueIds.length > 0 ? "pending" : "ok"}
+              showText={false}
+            />
+          }
+        />
+      </StatGrid>
+
       {/*
         課題の切替(D-06:件数が増えても破綻しない共通セレクタ)。
         C-05の「代表値が未選択」ドットはピル・リストのどちらのモードでも出る。
@@ -494,7 +520,7 @@ export default async function ValuationPage({
               <th>価値の性質</th>
               <th title="算定の確からしさ。A=現地評価に近い/B=補正付きで実務利用可/C=桁の把握のみ/直接算定=他地域の研究値を借りていないため等級の対象外">確からしさ</th>
               <th>中心値</th>
-              <th>幅(P5〜P95)</th>
+              <th style={{ minWidth: 170 }}>幅(P5〜P95)</th>
               <th>係数・対応表</th>
             </tr>
           </thead>
@@ -510,7 +536,9 @@ export default async function ValuationPage({
                   </Tag>
                 </td>
                 <td>
-                  <Tag variant={tierTagVariant(r.transferFitness.tier)}>{tierLabel(r.transferFitness.tier)}</Tag>
+                  <StatusBadge variant={tierTagVariant(r.transferFitness.tier)} title={tierLabel(r.transferFitness.tier)}>
+                    {tierLabel(r.transferFitness.tier)}
+                  </StatusBadge>
                 </td>
                 <td className="num" style={{ fontWeight: 600 }}>
                   <Num value={r.centralValue} unit="円" scale={recordScale} />
@@ -526,6 +554,18 @@ export default async function ValuationPage({
                     <>
                       <Num value={r.quantileRange.p5} unit="円" scale={recordScale} /> 〜{" "}
                       <Num value={r.quantileRange.p95} unit="円" scale={recordScale} />
+                      <div style={{ marginTop: 4 }}>
+                        <RangeBar
+                          low={r.quantileRange.p5}
+                          mid={r.quantileRange.p50}
+                          high={r.quantileRange.p95}
+                          min={0}
+                          max={rangeMaxP95}
+                          label={`${methodLabel(r.methodId)}の試算の幅`}
+                          tone={r.valueConcept === "welfare" ? "neutral" : "accent"}
+                          format={(n) => formatYen(n, recordScale)}
+                        />
+                      </div>
                     </>
                   ) : (
                     "不確実性情報未取得"

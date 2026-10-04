@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { isUserSiteId } from "@/lib/db/repositories/sites";
 import { loadSitesView } from "@/lib/views/pipeline";
-import { Card, GuideBox, GuideButton, ScreenLead, Tag } from "../components/ui";
+import { Card, GuideBox, GuideButton, ScreenLead } from "../components/ui";
 import { industrySectorLabel, siteTypeLabel } from "../components/labels";
 import { StepNav } from "../components/step-nav";
 import { DataSourceAttribution } from "../components/attribution";
@@ -10,6 +9,8 @@ import { EditSiteButton } from "./add-site-form";
 import { RemoveSiteButton } from "./remove-site-button";
 import { TaskBanner } from "../components/task-banner";
 import { IntakeReference } from "./intake-reference";
+import { FeatureCard, FeatureGrid, StatusBadge } from "../components/viz";
+import { CATEGORY_ICON, STAGE_ICON } from "../components/icons";
 
 /** 操作列に出す「なぜ編集できないのか」。空欄のまま放置しない(指示B-03)。 */
 const LOCKED_REASON = {
@@ -59,24 +60,20 @@ export default async function SitesPage() {
 
       <div className="grid-2">
         <Card title="登録・取込" subtitle="作業の種類ごとに画面を分けています">
-          <div className="action-list">
-            <Link href="/sites/register" className="action-link">
-              <b>拠点データを登録する</b>
-              <span>CSV一括登録、または1件ずつ追加します</span>
-            </Link>
-            <Link href="/sites/import/prtr" className="action-link">
-              <b>PRTR排出量を取り込む</b>
-              <span>汚染物質算定に使う4ファイルを検証します</span>
-            </Link>
-            <Link href="/sites/import/waste" className="action-link">
-              <b>廃棄物データを取り込む</b>
-              <span>廃棄物カテゴリの追加入力を反映します</span>
-            </Link>
-            <Link href="/sites/import/land-use" className="action-link">
-              <b>土地利用データを取り込む</b>
-              <span>土地利用・改変の追加入力を反映します</span>
-            </Link>
-          </div>
+          <FeatureGrid>
+            <FeatureCard icon={STAGE_ICON.sites} title="拠点データを登録する" href="/sites/register" linkLabel="開く">
+              CSV一括登録、または1件ずつ追加します
+            </FeatureCard>
+            <FeatureCard icon={CATEGORY_ICON.pollution} title="PRTR排出量を取り込む" href="/sites/import/prtr" linkLabel="開く">
+              汚染物質算定に使う4ファイルを検証します
+            </FeatureCard>
+            <FeatureCard icon={CATEGORY_ICON.waste} title="廃棄物データを取り込む" href="/sites/import/waste" linkLabel="開く">
+              廃棄物カテゴリの追加入力を反映します
+            </FeatureCard>
+            <FeatureCard icon={CATEGORY_ICON.land_use} title="土地利用データを取り込む" href="/sites/import/land-use" linkLabel="開く">
+              土地利用・改変の追加入力を反映します
+            </FeatureCard>
+          </FeatureGrid>
         </Card>
 
         <IntakeReference />
@@ -97,7 +94,7 @@ export default async function SitesPage() {
                 <th>名称</th>
                 <th>種別</th>
                 <th>業種</th>
-                <th>座標解決</th>
+                <th style={{ minWidth: 110 }}>座標解決</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -123,12 +120,12 @@ export default async function SitesPage() {
                         titleに含める(行内にボタンを増やさず、既存の操作列と関連付ける)。
                       */}
                       {site.location.kind === "coordinates" ? (
-                        <Tag variant="neutral">座標あり</Tag>
+                        <StatusBadge status="done">座標あり</StatusBadge>
                       ) : site.location.geocoded ? (
-                        <Tag variant="neutral">住所→解決済み</Tag>
+                        <StatusBadge status="done">住所→解決済み</StatusBadge>
                       ) : (
-                        <Tag
-                          variant="warn"
+                        <StatusBadge
+                          status="attention"
                           title={
                             editable
                               ? "座標が解決できないため評価対象外になります。操作列の「編集」から修正できます"
@@ -136,7 +133,7 @@ export default async function SitesPage() {
                           }
                         >
                           未解決
-                        </Tag>
+                        </StatusBadge>
                       )}
                     </td>
                     <td>
@@ -147,7 +144,7 @@ export default async function SitesPage() {
                         </span>
                       ) : (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <Tag variant="neutral">{locked.tag}</Tag>
+                          <StatusBadge variant="neutral">{locked.tag}</StatusBadge>
                           <span style={{ color: "var(--ink-faint)", fontSize: 11.5 }} title={locked.title}>
                             編集不可
                           </span>

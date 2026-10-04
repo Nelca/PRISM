@@ -5,9 +5,10 @@ import { INTERNAL_REVIEW_TEMPLATE } from "@core/disclosure/templates/internal-re
 import { physicalDisclosureBundle } from "@/lib/environment/review";
 import { hasRepresentativeSelection } from "@/lib/pipeline/valuation-insights";
 import { loadPipelineView } from "@/lib/views/pipeline";
-import { Card, ScreenLead, Tag } from "../../components/ui";
+import { Card, ScreenLead } from "../../components/ui";
 import { SectionNav } from "../../components/section-nav";
 import { TextExport } from "../../components/text-export";
+import { StatusBadge } from "../../components/viz";
 
 export const metadata: Metadata = {
   title: "開示文下書き | PRISM",
@@ -69,7 +70,7 @@ export default async function DisclosureDraftPage() {
       />
 
       {unfilledRequirements.length > 0 && (
-        <Card title="下書きに不足している項目" headExtra={<Tag variant="warn">{unfilledRequirements.length}件</Tag>}>
+        <Card title="下書きに不足している項目" headExtra={<StatusBadge variant="warn">{unfilledRequirements.length}件</StatusBadge>}>
           <ul className="task-list" style={{ margin: 0 }}>
             {unfilledRequirements.map((requirement) => <li key={requirement}>{requirement}</li>)}
           </ul>
@@ -92,7 +93,7 @@ export default async function DisclosureDraftPage() {
       </Card>
       <Card
         title="下書き"
-        headExtra={<Tag variant="neutral">基準へのマッピング前</Tag>}
+        headExtra={<StatusBadge variant="neutral">基準へのマッピング前</StatusBadge>}
         foot="金額の評価は固定の文章テンプレートに数値を埋め込み、物理指標は利用者が確認した文案を出力します。AIによる文章生成は行っていません"
       >
         <TextExport text={exportText} filename="prism-disclosure-draft.txt" />

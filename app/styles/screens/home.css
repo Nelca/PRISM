@@ -1,0 +1,77 @@
+/* home 画面固有のスタイル(2026-10 視覚化リデザイン)。共通部品は app/styles/viz.css。 */
+
+/* ナビ項目にアイコンを追加(G-A 1)。globals.css の .nav__label(flex子)の中に
+   アイコン+文言を inline-flex で並べる。モバイルドロワーでも折り返しのみで崩れない。 */
+.nav__label {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.nav__icon {
+  margin-top: 1px;
+  color: #9db9ff;
+  opacity: 0.85;
+}
+.nav__item.active .nav__icon {
+  opacity: 1;
+}
+
+/* ヘッダーのルートタイトル横のアイコン(G-A 8)。 */
+.header-context__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.header-context__route-icon {
+  color: var(--accent-ink, var(--accent));
+}
+
+/* ホーム冒頭の3段フロー(G-A 2): FeatureCard に置き換え。既存の文言は維持。 */
+.home-flow-grid {
+  margin-top: var(--space-4);
+}
+
+/* 全体の流れ(G-A 3): Stepper をワークフロー一覧の上に。 */
+.home-stepper {
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+/* 得られた結果(G-A 4): StatGrid に置き換え。 */
+.home-outcome-grid {
+  padding: var(--space-4);
+}
+
+/* ガイドの年間サイクル(G-A 7): 4列カード。 */
+.home-cycle {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.home-cycle__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  min-width: 0;
+}
+.home-cycle__card > .status-badge {
+  align-self: flex-start;
+}
+.home-cycle__card p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+@media (max-width: 900px) {
+  .home-cycle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .home-cycle {
+    grid-template-columns: 1fr;
+  }
+}

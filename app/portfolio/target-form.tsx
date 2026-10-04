@@ -11,6 +11,7 @@ import {
   type TargetCategory,
   type TargetValues,
 } from "@/lib/environment/metrics";
+import { ActionRow } from "../components/viz";
 import { saveTargetAction, type TargetFormState } from "./actions";
 
 const VALUE_FIELDS = [
@@ -54,8 +55,10 @@ export function TargetForm({
     return (
       <div role="status">
         <p className="form-success">環境指標を保存し、目標との関係を判定しました。</p>
-        <Link href={`/portfolio/${state.savedId}`} className="pill-btn pill-btn--accent">保存した指標を確認する →</Link>{" "}
-        <Link href="/portfolio" className="pill-btn">統合管理へ</Link>
+        <ActionRow>
+          <Link href={`/portfolio/${state.savedId}`} className="pill-btn pill-btn--accent">保存した指標を確認する →</Link>
+          <Link href="/portfolio" className="pill-btn">統合管理へ</Link>
+        </ActionRow>
       </div>
     );
   }

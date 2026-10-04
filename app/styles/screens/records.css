@@ -1,0 +1,48 @@
+/* records 画面固有のスタイル(2026-10 視覚化リデザイン)。共通部品は app/styles/viz.css。 */
+
+/*
+ * /sites/import/prtr の横はみ出し修正。
+ * フォーム全体とグリッド・入力・ファイル名表示に min-width:0 / max-width:100% を敷き、
+ * どの子要素も自分の内容分だけ幅を要求してコンテナ(.card__body)からあふれないようにする。
+ * サンプルDLリンク4つは折り返し可能な行に、長い英数字トークンは overflow-wrap で折る。
+ */
+.rec-prtr-form {
+  max-width: 100%;
+  min-width: 0;
+}
+.rec-prtr-form .rec-prtr-grid {
+  min-width: 0;
+}
+.rec-prtr-form .rec-prtr-grid .field {
+  min-width: 0;
+}
+.rec-prtr-form .rec-prtr-grid input {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.rec-prtr-samples-note {
+  margin-bottom: 6px;
+}
+.rec-prtr-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 10px;
+  min-width: 0;
+}
+.rec-prtr-samples a {
+  max-width: 100%;
+}
+.rec-prtr-field {
+  min-width: 0;
+  max-width: 100%;
+}
+.rec-prtr-file-input {
+  max-width: 100%;
+  min-width: 0;
+}
+.rec-prtr-filename {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}

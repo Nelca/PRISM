@@ -4,9 +4,10 @@ import { notFound } from "next/navigation";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { bindingLabel, verdictLabel, verdictTagVariant } from "../../../components/labels";
 import { Num, pickYenScale } from "../../../components/numeric";
-import { Card, ScreenLead, Stat, TableScroll, Tag } from "../../../components/ui";
+import { Card, ScreenLead, Stat, TableScroll } from "../../../components/ui";
 import { Scatter } from "../../../components/charts/Scatter";
 import { SectionNav } from "../../../components/section-nav";
+import { StatusBadge } from "../../../components/viz";
 
 export const metadata: Metadata = { title: "対策・判定の分析 | PRISM" };
 
@@ -57,7 +58,7 @@ export default async function DecisionAnalysisPage({ params }: { params: Promise
         ]}
       />
 
-      <Card title="現在の判定" headExtra={<Tag variant={verdictTagVariant(record.verdict)}>{record.verdict === "pending" ? "保留中" : verdictLabel(record.verdict)}</Tag>}>
+      <Card title="現在の判定" headExtra={<StatusBadge variant={verdictTagVariant(record.verdict)}>{record.verdict === "pending" ? "保留中" : verdictLabel(record.verdict)}</StatusBadge>}>
         <div className="grid-3">
           <Stat label="投資の承認ライン" value={threshold === null ? "未入力" : <Num value={threshold} unit="円" />} />
           <Stat label="自然コスト反映後NPV" value={<Num value={Number(record.natureAdjustedNpv.central)} unit="円" scale={scale} />} />

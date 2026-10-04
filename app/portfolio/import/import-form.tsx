@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition, type ChangeEvent } from "react";
 import { TARGET_CSV_MAX_BYTES } from "@/lib/environment/csv";
+import { ActionRow } from "../../components/viz";
 import { importTargetsAction, type ImportPreviewRow, type ImportState } from "./actions";
 
 const MAX_VISIBLE_ERRORS = 30;
@@ -45,17 +46,19 @@ export function ImportForm({ initialCsv = "" }: { initialCsv?: string }) {
     return (
       <div role="status">
         <p>{state.savedCount}件を保存し、判定しました。</p>
-        <Link href="/portfolio" className="pill-btn pill-btn--accent">統合管理で確認する →</Link>
-        <button
-          className="pill-btn"
-          onClick={() => {
-            setCsv("");
-            setReason("");
-            setState({});
-          }}
-        >
-          続けて取り込む
-        </button>
+        <ActionRow>
+          <Link href="/portfolio" className="pill-btn pill-btn--accent">統合管理で確認する →</Link>
+          <button
+            className="pill-btn"
+            onClick={() => {
+              setCsv("");
+              setReason("");
+              setState({});
+            }}
+          >
+            続けて取り込む
+          </button>
+        </ActionRow>
       </div>
     );
   }

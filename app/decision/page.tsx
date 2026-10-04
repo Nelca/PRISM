@@ -17,6 +17,7 @@ import { PipelineWarnings } from "../components/pipeline-warnings";
 import { DeferredDecisions } from "./deferred-decisions";
 import { ResourceDecisions } from "./resource-decisions";
 import { SectionNav } from "../components/section-nav";
+import { StatGrid, StatTile, StatusBadge, RatioBar, RangeBar, ActionRow } from "../components/viz";
 
 export const metadata: Metadata = {
   title: "対策と判定 | PRISM",
@@ -78,9 +79,11 @@ export default async function DecisionPage({
             評価対象の絞り込みで課題を「詳細評価」に切り替え、価値の算定と代表値の選択で代表値を選ぶと、
             ここに判定結果が表示されます。
           </p>
-          <Link href="/assessment" className="pill-btn pill-btn--sm">
-            評価対象の絞り込みへ →
-          </Link>
+          <ActionRow>
+            <Link href="/assessment" className="pill-btn pill-btn--sm">
+              評価対象の絞り込みへ →
+            </Link>
+          </ActionRow>
         </Card>
         {welfareOnlyIssues.length > 0 && (
           <Card title="社会的厚生価値の参考結果" headExtra={<Tag variant="welfare">NPV・ROI対象外</Tag>}>
@@ -113,6 +116,11 @@ export default async function DecisionPage({
     };
   });
 
+  // 2026-10 視覚化リデザイン:冒頭サマリーの件数(既存のsiteRowsから導くだけ)。
+  const confirmedCount = siteRows.filter((row) => row.record.verdict !== "pending").length;
+  const crossesCount = siteRows.filter((row) => row.record.verdict === "crosses").length;
+  const unboundCount = siteRows.filter((row) => !row.bindingConfirmed).length;
+
   /** 既定で展開する拠点:残タスクがある先頭の拠点、なければ先頭。URLの?site=を優先。 */
   const defaultOpenSiteId = siteRows.find((row) => row.remaining.length > 0)?.siteId ?? siteRows[0]?.siteId;
   const openSiteId = siteRows.some((row) => row.siteId === siteParam) ? siteParam : defaultOpenSiteId;
@@ -136,6 +144,33 @@ export default async function DecisionPage({
           承認ラインを入力し、対策を選び、結果を反映する社内制度を指定します。
         </GuideBox>}
       </div>
+
+      {/* 2026-10 視覚化リデザイン:冒頭で「判定確定・承認ライン超過・未反映」の件数を一目で見せる。 */}
+      {!detailOnly && (
+        <StatGrid columns={3}>
+          <StatTile
+            label="判定確定"
+            value={`${confirmedCount}/${siteRows.length}`}
+            unit="拠点"
+            tone={confirmedCount === siteRows.length ? "ok" : "pending"}
+            visual={<RatioBar value={confirmedCount} total={siteRows.length} label="判定確定拠点" tone={confirmedCount === siteRows.length ? "ok" : "pending"} showText={false} />}
+          />
+          <StatTile
+            label="承認ライン超過件数"
+            value={crossesCount}
+            unit="件"
+            tone={crossesCount > 0 ? "warn" : "neutral"}
+            note="承認ラインをまたぐ判定"
+          />
+          <StatTile
+            label="未反映件数"
+            value={unboundCount}
+            unit="件"
+            tone={unboundCount > 0 ? "warn" : "ok"}
+            note="結果の反映先が未選択"
+          />
+        </StatGrid>
+      )}
 
       <ResourceDecisions
         records={[...interactions.environmentalTargets.values()].filter((record) => !detailOnly || record.siteId === openSiteId)}
@@ -203,7 +238,7 @@ export default async function DecisionPage({
           <thead>
             <tr>
               <th>拠点</th>
-              <th>判定</th>
+              <th style={{ minWidth: 110 }}>判定</th>
               <th>選択中の対策</th>
               <th>反映先</th>
               <th>残タスク</th>
@@ -217,9 +252,9 @@ export default async function DecisionPage({
                   <b>{row.siteName}</b>
                 </td>
                 <td>
-                  <Tag variant={verdictTagVariant(row.record.verdict)}>
+                  <StatusBadge variant={verdictTagVariant(row.record.verdict)}>
                     {row.record.verdict === "pending" ? "保留中" : verdictLabel(row.record.verdict)}
-                  </Tag>
+                  </StatusBadge>
                 </td>
                 <td>{row.selectedLabel}</td>
                 <td style={{ fontSize: 12 }}>{row.bindingConfirmed ? bindingLabel(row.record.bindingMechanism.kind) : "未選択"}</td>
@@ -265,6 +300,13 @@ export default async function DecisionPage({
         const npvScale = pickYenScale(
           ...countermeasureCandidates.map((c) => c.decisionRecord.natureAdjustedNpv.central)
         );
+        // 2026-10 視覚化リデザイン:対策候補の比較表で行をまたいで比べられるよう、
+        // 投資額(RatioBar)とNPV(RangeBar)の軸をこの表の中で揃える。
+        const maxInitial = Math.max(...countermeasureCandidates.map((c) => Number(c.investmentCost.initial)), 0) || 1;
+        const npvLows = countermeasureCandidates.map((c) => Number(c.decisionRecord.natureAdjustedNpv.quantileRange.p5));
+        const npvHighs = countermeasureCandidates.map((c) => Number(c.decisionRecord.natureAdjustedNpv.quantileRange.p95));
+        const npvRangeMin = Math.min(...npvLows, 0, threshold !== null ? Number(threshold) : 0);
+        const npvRangeMax = Math.max(...npvHighs, threshold !== null ? Number(threshold) : 0) * 1.05 || 1;
 
         return (
           <div key={siteId} id={`site-${siteId}`} className="detail-stack">
@@ -274,9 +316,9 @@ export default async function DecisionPage({
                 subtitle={`対象:${countermeasureCandidates.find((c) => c.key === selectedCountermeasureKey)?.label}`}
                 headExtra={
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <Tag variant={verdictTagVariant(record.verdict)}>
+                    <StatusBadge variant={verdictTagVariant(record.verdict)}>
                       {record.verdict === "pending" ? "判定は保留中" : verdictLabel(record.verdict)}
-                    </Tag>
+                    </StatusBadge>
                     {/*
                       C-06:保留中は本文先頭の主要ボタンが主導線になるため、ここには出さない
                       (同じフォームを開くボタンを1画面に2つ並べない)。確定後は従来どおり
@@ -328,6 +370,38 @@ export default async function DecisionPage({
                     }
                   />
                 </div>
+                {/*
+                  2026-10 視覚化リデザインの中心的な部品:投資価値の幅(p5-中心-p95)が承認ライン
+                  をまたぐかどうかを視覚化する。承認ラインが未入力(pending)の間は threshold を
+                  渡さず、仮の値を置かない(M6 D-10の規律を維持)。
+                */}
+                <div style={{ marginTop: 14 }}>
+                  {record.verdict === "pending" ? (
+                    <RangeBar
+                      low={Number(record.natureAdjustedNpv.quantileRange.p5)}
+                      mid={Number(record.natureAdjustedNpv.central)}
+                      high={Number(record.natureAdjustedNpv.quantileRange.p95)}
+                      min={Math.min(0, Number(record.natureAdjustedNpv.quantileRange.p5))}
+                      max={Math.max(Number(record.natureAdjustedNpv.quantileRange.p95), 0) * 1.1 || 1}
+                      label="投資価値の幅(自然コスト反映後)"
+                      tone="pending"
+                      width={260}
+                      format={(n) => formatYen(n, pickYenScale(Number(record.natureAdjustedNpv.quantileRange.p5), Number(record.natureAdjustedNpv.quantileRange.p95)))}
+                    />
+                  ) : (
+                    <RangeBar
+                      low={Number(record.natureAdjustedNpv.quantileRange.p5)}
+                      mid={Number(record.natureAdjustedNpv.central)}
+                      high={Number(record.natureAdjustedNpv.quantileRange.p95)}
+                      min={Math.min(0, Number(record.natureAdjustedNpv.quantileRange.p5), Number(threshold))}
+                      max={Math.max(Number(record.natureAdjustedNpv.quantileRange.p95), Number(threshold)) * 1.1 || 1}
+                      threshold={Number(threshold)}
+                      label="投資価値の幅(自然コスト反映後)"
+                      width={260}
+                      format={(n) => formatYen(n, pickYenScale(Number(record.natureAdjustedNpv.quantileRange.p5), Number(record.natureAdjustedNpv.quantileRange.p95), Number(threshold)))}
+                    />
+                  )}
+                </div>
                 {record.deepDiveRecommendation && (
                   // B-04(点検分):coreの推奨文は先頭に内部の手法ID(例:replacement-cost)が
                   // そのまま出るため、③と同じmethodLabel辞書で日本語ラベルに差し替える。
@@ -375,8 +449,8 @@ export default async function DecisionPage({
                     <thead>
                       <tr>
                         <th>対策</th>
-                        <th>投資額</th>
-                        <th>投資価値(反映後)</th>
+                        <th style={{ minWidth: 140 }}>投資額</th>
+                        <th style={{ minWidth: 160 }}>投資価値(反映後)</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -389,12 +463,35 @@ export default async function DecisionPage({
                               <b>{candidate.label}</b>
                               {selected && <span className="cell-note">選択中</span>}
                             </td>
-                            <td className="num">
-                              <Num value={candidate.investmentCost.initial} unit="円" scale={investInitialScale} /> /{" "}
-                              <Num value={candidate.investmentCost.recurring} unit="円/年" scale={investRecurringScale} />
+                            <td>
+                              <div className="num">
+                                <Num value={candidate.investmentCost.initial} unit="円" scale={investInitialScale} /> /{" "}
+                                <Num value={candidate.investmentCost.recurring} unit="円/年" scale={investRecurringScale} />
+                              </div>
+                              <RatioBar
+                                value={Number(candidate.investmentCost.initial)}
+                                total={maxInitial}
+                                label={`${candidate.label}の初期投資額`}
+                                tone="neutral"
+                                showText={false}
+                              />
                             </td>
-                            <td className="num">
-                              <Num value={candidate.decisionRecord.natureAdjustedNpv.central} unit="円" scale={npvScale} />
+                            <td>
+                              <RangeBar
+                                low={Number(candidate.decisionRecord.natureAdjustedNpv.quantileRange.p5)}
+                                mid={Number(candidate.decisionRecord.natureAdjustedNpv.central)}
+                                high={Number(candidate.decisionRecord.natureAdjustedNpv.quantileRange.p95)}
+                                min={npvRangeMin}
+                                max={npvRangeMax}
+                                threshold={threshold !== null ? Number(threshold) : undefined}
+                                label={`${candidate.label}の投資価値`}
+                                tone={threshold === null ? "pending" : "accent"}
+                                width={150}
+                                format={(n) => formatYen(n, npvScale)}
+                              />
+                              <div className="num cell-note">
+                                <Num value={candidate.decisionRecord.natureAdjustedNpv.central} unit="円" scale={npvScale} />
+                              </div>
                               <span className="cell-note">{verdictLabel(candidate.decisionRecord.verdict)}</span>
                             </td>
                             <td>
@@ -405,11 +502,11 @@ export default async function DecisionPage({
                       })}
                     </tbody>
                   </table>
-                  <div className="card-action-row">
+                  <ActionRow>
                     <Link href={`/decision/${encodeURIComponent(siteId)}/analysis`} className="pill-btn pill-btn--sm">
                       回避量と追加リターンを分析する →
                     </Link>
-                  </div>
+                  </ActionRow>
               </Card>
 
               {/* (3) この結果の反映先(指示15) */}

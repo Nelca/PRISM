@@ -1,0 +1,49 @@
+/* portfolio 画面固有のスタイル(2026-10 視覚化リデザイン)。共通部品は app/styles/viz.css。 */
+
+/* サマリー4件: 既存の .portfolio-summary(4列グリッド)に stat-tile の見た目を重ねる。 */
+.pf-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.pf-summary__tile {
+  width: 100%;
+  align-items: flex-start;
+  padding: var(--space-4);
+  cursor: pointer;
+}
+.pf-summary__tile:hover {
+  border-color: var(--accent-line);
+  background: var(--surface-alt);
+}
+@media (max-width: 640px) {
+  .pf-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* カバー状況マトリクス: 行見出しの折り返し防止。 */
+.pf-row-head {
+  min-width: 140px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-heat-btn {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* 一覧表: 状態・実測/目標・操作列の最小幅(重なり防止)。 */
+.portfolio-table-fixed .pf-col-status {
+  min-width: 110px;
+}
+.portfolio-table-fixed .pf-col-target {
+  min-width: 170px;
+}
+.portfolio-table-fixed .pf-col-action {
+  min-width: 90px;
+}

@@ -10,19 +10,24 @@ const ROOT = path.resolve(__dirname, '../..');
     const p = await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
     const errors=[];
     p.on('pageerror',e=>errors.push(e.message));
+    if (!process.env.PRISM_SKIP_PDF) {
     await p.goto(pathToFileURL(path.join(ROOT,'tools/promotion/overview.html')).href);
     await p.evaluate(()=>document.fonts.ready);
     await p.pdf({path:path.join(ROOT,'public/promotion/assets/prism-overview.pdf'),format:'A4',printBackground:true,preferCSSPageSize:true});
+    }
     const url=process.env.PRISM_PREVIEW_URL || pathToFileURL(path.join(ROOT,'public/promotion/index.html')).href;
     await p.goto(url);
     await p.evaluate(()=>document.fonts.ready);
     const checks=[];
+    if(await p.locator('h1').textContent()!=='正解のない環境の評価額を、投資の根拠に変える。') throw new Error('Brand headline mismatch');
+    if(await p.locator('.brand-subcopy').textContent()!=='算出方法で、変わる金額。') throw new Error('Brand subcopy mismatch');
+    if(!(await p.locator('.hero .eyebrow').textContent()).includes('環境財務評価プラットフォーム')) throw new Error('Product description mismatch');
     for(const width of [1440,1024,768,390,320]) {
       await p.setViewportSize({width,height:1000});
       const size=await p.evaluate(()=>({body:document.documentElement.scrollWidth,view:window.innerWidth}));
       if(size.body>size.view) throw new Error('Horizontal overflow: '+JSON.stringify(size));
       checks.push({width,overflow:false});
-      if(width===1440 || width===390) await p.screenshot({path:path.join(ROOT,`output/promotion/lp-${width}.png`),fullPage:true});
+      if(width===1440 || width===390) { await p.screenshot({path:path.join(ROOT,`output/promotion/lp-${width}.png`),fullPage:true}); await p.screenshot({path:path.join(ROOT,`output/promotion/lp-${width}-top.png`),fullPage:false}); }
     }
     await p.setViewportSize({width:1440,height:1000});
     for(const [key,low,high] of [['above','+8','+22'],['below','−18','−4'],['cross','−8','+18']]){
@@ -60,6 +65,6 @@ const ROOT = path.resolve(__dirname, '../..');
     await vertical.close();
     if(errors.length) throw new Error('JS errors '+errors.join(';'));
     fs.writeFileSync(path.join(ROOT,'output/promotion/browser-check.json'),JSON.stringify({checked:new Date().toISOString(),checks,scenarios:3,faq:true,downloads:true,resources:resources.length,images:true,media,verticalMedia,playback:true,seeking:true,keyboard:true,errors},null,2));
-    console.log('PDF exported; responsive/scenario/download/media checks passed.');
+    console.log('Responsive/scenario/download/media checks passed. PDF export: '+!process.env.PRISM_SKIP_PDF);
   } finally {await browser.close()}
 })().catch(e=>{console.error(e);process.exit(1)});

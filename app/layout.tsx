@@ -5,6 +5,12 @@ import { loadPipelineView } from "@/lib/views/pipeline";
 import { deriveOpenTasks } from "@/lib/pipeline/open-tasks";
 import { AppShell } from "./components/app-shell";
 import "./globals.css";
+import "./styles/viz.css";
+import "./styles/screens/home.css";
+import "./styles/screens/portfolio.css";
+import "./styles/screens/valuation.css";
+import "./styles/screens/decision.css";
+import "./styles/screens/records.css";
 
 const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",

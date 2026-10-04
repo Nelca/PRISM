@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { computePercentileRanks } from "@core/assessment/percentile-rank";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { materialIssueLabel } from "../../components/labels";
+import { sensitivityFraction } from "../../components/criteria-labels";
 import { Card, KV, ScreenLead, Tag } from "../../components/ui";
 import { StepNav } from "../../components/step-nav";
 import { DepthToggle } from "../depth-toggle";
+import { RatioBar } from "../../components/viz";
 
 export const metadata: Metadata = {
   title: "評価対象詳細 | PRISM",
@@ -44,7 +46,17 @@ export default async function AssessmentIssuePage({ params }: { params: Promise<
       <Card title="評価対象の詳細" headExtra={<Tag variant={decision?.depth === "deep_dive" ? "ok" : "neutral"}>{decision?.depth === "deep_dive" ? "詳細評価" : "概算評価"}</Tag>}>
         <KV k="拠点" v={site?.name ?? issue.siteId} />
         <KV k="課題ID" v={issue.id} />
-        <KV k="自然との関わり" v={`${issue.sensitivityScore}/5`} />
+        <KV
+          k="自然との関わり"
+          v={
+            <RatioBar
+              value={issue.sensitivityScore}
+              total={Number(sensitivityFraction(issue).split("/")[1])}
+              label="自然との関わり"
+              unit="基準"
+            />
+          }
+        />
         <KV k="優先順位" v={rank > 0 ? `${rank}位` : "優先度未算定"} />
         {score && <KV k="優先度スコア" v={score.normalizedScore.toFixed(3)} />}
         {ranks && (

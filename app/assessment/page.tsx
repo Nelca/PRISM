@@ -3,13 +3,15 @@ import Link from "next/link";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { computePercentileRanks } from "@core/assessment/percentile-rank";
 import type { DepthDecision } from "@core/types/assessment";
-import { Card, GuideBox, GuideButton, ScreenLead, Tag } from "../components/ui";
+import { Card, GuideBox, GuideButton, ScreenLead } from "../components/ui";
 import { sensitivityFraction, unevaluatedCriteriaNote } from "../components/criteria-labels";
 import { formatDepthReason, formatIssueExclusionReason, materialIssueLabel } from "../components/labels";
 import { StepNav } from "../components/step-nav";
 import { DataSourceAttribution } from "../components/attribution";
 import { DepthToggle } from "./depth-toggle";
 import { TaskBanner } from "../components/task-banner";
+import { StatGrid, StatTile, StatusBadge, BreakdownBar } from "../components/viz";
+import { STAGE_ICON } from "../components/icons";
 
 /**
  * 「上位◯%」の閾値(M2 D-3の暫定20%)。DepthDecision自体にはこの値を持つフィールドが
@@ -100,6 +102,11 @@ export default async function AssessmentPage() {
   const maxNormalizedScore = sorted.length > 0 ? sorted[0].normalizedScore : 0;
   const promotionPercent = findPromotionPercent(depthDecisions);
 
+  /** 冒頭のStatGrid用の集計(視覚化リデザイン)。既存の判定・集計から導くだけで新しい計算は増やさない。 */
+  const deepDiveCount = depthDecisions.filter((d) => d.depth === "deep_dive").length;
+  const excludedCount =
+    sorted.filter((score) => issueById.get(score.materialIssueId)?.excluded).length + unscoredIssues.length;
+
   return (
     <div className="screen">
       <div className="screen__head">
@@ -117,35 +124,37 @@ export default async function AssessmentPage() {
       {/* D-11-1:残タスクの頭出しバナー(全6画面共通。残タスクがある時だけ出る)。 */}
       <TaskBanner current="/assessment" result={result} />
 
+      <StatGrid columns={3}>
+        <StatTile label="評価対象" value={materialIssues.length} unit="件" icon={STAGE_ICON.assessment} />
+        <StatTile label="詳細評価" value={deepDiveCount} unit="件" tone="accent" />
+        <StatTile label="対象外" value={excludedCount} unit="件" tone={excludedCount > 0 ? "pending" : "neutral"} />
+      </StatGrid>
+
       <Card
         title="評価対象の一覧"
         subtitle="優先度を見て、詳細評価する課題を指定します"
         padBody={false}
         foot="優先度は、自然との関わり・影響しうる財務規模・不確実性・開示必須性の4項目を同一バッチ内で順位化して合算した値です。自然との関わりが強い課題は自然への依存・影響が強く、財務影響が生じやすい評価候補です(分数は、実際に評価できた基準の数を分母にしています)。評価の深さはクリックで切り替えられ、切り替えは記録に残ります。対象外とした課題は末尾に理由付きで残ります"
       >
+        {/* 優先度の内訳4色の凡例を表の上に1回だけ出す(各行のバーは色だけで意味を持たせない=titleに数値併記)。 */}
+        <div className="breakdown__legend" style={{ padding: "10px 18px 0" }}>
+          <span className="breakdown__key"><i className="breakdown__swatch breakdown__seg--c1" />自然との関わり</span>
+          <span className="breakdown__key"><i className="breakdown__swatch breakdown__seg--c2" />財務</span>
+          <span className="breakdown__key"><i className="breakdown__swatch breakdown__seg--c3" />不確実性</span>
+          <span className="breakdown__key"><i className="breakdown__swatch breakdown__seg--c4" />開示</span>
+        </div>
         <table className="data-table">
           <thead>
             <tr>
-              <th rowSpan={2}>評価対象</th>
-              <th rowSpan={2}>優先度</th>
-              <th colSpan={4} style={{ textAlign: "center" }}>
-                優先度の内訳
-              </th>
+              <th>評価対象</th>
+              <th>優先度</th>
+              <th title="自然との関わり(TNFDの5基準のうち該当した数)・財務規模・不確実性(log(P95/P5))・開示必須性を同一バッチ内で順位化した内訳">優先度の内訳</th>
               {/* D-04:切替が何を引き起こすかをheaderのtitleでも説明する(ガイド文と同じ因果)。 */}
-              <th
-                rowSpan={2}
-                title="概算評価=全課題に自動で行う簡易な優先度づけまで。詳細評価=次の「価値の算定」で貨幣価値の算定〜投資判断への反映まで行う対象になる"
-              >
+              <th title="概算評価=全課題に自動で行う簡易な優先度づけまで。詳細評価=次の「価値の算定」で貨幣価値の算定〜投資判断への反映まで行う対象になる">
                 評価の深さ
               </th>
-              <th rowSpan={2}>理由</th>
-              <th rowSpan={2}><span className="sr-only">操作</span></th>
-            </tr>
-            <tr>
-              <th title="TNFDの5基準(水ストレス・生物多様性の重要性など)のうち該当した数。数が多いほど自然への依存・影響が強い">自然との関わり</th>
-              <th title="財務規模:この課題が影響しうる売上・費用の大きさ">財務</th>
-              <th title="不確実性:log(P95/P5)で表した試算の幅">不確実性</th>
-              <th title="開示必須性:開示上の必須度合い">開示</th>
+              <th>理由</th>
+              <th><span className="sr-only">操作</span></th>
             </tr>
           </thead>
           <tbody>
@@ -176,41 +185,42 @@ export default async function AssessmentPage() {
                     </div>
                   </td>
                   {/*
-                    C-01:削除した「感応度が高い拠点」表にしかなかった分数表示(2/4)と未評価注記を、
-                    バーの下に常時表示する。分母は「実際に評価できた基準の数」であり常に5ではない
-                    (第1版§5「除外・未評価を黙って消さない」)。5基準の定義文は上のthのtitleに残す。
+                    C-01→視覚化リデザイン:4列(自然・財務・不確実性・開示)を1列のBreakdownBarに
+                    集約する(凡例は表の上に1回だけ)。個別の生値はBreakdownBarのtitle/aria-labelと
+                    下のcell-note(分数・未評価注記)に残す(第1版§5「除外・未評価を黙って消さない」)。
                   */}
-                  <td
-                    style={{ minWidth: 92 }}
-                    title={`自然との関わり(生値) ${issue ? sensitivityFraction(issue) : score.sensitivity}`}
-                  >
-                    <Bar ratio={sensitivityRanks[i]} sub />
+                  <td style={{ minWidth: 150 }}>
+                    <BreakdownBar
+                      label="優先度の内訳"
+                      legend={false}
+                      unit="%"
+                      format={(n) => n.toFixed(0)}
+                      segments={[
+                        { label: "自然との関わり", value: Math.round(sensitivityRanks[i] * 100), color: 1 },
+                        { label: "財務", value: Math.round(financialRanks[i] * 100), color: 2 },
+                        { label: "不確実性", value: Math.round(uncertaintyRanks[i] * 100), color: 3 },
+                        { label: "開示", value: Math.round(disclosureRanks[i] * 100), color: 4 },
+                      ]}
+                    />
                     {issue && (
                       <span className="cell-note">
-                        {sensitivityFraction(issue)}
+                        自然{sensitivityFraction(issue)}
                         {unevaluatedCriteriaNote(issue) && (
                           <span title={unevaluatedCriteriaNote(issue)!}> ・未評価{issue.unevaluatedCriteria.length}件</span>
                         )}
                       </span>
                     )}
                   </td>
-                  <td
-                    style={{ minWidth: 78 }}
-                    title={`影響しうる財務規模 ${new Intl.NumberFormat("ja-JP").format(Math.round(score.financialExposure))}円`}
-                  >
-                    <Bar ratio={financialRanks[i]} sub />
-                  </td>
-                  <td style={{ minWidth: 78 }} title={`不確実性(log(P95/P5)) ${score.uncertaintyMagnitude.toFixed(3)}`}>
-                    <Bar ratio={uncertaintyRanks[i]} sub />
-                  </td>
-                  <td style={{ minWidth: 78 }} title={`開示必須性(生値) ${score.disclosureRequirement.toFixed(3)}`}>
-                    <Bar ratio={disclosureRanks[i]} sub />
-                  </td>
                   <td>
                     {issue?.excluded ? (
-                      <Tag variant="neutral">対象外(座標未解決)</Tag>
+                      <StatusBadge variant="pending">対象外(座標未解決)</StatusBadge>
                     ) : (
-                      <DepthToggle materialIssueId={score.materialIssueId} currentDepth={isPromoted ? "deep_dive" : "screening"} />
+                      <span className="val-depth">
+                        <StatusBadge variant={isPromoted ? "accent" : "neutral"} title={isPromoted ? "詳細評価の対象です" : "概算評価までです"}>
+                          {isPromoted ? "詳細評価" : "概算評価"}
+                        </StatusBadge>
+                        <DepthToggle materialIssueId={score.materialIssueId} currentDepth={isPromoted ? "deep_dive" : "screening"} />
+                      </span>
                     )}
                   </td>
                   <td style={{ fontSize: 11.5, color: "var(--ink-soft)", maxWidth: 240 }}>
@@ -245,11 +255,8 @@ export default async function AssessmentPage() {
                 </td>
                 <td className="num">—</td>
                 <td className="num">—</td>
-                <td className="num">—</td>
-                <td className="num">—</td>
-                <td className="num">—</td>
                 <td>
-                  <Tag variant="neutral">対象外</Tag>
+                  <StatusBadge variant="pending">対象外</StatusBadge>
                 </td>
                 <td style={{ fontSize: 11.5, color: "var(--ink-soft)", maxWidth: 240 }}>
                   {issue.exclusionReason

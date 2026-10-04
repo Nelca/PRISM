@@ -4,11 +4,13 @@ import { formatJstDateTime } from "@/lib/datetime";
 import { loadLedgerView } from "@/lib/views/pipeline";
 import { recalculateWithPriorParameters } from "@core/ledger/recalculate-with-prior-parameters";
 import { Mono, Num, pickYenScale } from "../components/numeric";
-import { Card, ScreenLead, Stat, Tag } from "../components/ui";
-import { categoryLabel, materialIssueLabel, verdictLabel } from "../components/labels";
+import { Card, ScreenLead, Stat } from "../components/ui";
+import { categoryLabel, materialIssueLabel, verdictLabel, verdictTagVariant } from "../components/labels";
 import { methodLabel, withMethodLabelsInText } from "../components/method-labels";
 import { DataSourceAttribution } from "../components/attribution";
 import { SectionNav } from "../components/section-nav";
+import { EmptyState, FeatureCard, FeatureGrid, StatusBadge } from "../components/viz";
+import { ACTION_ICON, SCREEN_ICON, STAGE_ICON } from "../components/icons";
 
 export const metadata: Metadata = {
   title: "記録 | PRISM",
@@ -144,18 +146,33 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
         <ScreenLead>{sectionLead[section]}</ScreenLead>
       </div>
 
-      <SectionNav
-        label="記録内の画面"
-        items={[
-          ...(section === "overview"
-            ? []
-            : [{ href: "/ledger", label: "記録メニュー", description: "確認する記録を選択", active: false }]),
-          { href: "/ledger/history", label: "変更履歴", description: "担当・日時・変更内容", active: section === "history" },
-          { href: "/ledger/inputs", label: "入力・係数", description: "算定根拠を照合", active: section === "inputs" },
-          { href: "/ledger/parameter-versions", label: "版と再計算", description: "現在版と旧版を比較", active: section === "parameter-versions" },
-          { href: "/ledger/billing", label: "判定件数", description: "従量課金の根拠", active: section === "billing" },
-        ]}
-      />
+      {section === "overview" ? (
+        <FeatureGrid>
+          <FeatureCard icon={SCREEN_ICON.ledger} title="変更履歴" href="/ledger/history" linkLabel="開く">
+            担当・日時・変更内容を確認します
+          </FeatureCard>
+          <FeatureCard icon={ACTION_ICON.search} title="入力・係数" href="/ledger/inputs" linkLabel="開く">
+            算定根拠を照合します
+          </FeatureCard>
+          <FeatureCard icon={SCREEN_ICON.evidence} title="版と再計算" href="/ledger/parameter-versions" linkLabel="開く">
+            現在版と旧版を比較します
+          </FeatureCard>
+          <FeatureCard icon={STAGE_ICON.decision} title="判定件数" href="/ledger/billing" linkLabel="開く">
+            従量課金の根拠を確認します
+          </FeatureCard>
+        </FeatureGrid>
+      ) : (
+        <SectionNav
+          label="記録内の画面"
+          items={[
+            { href: "/ledger", label: "記録メニュー", description: "確認する記録を選択", active: false },
+            { href: "/ledger/history", label: "変更履歴", description: "担当・日時・変更内容", active: section === "history" },
+            { href: "/ledger/inputs", label: "入力・係数", description: "算定根拠を照合", active: section === "inputs" },
+            { href: "/ledger/parameter-versions", label: "版と再計算", description: "現在版と旧版を比較", active: section === "parameter-versions" },
+            { href: "/ledger/billing", label: "判定件数", description: "従量課金の根拠", active: section === "billing" },
+          ]}
+        />
+      )}
 
       {(section === "history" || section === "parameter-versions") && <div>
         {section === "history" && <Card id="history" padBody={false}>
@@ -225,9 +242,9 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
                     </td>
                     <td>
                       {version.active ? (
-                        <Tag variant="ok">有効</Tag>
+                        <StatusBadge variant="ok">有効</StatusBadge>
                       ) : (
-                        <Tag variant="neutral">旧版 → {version.supersededByDerived}</Tag>
+                        <StatusBadge variant="neutral">旧版 → {version.supersededByDerived}</StatusBadge>
                       )}
                     </td>
                     <td style={{ fontSize: 12, color: version.changeReason ? undefined : "var(--ink-faint)" }}>
@@ -249,7 +266,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
         foot="顧客の元ファイル本文は保存・表示しません。正規化入力と出典ハッシュだけを記録します。"
       >
         {inputTraceRows.length === 0 ? (
-          <p style={{ padding: "12px 18px", color: "var(--ink-faint)" }}>追加カテゴリの算定行はまだありません。</p>
+          <EmptyState icon={ACTION_ICON.search} title="追加カテゴリの算定行はまだありません" />
         ) : (
           <table className="data-table">
             <thead>
@@ -312,7 +329,7 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
                     {entry.decisionRecordId}
                   </td>
                   <td>{decisions.find((d) => d.siteId === entry.siteId)?.siteName ?? entry.siteId ?? "—"}</td>
-                  <td>{verdictLabel(entry.verdict)}</td>
+                  <td><StatusBadge variant={verdictTagVariant(entry.verdict)}>{verdictLabel(entry.verdict)}</StatusBadge></td>
                   <td className="num" style={{ fontSize: 11 }}>
                     {entry.countedAt.slice(0, 16).replace("T", " ")}
                   </td>
@@ -320,6 +337,11 @@ export default async function LedgerPage({ searchParams, section = "overview" }:
               ))}
             </tbody>
           </table>
+        )}
+        {decisionCounts.length === 0 && (
+          <EmptyState icon={STAGE_ICON.decision} title="確定した判定はまだありません">
+            判定が確定すると、ここに計上日時とともに一覧が表示されます。
+          </EmptyState>
         )}
       </Card>}
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { InteractionEvent } from "@/lib/demo/interaction-state";
 import { listInteractionEvents } from "@/lib/db/repositories/interactions";
-import { formatJstDateTime } from "@/lib/datetime";
+import { formatJstDateTime, todayInJst } from "@/lib/datetime";
 import {
   DIRECTION_LABEL,
   MAX_REPORTING_YEAR,
@@ -10,14 +10,16 @@ import {
   TARGET_CATEGORIES,
   TARGET_STATUS,
   evaluateTarget,
+  isOverdue,
   targetDelta,
   type EnvironmentalTarget,
 } from "@/lib/environment/metrics";
 import { researchEnabled } from "@/lib/research/access";
 import { GVFD_METRIC_TOPICS } from "@/lib/research/gvfd";
 import { loadInteractivePipelineView } from "@/lib/views/pipeline";
-import { formatQuantity } from "../../components/numeric";
+import { formatExactNumber, formatQuantity } from "../../components/numeric";
 import { Card, ScreenLead, Tag } from "../../components/ui";
+import { ActionRow, StatGrid, StatTile, TargetBar } from "../../components/viz";
 import { TargetForm } from "../target-form";
 import { TargetReviewPanels } from "../review-panels";
 
@@ -33,6 +35,7 @@ export default async function TargetPage({ params }: { params: Promise<{ targetI
     .reverse();
   const delta = targetDelta(record);
   const status = evaluateTarget(record);
+  const overdue = isOverdue(record, todayInJst());
   const quantity = (value: number | null) => formatQuantity(value, metric.unit);
   // 割合の差は増減率ではなくポイントで示す。
   const deltaUnit = metric.unit === "%" ? "ポイント" : metric.unit;
@@ -49,9 +52,9 @@ export default async function TargetPage({ params }: { params: Promise<{ targetI
       </div>
 
       {!record.archived && record.reportingYear < MAX_REPORTING_YEAR && (
-        <p className="portfolio-detail-actions">
+        <ActionRow>
           <Link className="pill-btn" href={`/portfolio/new?from=${encodeURIComponent(record.id)}`}>翌年の管理へ引き継ぐ →</Link>
-        </p>
+        </ActionRow>
       )}
       {record.carriedFrom && (
         <p className="field-hint">
@@ -59,16 +62,35 @@ export default async function TargetPage({ params }: { params: Promise<{ targetI
         </p>
       )}
 
-      <Card title="目標との関係" headExtra={<Tag variant={status === "met" ? "neutral" : "warn"}>{record.archived ? "保管中" : TARGET_STATUS[status]}</Tag>}>
-        <div className="portfolio-detail-values">
-          <div><span>実測値</span><strong>{quantity(record.current)}</strong></div>
-          <div><span>目標（{DIRECTION_LABEL[record.direction]}）</span><strong>{quantity(record.target)}</strong></div>
-          <div>
-            <span>比較基準値からの差</span>
-            <strong>{delta === null ? "比較基準値・実測値が必要" : `${delta > 0 ? "+" : ""}${formatQuantity(delta, deltaUnit)}`}</strong>
-          </div>
-        </div>
-        <p className="field-hint">入力された範囲・対象年の目標との比較です。生態系全体の健全性や、法令への適合、投資の可否を保証する判定ではありません。</p>
+      <Card
+        title="目標との関係"
+        headExtra={<Tag variant={status === "met" ? "neutral" : "warn"}>{record.archived ? "保管中" : TARGET_STATUS[status]}</Tag>}
+        foot="入力された範囲・対象年の目標との比較です。生態系全体の健全性や、法令への適合、投資の可否を保証する判定ではありません。"
+      >
+        <StatGrid columns={4}>
+          <StatTile label="実測値" value={quantity(record.current)} tone="neutral" />
+          <StatTile label={`目標（${DIRECTION_LABEL[record.direction]}）`} value={quantity(record.target)} tone="neutral" />
+          <StatTile
+            label="比較基準値からの差"
+            value={delta === null ? "比較基準値・実測値が必要" : `${delta > 0 ? "+" : ""}${formatQuantity(delta, deltaUnit)}`}
+            tone={delta === null ? "neutral" : status === "met" ? "ok" : "warn"}
+          />
+          <StatTile
+            label="対応期限"
+            value={record.dueDate || "未設定"}
+            tone={overdue ? "warn" : "neutral"}
+            note={overdue ? "期限超過" : undefined}
+          />
+        </StatGrid>
+        <TargetBar
+          current={record.current}
+          target={record.target}
+          baseline={record.baseline}
+          direction={record.direction === "at_least" ? "up" : "down"}
+          unit={metric.unit}
+          label={`${site?.name ?? record.siteId}・${metric.label}`}
+          format={formatExactNumber}
+        />
       </Card>
 
       <Card title="実測値・目標・対応">
@@ -82,7 +104,9 @@ export default async function TargetPage({ params }: { params: Promise<{ targetI
       {researchEnabled() && !record.archived && GVFD_METRIC_TOPICS[record.metricId] && (
         <Card title="地域別の環境影響を比較">
           <p>この指標の実測値・目標値を引き継ぎ、IFVI GVFDの研究用算定で社会への影響額を比較します。物質や処理方法、地域の対応を次の画面で確認してください。</p>
-          <Link className="pill-btn" href={`/research/gvfd?target=${encodeURIComponent(record.id)}`}>GVFDで実測値と目標を比較する →</Link>
+          <ActionRow>
+            <Link className="pill-btn" href={`/research/gvfd?target=${encodeURIComponent(record.id)}`}>GVFDで実測値と目標を比較する →</Link>
+          </ActionRow>
         </Card>
       )}
 

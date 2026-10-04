@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Nav } from "./nav";
+import { Icon, iconForHref } from "./icons";
 
 const ROUTE_TITLES = [
   ["/portfolio", "環境・資源の統合管理"],
@@ -16,6 +17,7 @@ const ROUTE_TITLES = [
   ["/decision", "対策と判定"],
   ["/disclosure", "開示"],
   ["/ledger", "記録"],
+  ["/research", "公開データで検証"],
   ["/guide", "PRISMとは・使い方"],
 ] as const;
 
@@ -103,7 +105,10 @@ export function AppShell({
 
         <div className="header-context">
           <span className="header-context__mark" aria-hidden="true" />
-          <span className="header-context__title">{routeTitle}</span>
+          <span className="header-context__title">
+            <Icon icon={iconForHref(pathname)} size={16} className="header-context__route-icon" />
+            {routeTitle}
+          </span>
         </div>
         <div className="header-meta">
           <span>{companyName}</span>

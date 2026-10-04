@@ -7,7 +7,8 @@ import type { ValuationRecord } from "@core/types/valuation";
 import { loadPipelineView } from "@/lib/views/pipeline";
 import { maxDivergenceRatio, pairDivergenceRatio } from "@/lib/pipeline/open-tasks";
 import { Card, KV, ScreenLead, Stat, TableScroll, Tag } from "../components/ui";
-import { Mono, Num, pickYenScale } from "../components/numeric";
+import { Mono, Num, formatYen, pickYenScale } from "../components/numeric";
+import { StatGrid, StatTile, BreakdownBar, type BreakdownSegment } from "../components/viz";
 import { decompositionFactorLabel, flowInterpretationStatusLabel, materialIssueLabel, traceAvailabilityLabel, traceStepRoleLabel } from "../components/labels";
 import { methodLabel, methodShortLabel, withMethodLabelsInText } from "../components/method-labels";
 import { Waterfall } from "../components/charts/Waterfall";
@@ -314,14 +315,15 @@ function CrossMethodPairView({
         subtitle="なぜ差が生じるか"
         headExtra={<Tag variant={valueConcept === "welfare" ? "welfare" : "exchange"}>{valueConcept === "welfare" ? "厚生価値" : "交換価値"}</Tag>}
       >
-        <div className="grid-3">
-          <Stat label={labelA} value={<Num value={Number(pair.valueA)} unit="円/年" scale={scale} />} />
-          <Stat label={labelB} value={<Num value={Number(pair.valueB)} unit="円/年" scale={scale} />} />
-          <Stat
+        <StatGrid columns={3}>
+          <StatTile label={labelA} value={<Num value={Number(pair.valueA)} unit="円/年" scale={scale} />} />
+          <StatTile label={labelB} value={<Num value={Number(pair.valueB)} unit="円/年" scale={scale} />} />
+          <StatTile
             label="差の倍率"
             value={pairDivergenceRatio(pair) ? `${pairDivergenceRatio(pair)!.toFixed(1)}倍` : "倍率なし"}
+            tone={(pairDivergenceRatio(pair) ?? 0) > 2 ? "warn" : "neutral"}
           />
-        </div>
+        </StatGrid>
         <div className="detail-actions" aria-label="ゼロ値の意味">
           <ZeroMeaningBadge pair={pair} side="A" />
           <ZeroMeaningBadge pair={pair} side="B" />
@@ -343,6 +345,25 @@ function CrossMethodPairView({
             <Waterfall steps={pairwiseToWaterfallSteps(decomposed, labelA, labelB)} />
           ) : (
             <div style={{ padding: 0 }}>
+              {(() => {
+                const amountSegments: BreakdownSegment[] = decomposed.contributions
+                  .filter((contribution) => contribution.displayAmount !== null)
+                  .map((contribution, i) => ({
+                    label: decompositionFactorLabel(contribution.category),
+                    value: Math.abs(contribution.displayAmount!),
+                    color: ((i % 6) + 1) as BreakdownSegment["color"],
+                  }));
+                return amountSegments.length > 0 ? (
+                  <div style={{ padding: "12px 18px 0" }}>
+                    <BreakdownBar
+                      label="要因ごとの寄与(絶対値)"
+                      segments={amountSegments}
+                      format={(n) => formatYen(n, scale)}
+                      unit=""
+                    />
+                  </div>
+                ) : null;
+              })()}
               <TableScroll label="手法間差の要因分解">
                 <table className="data-table">
                   <caption className="sr-only">選択中の手法ペアの要因分解</caption>

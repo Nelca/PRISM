@@ -1,0 +1,62 @@
+{
+  "checked": "2026-10-04T14:09:15.491Z",
+  "report": [
+    {
+      "width": 1920,
+      "overflow": false,
+      "textNodes": 119,
+      "minContrast": 5.321098890055454,
+      "problems": []
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "textNodes": 119,
+      "minContrast": 5.321098890055454,
+      "problems": []
+    },
+    {
+      "width": 1024,
+      "overflow": false,
+      "textNodes": 117,
+      "minContrast": 5.321098890055454,
+      "problems": []
+    },
+    {
+      "width": 820,
+      "overflow": false,
+      "textNodes": 117,
+      "minContrast": 5.321098890055454,
+      "problems": []
+    },
+    {
+      "width": 800,
+      "overflow": false,
+      "textNodes": 114,
+      "minContrast": 5.321098890055454,
+      "problems": []
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "textNodes": 114,
+      "minContrast": 5.321098890055454,
+      "problems": []
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "textNodes": 114,
+      "minContrast": 5.321098890055454,
+      "problems": []
+    },
+    {
+      "width": 320,
+      "overflow": false,
+      "textNodes": 113,
+      "minContrast": 5.321098890055454,
+      "problems": []
+    }
+  ],
+  "reflow": true
+}

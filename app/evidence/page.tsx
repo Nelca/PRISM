@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { loadPipelineView } from "@/lib/views/pipeline";
-import { Card, ScreenLead, TableScroll, Tag } from "../components/ui";
+import { Card, ScreenLead, TableScroll } from "../components/ui";
 import { categoryLabel, materialIssueLabel } from "../components/labels";
 import { inputSourceLabel } from "../valuation/category-expansion";
 import { methodShortLabel } from "../components/method-labels";
+import { StatusBadge } from "../components/viz";
 
 export const metadata: Metadata = {
   title: "証拠・入力根拠 | PRISM",
@@ -79,9 +80,9 @@ export default async function EvidencePage({ searchParams }: { searchParams: Pro
                   <td>{coverage?.reportingPeriod ?? "年次入力"}</td>
                   <td>
                     {coverage?.quantities.some((quantity) => quantity.rowCounts.blocked > 0 || quantity.rowCounts.unmapped > 0) ? (
-                      <Tag variant="warn">未算定あり</Tag>
+                      <StatusBadge status="attention">未算定あり</StatusBadge>
                     ) : (
-                      <Tag variant="ok">算定済み</Tag>
+                      <StatusBadge status="done">算定済み</StatusBadge>
                     )}
                   </td>
                   <td style={{ fontSize: 12 }}>

@@ -11,6 +11,15 @@ import { StepNav } from "../components/step-nav";
 import { TaskBanner } from "../components/task-banner";
 import { Waterfall } from "../components/charts/Waterfall";
 import { PipelineWarnings } from "../components/pipeline-warnings";
+import { StatGrid, StatTile, StatusBadge, RatioBar, ActionRow } from "../components/viz";
+import { STAGE_ICON } from "../components/icons";
+
+/** 2026-10 視覚化リデザイン:利益への影響の棒(ホームの資金サマリーと同じ見せ方・同じCSSクラス)。 */
+function formatProfitImpact(value: number): string {
+  if (value === 0) return "0.0%";
+  if (Math.abs(value) < 0.05) return `${value > 0 ? "+" : "-"}0.1%未満`;
+  return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
 
 export const metadata: Metadata = {
   title: "財務への影響 | PRISM",
@@ -54,9 +63,11 @@ export default async function FinancialBridgePage({
             評価対象の絞り込みで課題を「詳細評価」に切り替え、価値の算定と代表値の選択で代表値を選ぶと、
             ここに試算結果が表示されます。
           </p>
-          <Link href="/assessment" className="pill-btn pill-btn--sm">
-            評価対象の絞り込みへ →
-          </Link>
+          <ActionRow>
+            <Link href="/assessment" className="pill-btn pill-btn--sm">
+              評価対象の絞り込みへ →
+            </Link>
+          </ActionRow>
         </Card>
         {welfareOnlyIssues.length > 0 && (
           <Card title="社会的厚生価値の参考結果" headExtra={<Tag variant="welfare">NPV・ROI対象外</Tag>}>
@@ -82,16 +93,24 @@ export default async function FinancialBridgePage({
    * 第4版 D-11:拠点サマリーに出す1行分の値。金額の計算は deriveMoneySummary に集約し、
    * ホームの「金額でみる評価結果」とこの画面のサマリー行で数値が食い違わないようにする。
    */
-  const moneyRowBySite = new Map(deriveMoneySummary(result).rows.map((row) => [row.siteId, row]));
+  const money = deriveMoneySummary(result);
+  const moneyRowBySite = new Map(money.rows.map((row) => [row.siteId, row]));
   const siteRows = decisions.map((entry) => {
-    const money = moneyRowBySite.get(entry.siteId);
+    const moneyRow = moneyRowBySite.get(entry.siteId);
     return {
       ...entry,
-      adjustmentRatioPct: money?.profitImpactPct ?? 0,
-      expectedLoss: money?.natureDebt ?? 0,
-      impairmentAffected: money?.impairmentAffected ?? false,
+      adjustmentRatioPct: moneyRow?.profitImpactPct ?? 0,
+      expectedLoss: moneyRow?.natureDebt ?? 0,
+      impairmentAffected: moneyRow?.impairmentAffected ?? false,
     };
   });
+
+  // 2026-10 視覚化リデザイン:冒頭サマリー(自然債務合計・減損リスク拠点数・利益影響の最大)。
+  // 既存の集計値(deriveMoneySummary・siteRows)から導くだけで、新しい計算は行わない。
+  const impairmentCount = siteRows.filter((row) => row.impairmentAffected).length;
+  const maxImpactRow = [...siteRows].sort((a, b) => Math.abs(b.adjustmentRatioPct) - Math.abs(a.adjustmentRatioPct))[0];
+  const maxImpactAbsPct = Math.max(...siteRows.map((row) => Math.abs(row.adjustmentRatioPct)), 0);
+  const totalNatureDebtScale = pickYenScale(money.totalNatureDebt);
 
   /**
    * 既定で展開する「最重要拠点」:減損テストの前提に抵触している拠点があればその先頭、
@@ -128,6 +147,30 @@ export default async function FinancialBridgePage({
       </div>
 
       {!detailOnly && <>
+
+      {/* 2026-10 視覚化リデザイン:冒頭で「自然債務の合計・減損リスク・利益影響の最大」を一目で見せる。 */}
+      <StatGrid columns={3}>
+        <StatTile
+          label="自然債務合計"
+          value={<Num value={money.totalNatureDebt} unit="円" scale={totalNatureDebtScale} />}
+          icon={STAGE_ICON["financial-bridge"]}
+          tone="neutral"
+        />
+        <StatTile
+          label="減損リスク拠点数"
+          value={impairmentCount}
+          unit="拠点"
+          tone={impairmentCount > 0 ? "warn" : "ok"}
+          note={impairmentCount > 0 ? "見直しが必要な拠点があります" : "減損テストの前提内です"}
+          visual={<RatioBar value={impairmentCount} total={siteRows.length} label="減損リスク拠点" tone={impairmentCount > 0 ? "warn" : "ok"} />}
+        />
+        <StatTile
+          label="利益影響の最大(絶対値)"
+          value={maxImpactRow ? formatProfitImpact(maxImpactRow.adjustmentRatioPct) : "—"}
+          note={maxImpactRow ? maxImpactRow.siteName : undefined}
+          tone={maxImpactAbsPct > 0 ? "warn" : "neutral"}
+        />
+      </StatGrid>
 
       {/* D-01-3:保存済みの操作のうち、今回の計算に反映できなかったものを黙って捨てない。 */}
       <PipelineWarnings warnings={result.warnings} screen="/financial-bridge" />
@@ -208,9 +251,9 @@ export default async function FinancialBridgePage({
           <thead>
             <tr>
               <th>拠点</th>
-              <th>{term("利益への影響")}</th>
-              <th>{term("自然債務(期待損失)")}</th>
-              <th>{term("減損リスク")}</th>
+              <th style={{ minWidth: 140 }}>{term("利益への影響")}</th>
+              <th style={{ minWidth: 90, textAlign: "right" }}>{term("自然債務(期待損失)")}</th>
+              <th style={{ minWidth: 110 }}>{term("減損リスク")}</th>
               <th>重要な論点</th>
               <th></th>
             </tr>
@@ -221,12 +264,28 @@ export default async function FinancialBridgePage({
                 <td>
                   <b>{row.siteName}</b>
                 </td>
-                <td className="num">{`${row.adjustmentRatioPct >= 0 ? "+" : ""}${row.adjustmentRatioPct.toFixed(1)}%`}</td>
+                <td style={{ minWidth: 150 }}>
+                  <span className="impact">
+                    <span className="impact__bar" aria-hidden="true">
+                      <span
+                        className={`impact__fill ${row.adjustmentRatioPct < 0 ? "impact__fill--neg" : "impact__fill--pos"}`}
+                        style={{
+                          width: `${maxImpactAbsPct > 0 ? (Math.abs(row.adjustmentRatioPct) / maxImpactAbsPct) * 50 : 0}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="impact__pct num" title={`${row.adjustmentRatioPct}%`}>
+                      {formatProfitImpact(row.adjustmentRatioPct)}
+                    </span>
+                  </span>
+                </td>
                 <td className="num">
                   <Num value={row.expectedLoss} unit="円" scale={expectedLossScale} />
                 </td>
                 <td>
-                  {row.impairmentAffected ? <Tag variant="warn">見直しが必要</Tag> : <Tag variant="neutral">範囲内</Tag>}
+                  <StatusBadge status={row.impairmentAffected ? "attention" : "done"}>
+                    {row.impairmentAffected ? "見直しが必要" : "範囲内"}
+                  </StatusBadge>
                 </td>
                 <td>{row.impairmentAffected ? <Tag variant="warn">あり</Tag> : "—"}</td>
                 <td>
@@ -333,6 +392,17 @@ export default async function FinancialBridgePage({
                   (点線の用語にマウスを載せると説明が出ます)
                 </p>
               </Card>
+
+              {/* 2026-10 視覚化リデザイン:KVの並びの前に主要3値を一目で見せる。 */}
+              <StatGrid columns={3}>
+                <StatTile label="報告営業利益" value={<Num value={operatingProfit} unit="円" scale={lossScale} />} tone="neutral" />
+                <StatTile
+                  label="自然調整後営業利益"
+                  value={<Num value={financialBridge.bridge1.natureAdjustedOperatingProfit} unit="円" scale={lossScale} />}
+                  tone={financialBridge.bridge1.natureAdjustedOperatingProfit < operatingProfit ? "warn" : "ok"}
+                />
+                <StatTile label="自然債務(期待損失)" value={<Num value={expectedLoss} unit="円" scale={lossScale} />} tone="warn" />
+              </StatGrid>
 
               <div className="grid-2">
                 <Card title="期待損失">

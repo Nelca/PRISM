@@ -12,6 +12,8 @@ import { verdictLabel, verdictTagVariant } from "./components/labels";
 import { HomeOrientation } from "./components/home-orientation";
 import { Num, pickYenScale } from "./components/numeric";
 import { Card, Tag } from "./components/ui";
+import { ActionRow, RatioBar, StatGrid, StatTile, StatusBadge, Stepper, type StepState } from "./components/viz";
+import { Icon, SCREEN_ICON, iconForHref } from "./components/icons";
 
 /** 工程の番号はこの画面(進捗ブロック)にだけ出す。常設ナビには出さない(指示01)。 */
 const STEP_MARK = ["01", "02", "03", "04", "05", "06"];
@@ -56,54 +58,42 @@ export default async function Home() {
   const tasksBySection = new Map(steps.map((step) => [step.href, tasks.filter((task) => task.section === step.href)]));
   const confirmedVerdicts = outcomes.verdicts.total - outcomes.verdicts.pending;
 
-  const resultStages = [
-    {
-      href: "/sites",
-      label: "登録データ",
-      value: `${outcomes.siteCount}拠点`,
-      note: "評価の入力",
-    },
-    {
-      href: "/assessment",
-      label: "評価対象",
-      value: `${outcomes.valuation.prioritized}/${outcomes.valuation.total}課題`,
-      note: `詳細評価 ${outcomes.valuation.deepDive}件`,
-    },
-    {
-      href: "/valuation",
-      label: "価値の算定",
-      value: `${outcomes.valuation.valued}課題`,
-      note:
-        outcomes.valuation.representativeRequired > 0
-          ? `代表値 ${outcomes.valuation.selected}/${outcomes.valuation.representativeRequired}件`
-          : "代表値選択なし",
-    },
-    {
-      href: "/financial-bridge",
-      label: "財務への影響",
-      value: <Num key="nature-debt" value={money.totalNatureDebt} unit="円" scale={moneyScale} />,
-      note: "自然債務 合計",
-    },
-    {
-      href: "/decision",
-      label: "対策と判定",
-      value: `${confirmedVerdicts}/${outcomes.verdicts.total}拠点`,
-      note: `承認ライン超過 ${outcomes.verdicts.crosses}件`,
-    },
-    {
-      href: "/disclosure",
-      label: "開示への反映",
-      value: `${disclosure.handled}/${disclosure.total}件`,
-      note: "根拠確認済み",
-    },
-  ];
+  // Stepper(全体の流れ)の状態: 要対応あり→attention、done→done、それ以外は最初の1件だけ
+  // current・残りは upcoming(件数で形を変えず、状態の進み方だけを示す)。
+  const firstOpenIndex = steps.findIndex((step) => {
+    const stepTasks = tasksBySection.get(step.href) ?? [];
+    return stepTasks.length === 0 && !step.done;
+  });
+  const stepperSteps = steps.map((step, index) => {
+    const stepTasks = tasksBySection.get(step.href) ?? [];
+    let state: StepState;
+    if (stepTasks.length > 0) {
+      state = "attention";
+    } else if (step.done) {
+      state = "done";
+    } else if (index === firstOpenIndex) {
+      state = "current";
+    } else {
+      state = "upcoming";
+    }
+    return { href: step.href, label: step.label, state, icon: iconForHref(step.href), note: step.note };
+  });
 
   return (
     <div className="screen home-screen">
       <HomeOrientation />
-      <Card title="資源・生態系もまとめて管理">
+      <Card
+        title={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Icon icon={SCREEN_ICON.portfolio} size={16} />
+            資源・生態系もまとめて管理
+          </span>
+        }
+      >
         <p>調達量・再生材割合・生息地の状態などを目標と比較し、拠点を横断して担当・対応期限を確認できます。</p>
-        <Link href="/portfolio" className="pill-btn pill-btn--accent">環境・資源の統合管理へ →</Link>
+        <ActionRow>
+          <Link href="/portfolio" className="pill-btn pill-btn--accent">環境・資源の統合管理へ →</Link>
+        </ActionRow>
       </Card>
 
       <div className="workspace-heading">
@@ -117,6 +107,9 @@ export default async function Home() {
         </section>
       )}
       <Card title="全体の流れ" subtitle="各工程から詳細を開けます" padBody={false}>
+        <div className="home-stepper">
+          <Stepper steps={stepperSteps} label="業務工程ごとの進捗" />
+        </div>
         <ol className="home-workflow" aria-label="業務工程ごとの進捗と次の操作">
           {steps.map((step) => {
             const stepTasks = tasksBySection.get(step.href) ?? [];
@@ -128,9 +121,9 @@ export default async function Home() {
                     <b>{step.label}</b>
                     <small>{step.note}</small>
                   </span>
-                  <Tag variant={stepTasks.length > 0 ? "warn" : step.done ? "ok" : "neutral"}>
+                  <StatusBadge status={stepTasks.length > 0 ? "attention" : step.done ? "done" : "active"}>
                     {stepTasks.length > 0 ? "要対応" : step.done ? "完了" : "進行中"}
-                  </Tag>
+                  </StatusBadge>
                 </Link>
                 <div className="home-workflow__tasks">
                   {stepTasks.map((task) => (
@@ -159,18 +152,64 @@ export default async function Home() {
         padBody={false}
         foot="自然債務は交換価値のみを集計し、厚生価値は含めません。"
       >
-        <ol className="home-result-chain" aria-label="登録データから成果物までの関係">
-          {resultStages.map((stage, index) => (
-            <li key={stage.href}>
-              <Link href={stage.href}>
-                <span>{stage.label}</span>
-                <strong className="num">{stage.value}</strong>
-                <small>{stage.note}</small>
-              </Link>
-              {index < resultStages.length - 1 && <span className="home-result-chain__arrow" aria-hidden="true">→</span>}
-            </li>
-          ))}
-        </ol>
+        <div className="home-outcome-grid">
+          <StatGrid columns={3}>
+            <StatTile
+              label="登録データ"
+              value={`${outcomes.siteCount}拠点`}
+              note="評価の入力"
+              href="/sites"
+              icon={iconForHref("/sites")}
+            />
+            <StatTile
+              label="評価対象"
+              value={`${outcomes.valuation.prioritized}/${outcomes.valuation.total}課題`}
+              note={`詳細評価 ${outcomes.valuation.deepDive}件`}
+              href="/assessment"
+              icon={iconForHref("/assessment")}
+              visual={<RatioBar value={outcomes.valuation.prioritized} total={outcomes.valuation.total} label="評価対象の優先度算定" unit="課題" showText={false} />}
+            />
+            <StatTile
+              label="価値の算定"
+              value={`${outcomes.valuation.valued}課題`}
+              note={
+                outcomes.valuation.representativeRequired > 0
+                  ? `代表値 ${outcomes.valuation.selected}/${outcomes.valuation.representativeRequired}件`
+                  : "代表値選択なし"
+              }
+              href="/valuation"
+              icon={iconForHref("/valuation")}
+              visual={
+                outcomes.valuation.representativeRequired > 0 ? (
+                  <RatioBar value={outcomes.valuation.selected} total={outcomes.valuation.representativeRequired} label="代表値の選択" unit="件" showText={false} />
+                ) : undefined
+              }
+            />
+            <StatTile
+              label="財務への影響"
+              value={<Num key="nature-debt" value={money.totalNatureDebt} unit="円" scale={moneyScale} />}
+              note="自然債務 合計"
+              href="/financial-bridge"
+              icon={iconForHref("/financial-bridge")}
+            />
+            <StatTile
+              label="対策と判定"
+              value={`${confirmedVerdicts}/${outcomes.verdicts.total}拠点`}
+              note={`承認ライン超過 ${outcomes.verdicts.crosses}件`}
+              href="/decision"
+              icon={iconForHref("/decision")}
+              visual={<RatioBar value={confirmedVerdicts} total={outcomes.verdicts.total} label="判定確定" unit="拠点" showText={false} />}
+            />
+            <StatTile
+              label="開示への反映"
+              value={`${disclosure.handled}/${disclosure.total}件`}
+              note="根拠確認済み"
+              href="/disclosure"
+              icon={iconForHref("/disclosure")}
+              visual={<RatioBar value={disclosure.handled} total={disclosure.total} label="根拠確認" unit="件" showText={false} />}
+            />
+          </StatGrid>
+        </div>
 
         <div className="home-result-panels">
           {moneyRows.length > 0 && (
@@ -220,8 +259,8 @@ export default async function Home() {
                   <td className="num">
                     <Num value={row.natureDebt} unit="円" scale={pickYenScale(row.natureDebt)} />
                   </td>
-                  <td>
-                    <Tag variant={verdictTagVariant(row.verdict)}>{verdictLabel(row.verdict)}</Tag>
+                  <td style={{ minWidth: 110 }}>
+                    <StatusBadge variant={verdictTagVariant(row.verdict)}>{verdictLabel(row.verdict)}</StatusBadge>
                   </td>
                   <td>
                     <Link

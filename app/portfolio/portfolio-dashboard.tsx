@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { TARGET_CATEGORIES, TARGET_STATUS, type TargetCategory } from "@/lib/environment/metrics";
+import type { LucideIcon } from "lucide-react";
+import { DIRECTION_LABEL, TARGET_CATEGORIES, TARGET_STATUS, type TargetCategory } from "@/lib/environment/metrics";
 import { EMPTY_PORTFOLIO_FILTER, filterPortfolio, portfolioCsv, type PortfolioFilter, type PortfolioRow } from "@/lib/environment/portfolio";
-import { formatQuantity } from "../components/numeric";
+import { CATEGORY_ICON, Icon, SCREEN_ICON } from "../components/icons";
+import { formatExactNumber } from "../components/numeric";
+import type { TagVariant } from "../components/tag-utils";
 import { TextExport } from "../components/text-export";
+import { ActionRow, HeatCell, ProgressRing, StatusBadge, TargetBar, type Tone } from "../components/viz";
 
 type Site = { id: string; name: string };
 
@@ -26,20 +30,31 @@ export function PortfolioDashboard({ rows, sites }: { rows: PortfolioRow[]; site
   const active = rows.filter((row) => !row.archived);
   const years = [...new Set(rows.flatMap((row) => (row.year === null ? [] : [row.year])))].sort((a, b) => b - a);
 
-  const summary = [
-    { state: "", count: active.length, label: "管理対象" },
-    { state: "attention", count: active.filter((row) => row.attention).length, label: "確認・対応が必要" },
-    { state: "not_met", count: active.filter((row) => row.status === TARGET_STATUS.not_met).length, label: "物理目標が未達" },
-    { state: "overdue", count: active.filter((row) => row.overdue).length, label: "対応期限を超過" },
+  const summary: { state: string; count: number; label: string; tone: Tone }[] = [
+    { state: "", count: active.length, label: "管理対象", tone: "neutral" },
+    { state: "attention", count: active.filter((row) => row.attention).length, label: "確認・対応が必要", tone: "warn" },
+    { state: "not_met", count: active.filter((row) => row.status === TARGET_STATUS.not_met).length, label: "物理目標が未達", tone: "warn" },
+    { state: "overdue", count: active.filter((row) => row.overdue).length, label: "対応期限を超過", tone: "warn" },
   ];
 
   return (
     <>
-      <div className="portfolio-summary">
+      <div className="portfolio-summary pf-summary">
         {summary.map((item) => (
-          <button key={item.label} type="button" onClick={() => setFilter({ ...EMPTY_PORTFOLIO_FILTER, state: item.state })}>
-            <strong>{item.count}</strong>
-            <span>{item.label}</span>
+          <button
+            key={item.label}
+            type="button"
+            className={`stat-tile stat-tile--${item.tone} pf-summary__tile`}
+            onClick={() => setFilter({ ...EMPTY_PORTFOLIO_FILTER, state: item.state })}
+          >
+            <span className="stat-tile__label">{item.label}</span>
+            <span className="stat-tile__value num">
+              {item.count}
+              <small>件</small>
+            </span>
+            <span className="stat-tile__visual">
+              <ProgressRing value={item.count} total={active.length} size={32} label={item.label} tone={item.tone} />
+            </span>
           </button>
         ))}
       </div>
@@ -95,9 +110,11 @@ export function PortfolioDashboard({ rows, sites }: { rows: PortfolioRow[]; site
           {filtered.length === 0 ? (
             <div className="portfolio-empty">
               <p>この条件に一致する管理対象はありません。</p>
-              <Link href={`/portfolio/new${filter.category ? `?category=${filter.category}` : ""}`} className="pill-btn pill-btn--accent">
-                管理する指標を追加する
-              </Link>
+              <ActionRow>
+                <Link href={`/portfolio/new${filter.category ? `?category=${filter.category}` : ""}`} className="pill-btn pill-btn--accent">
+                  管理する指標を追加する
+                </Link>
+              </ActionRow>
             </div>
           ) : (
             <TargetTable rows={filtered} />
@@ -108,9 +125,15 @@ export function PortfolioDashboard({ rows, sites }: { rows: PortfolioRow[]; site
   );
 }
 
+function categoryIcon(category: TargetCategory): LucideIcon {
+  return (CATEGORY_ICON as Partial<Record<TargetCategory, LucideIcon>>)[category] ?? SCREEN_ICON.portfolio;
+}
+
 /** 拠点×種類の件数。「未登録」はゼロ影響と区別して表示する。 */
 function CoverageMatrix({ sites, rows, onSelect }: { sites: Site[]; rows: PortfolioRow[]; onSelect: (siteId: string, category: string) => void }) {
   const categories = Object.entries(TARGET_CATEGORIES) as [TargetCategory, string][];
+  const counts = sites.flatMap((site) => categories.map(([category]) => rows.filter((row) => row.siteId === site.id && row.category === category).length));
+  const maxCount = Math.max(1, ...counts);
   return (
     <section className="card">
       <div className="card__body">
@@ -120,14 +143,18 @@ function CoverageMatrix({ sites, rows, onSelect }: { sites: Site[]; rows: Portfo
           <table className="data-table portfolio-matrix">
             <thead>
               <tr>
-                <th>拠点</th>
-                {categories.map(([key, label]) => <th key={key}>{label}</th>)}
+                <th className="pf-row-head">拠点</th>
+                {categories.map(([key, label]) => (
+                  <th key={key}>
+                    <Icon icon={categoryIcon(key)} size={14} /> {label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {sites.map((site) => (
                 <tr key={site.id}>
-                  <th>{site.name}</th>
+                  <th className="pf-row-head" title={site.name}>{site.name}</th>
                   {categories.map(([category, label]) => {
                     const cell = rows.filter((row) => row.siteId === site.id && row.category === category);
                     const attention = cell.filter((row) => row.attention).length;
@@ -135,12 +162,17 @@ function CoverageMatrix({ sites, rows, onSelect }: { sites: Site[]; rows: Portfo
                       <td key={category}>
                         <button
                           type="button"
-                          className={`portfolio-cell${attention ? " portfolio-cell--attention" : ""}`}
+                          className="pf-heat-btn"
                           onClick={() => onSelect(site.id, category)}
-                          aria-label={`${site.name}・${label}: ${cell.length}件、要確認${attention}件`}
+                          aria-label={`${site.name}・${label}: ${cell.length ? `${cell.length}件、要確認${attention}件` : "未登録"}`}
                         >
-                          {cell.length ? `${cell.length}件` : "未登録"}
-                          {attention > 0 && <small>要確認 {attention}</small>}
+                          <HeatCell
+                            value={cell.length}
+                            max={maxCount}
+                            empty={cell.length === 0}
+                            note={attention > 0 ? `要確認 ${attention}` : undefined}
+                            label={`${site.name}・${label}`}
+                          />
                         </button>
                       </td>
                     );
@@ -155,17 +187,38 @@ function CoverageMatrix({ sites, rows, onSelect }: { sites: Site[]; rows: Portfo
   );
 }
 
+/** 行の状態語 → バッジの色。保管中=neutral、達成=ok、未達=warn、未入力/未算定/代表値未選択=pending、対象外=neutral。 */
+const ROW_STATUS_VARIANT: Record<string, TagVariant> = {
+  [TARGET_STATUS.met]: "ok",
+  [TARGET_STATUS.not_met]: "warn",
+  [TARGET_STATUS.missing_measurement]: "pending",
+  [TARGET_STATUS.missing_target]: "pending",
+  算定済み: "ok",
+  未算定: "pending",
+  代表値未選択: "pending",
+  対象外: "neutral",
+};
+
+function rowStatusVariant(row: PortfolioRow): TagVariant {
+  return row.archived ? "neutral" : ROW_STATUS_VARIANT[row.status] ?? "neutral";
+}
+
+/** DIRECTION_LABELの表記から TargetBar の向きを引き直す(新しい判定は作らない)。 */
+function targetBarDirection(row: PortfolioRow): "down" | "up" {
+  return row.direction === DIRECTION_LABEL.at_least ? "up" : "down";
+}
+
 function TargetTable({ rows }: { rows: PortfolioRow[] }) {
   return (
     <div className="portfolio-table-scroll">
-      <table className="data-table">
+      <table className="data-table portfolio-table-fixed">
         <thead>
           <tr>
             <th>拠点・対象</th>
-            <th>状態</th>
-            <th>実測 / 目標</th>
+            <th className="pf-col-status">状態</th>
+            <th className="pf-col-target">実測 / 目標</th>
             <th>担当・期限</th>
-            <th>次の操作</th>
+            <th className="pf-col-action">次の操作</th>
           </tr>
         </thead>
         <tbody>
@@ -179,16 +232,24 @@ function TargetTable({ rows }: { rows: PortfolioRow[] }) {
                   <span className="cell-note">{row.boundary}{row.year ? ` / ${row.year}年` : ""}</span>
                 </td>
                 <td>
-                  <span className={`portfolio-status${row.attention ? " portfolio-status--attention" : ""}`}>{row.archived ? "保管中" : row.status}</span>
+                  <StatusBadge variant={rowStatusVariant(row)}>{row.archived ? "保管中" : row.status}</StatusBadge>
                   {row.reviewNeeds.length > 0 && <span className="cell-note">要再確認: {row.reviewNeeds.join("・")}</span>}
-                  {row.overdue && <span className="cell-note">期限超過</span>}
+                  {row.overdue && (
+                    <span className="cell-note">
+                      <StatusBadge status="attention">期限超過</StatusBadge>
+                    </span>
+                  )}
                 </td>
                 <td>
                   {physical ? (
-                    <>
-                      {formatQuantity(row.current, row.unit)}
-                      <span className="cell-note">目標 {formatQuantity(row.target, row.unit)}{row.target !== null ? ` ${row.direction}` : ""}</span>
-                    </>
+                    <TargetBar
+                      current={row.current}
+                      target={row.target}
+                      direction={targetBarDirection(row)}
+                      unit={row.unit}
+                      label={`${row.siteName}・${row.label}`}
+                      format={formatExactNumber}
+                    />
                   ) : (
                     <span className="cell-note">金額・前提は評価画面で確認</span>
                   )}

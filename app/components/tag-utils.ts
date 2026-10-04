@@ -5,7 +5,11 @@
 
 import type { TransferFitnessTier } from "@core/types/valuation";
 
-export type TagVariant = "tierA" | "tierB" | "tierC" | "exchange" | "welfare" | "warn" | "ok" | "neutral";
+/**
+ * 2026-10 視覚化リデザインで "accent"(進行中)と "pending"(保留)を追加。
+ * 色の対応: ok=完了/またがない(緑) accent=進行中(青) warn=要対応/またぐ(赤茶) pending=保留(金)。
+ */
+export type TagVariant = "tierA" | "tierB" | "tierC" | "exchange" | "welfare" | "warn" | "ok" | "neutral" | "accent" | "pending";
 
 /**
  * 適合度ティアの表示。

@@ -34,7 +34,8 @@ export function verdictLabel(verdict: string): string {
 
 export function verdictTagVariant(verdict: string): TagVariant {
   if (verdict === "crosses") return "warn";
-  if (verdict === "pending") return "neutral";
+  // 2026-10: 保留は「承認ライン未入力のため判定していない」状態。中立色ではなく保留色(金)で示す。
+  if (verdict === "pending") return "pending";
   return "ok";
 }
 
