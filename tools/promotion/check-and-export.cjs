@@ -43,6 +43,13 @@ const ROOT = path.resolve(__dirname, '../..');
     if(broken.length) throw new Error('Missing image: '+broken.join(','));
     const resources=await p.evaluate(()=>Array.from(document.querySelectorAll('[href],[src]')).map(e=>e.getAttribute('href')||e.getAttribute('src')).filter(u=>u&&!u.startsWith('#')&&!/^(https?:|data:)/.test(u)));
     for(const resource of resources) if(!fs.existsSync(path.join(ROOT,'public/promotion',resource))) throw new Error('Missing resource '+resource);
+    await p.evaluate(()=>{window.__prismCta=[];window.addEventListener('prism:cta',e=>window.__prismCta.push(e.detail))});
+    for(const placement of ['hero-overview','bottom-overview']) {
+      const [overview]=await Promise.all([p.waitForEvent('download'),p.locator(`[data-cta="${placement}"]`).click()]);
+      if(overview.suggestedFilename()!=='prism-overview.pdf') throw new Error('Overview download failed');
+    }
+    const ctaEvents=await p.evaluate(()=>window.__prismCta);
+    if(ctaEvents.length!==2||ctaEvents.some(e=>e.action!=='overview_download_click')) throw new Error('CTA event mismatch');
     const [download]=await Promise.all([p.waitForEvent('download'),p.locator('#contact-link').click()]);
     if(download.suggestedFilename()!=='project-brief.txt') throw new Error('Download failed');
     // Only load media metadata, allowing use while the second film is still rendering.
@@ -64,7 +71,7 @@ const ROOT = path.resolve(__dirname, '../..');
     if(Math.abs(verticalMedia.duration-15)>.1||verticalMedia.width!==1080||verticalMedia.height!==1920) throw new Error('Vertical video metadata mismatch');
     await vertical.close();
     if(errors.length) throw new Error('JS errors '+errors.join(';'));
-    fs.writeFileSync(path.join(ROOT,'output/promotion/browser-check.json'),JSON.stringify({checked:new Date().toISOString(),checks,scenarios:3,faq:true,downloads:true,resources:resources.length,images:true,media,verticalMedia,playback:true,seeking:true,keyboard:true,errors},null,2));
+    fs.writeFileSync(path.join(ROOT,'output/promotion/browser-check.json'),JSON.stringify({checked:new Date().toISOString(),checks,scenarios:3,faq:true,downloads:true,overviewDownloads:2,ctaEvents,resources:resources.length,images:true,media,verticalMedia,playback:true,seeking:true,keyboard:true,errors},null,2));
     console.log('Responsive/scenario/download/media checks passed. PDF export: '+!process.env.PRISM_SKIP_PDF);
   } finally {await browser.close()}
 })().catch(e=>{console.error(e);process.exit(1)});

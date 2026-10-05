@@ -11,3 +11,6 @@
 
 /* Keep Japanese headings balanced when the viewport narrows. */
 h2,h3{text-wrap:balance}@media(max-width:800px){.intro h2 br,.approach h2 br,.feature-row h3 br{display:none}}
+/* Let visitors understand the offer before preparing a project. */
+.overview-cta{margin-top:28px}.hero-description{max-width:34em}.approach{padding-bottom:72px}.experience{padding-top:32px}.scenario-tabs{flex-wrap:wrap}.scenario-tabs button{flex:1;white-space:nowrap}
+@media(max-width:800px){.experience{padding-top:0}.approach{padding-bottom:64px}.overview-cta{width:100%}.scenario-tabs button{white-space:normal}.experience h2 br,.start h2 br,.statement h2 br{display:none}}

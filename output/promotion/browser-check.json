@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-04T14:10:30.095Z",
+  "checked": "2026-10-05T00:26:50.969Z",
   "checks": [
     {
       "width": 1440,
@@ -25,7 +25,18 @@
   "scenarios": 3,
   "faq": true,
   "downloads": true,
-  "resources": 10,
+  "overviewDownloads": 2,
+  "ctaEvents": [
+    {
+      "action": "overview_download_click",
+      "placement": "hero-overview"
+    },
+    {
+      "action": "overview_download_click",
+      "placement": "bottom-overview"
+    }
+  ],
+  "resources": 11,
   "images": true,
   "media": {
     "duration": 45,

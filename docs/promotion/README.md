@@ -32,6 +32,7 @@
 6. [公開・運用・再編集の手順](06-launch.md)
 7. [検証記録](07-quality-report.md)
 8. [LPデザインレビューと改善記録](08-ui-design-review.md)
+9. [LP訴求とCVR検証の設計](09-message-and-conversion-review.md)
 
 ## 開く方法
 
@@ -41,4 +42,4 @@ node tools/promotion/preview.cjs
 
 [ローカルLP](http://127.0.0.1:4173/index.html) を開く。本体のDBは不要です。
 
-実在の相談窓口が未設定のため、現在の下部CTAは案件整理シートの取得です。`public/promotion/config.js` にHTTPSの窓口を設定すると相談CTAへ切り替わります。公開・投稿・送信は実施していません。
+主CTAは概要PDFの取得です。実在の相談窓口が未設定のため、案件を検討する方向けには案件整理シートの取得を案内しています。`public/promotion/config.js` にHTTPSの窓口を設定すると相談CTAへ切り替わります。公開・投稿・送信は実施していません。
